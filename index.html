@@ -112,9 +112,9 @@
                             <input type="checkbox" id="showDeadweightLoss">
                             <label for="showDeadweightLoss" class="checkbox-label">Show Deadweight Loss</label>
                         </div>
-                        <div class="checkbox-container" style="grid-column: 1 / -1; background: #f0f4ff; border-color: #667eea;">
+                        <div class="checkbox-container" style="grid-column: 1 / -1;">
                             <input type="checkbox" id="showAll">
-                            <label for="showAll" class="checkbox-label" style="font-weight: 600; color: #667eea;">Show All Regions</label>
+                            <label for="showAll" class="checkbox-label">Show All Regions</label>
                         </div>
                     </div>
                 </div>
@@ -154,7 +154,7 @@
                             <span class="value" id="eqQuantityWithTariff">-</span>
                         </div>
                         <div class="metric">
-                            <span class="label">Price:</span>
+                            <span class="label" id="eqPriceWithTariffLabel">Price:</span>
                             <span class="value" id="eqPriceWithTariff">-</span>
                         </div>
                         <div class="metric" id="consumerSurplusWithTariffRow">
@@ -171,6 +171,10 @@
                 <div class="result-card">
                     <h3>📊 Tariff Analysis</h3>
                     <div class="result-content">
+                        <div class="metric">
+                            <span class="label">Tariff Amount:</span>
+                            <span class="value" id="tariffAmountDisplay">-</span>
+                        </div>
                         <div class="metric">
                             <span class="label">Price Change:</span>
                             <span class="value" id="priceChange">-</span>

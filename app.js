@@ -127,30 +127,31 @@ function calculate() {
         demandWithTariff = demandFormula;
         supplyWithTariff = `(${supplyFormula}) + ${tariff}`;
         
-        // Show supply display, hide demand display
+        // Always show supply display, hide demand display
         supplyDisplay.style.display = 'block';
         demandDisplay.style.display = 'none';
         
-        // Update supply display
+        // Update supply display content
         if (tariff > 0) {
             document.getElementById('supplyWithTariffDisplay').textContent = 'P = (' + supplyFormula + ') + ' + tariff;
         } else {
-            document.getElementById('supplyWithTariffDisplay').textContent = 'P = ' + supplyFormula;
+            document.getElementById('supplyWithTariffDisplay').textContent = '-';
         }
     } else {
         // Tariff on buyers: shift demand curve down
         demandWithTariff = `(${demandFormula}) - ${tariff}`;
         supplyWithTariff = supplyFormula;
         
-        // Show demand display, hide supply display
+        // Hide supply display, always show demand display
         supplyDisplay.style.display = 'none';
         demandDisplay.style.display = 'block';
         
-        // Update demand display
+        // Update demand display content
         if (tariff > 0) {
+            demandDisplay.style.display = 'block';
             document.getElementById('demandWithTariffDisplay').textContent = 'P = (' + demandFormula + ') - ' + tariff;
         } else {
-            document.getElementById('demandWithTariffDisplay').textContent = 'P = ' + demandFormula;
+            document.getElementById('demandWithTariffDisplay').textContent = '-';
         }
     }
     
@@ -217,8 +218,11 @@ function calculate() {
     document.getElementById('eqPriceNoTariff').textContent = '$' + formatNumber(eqNoTariff.P);
     
     // Show/hide consumer and producer surplus based on display options
-    const showCS = document.getElementById('showConsumerSurplus').checked || document.getElementById('showAll').checked;
-    const showPS = document.getElementById('showProducerSurplus').checked || document.getElementById('showAll').checked;
+    const showCSWithTariff = document.getElementById('showConsumerSurplusWithTariff').checked || (document.getElementById('showAll').checked && tariff > 0);
+    const showPSWithTariff = document.getElementById('showProducerSurplusWithTariff').checked || (document.getElementById('showAll').checked && tariff > 0);
+    
+    const showCS = document.getElementById('showConsumerSurplus').checked || document.getElementById('showAll').checked || showCSWithTariff;
+    const showPS = document.getElementById('showProducerSurplus').checked || document.getElementById('showAll').checked || showPSWithTariff;
     
     // Always show the rows, but display "-" if not highlighted
     if (showCS) {
@@ -237,21 +241,20 @@ function calculate() {
         document.getElementById('eqQuantityWithTariff').textContent = formatNumber(eqWithTariff.Q);
         
         // Display the price consumers actually pay
-        let priceForDisplay;
+        let priceDisplayText;
         if (tariffOnSuppliers) {
             // Tariff on suppliers: consumers pay the equilibrium price
-            priceForDisplay = eqWithTariff.P;
+            document.getElementById('eqPriceWithTariffLabel').textContent = 'Price:';
+            priceDisplayText = '$' + formatNumber(eqWithTariff.P);
         } else {
-            // Tariff on buyers: consumers pay equilibrium price + tariff
-            priceForDisplay = eqWithTariff.P + tariff;
+            // Tariff on buyers: show as equilibrium price + tariff
+            document.getElementById('eqPriceWithTariffLabel').textContent = 'Total Price:';
+            priceDisplayText = '$' + formatNumber(eqWithTariff.P) + '+' + formatNumber(tariff);
         }
         
-        document.getElementById('eqPriceWithTariff').textContent = '$' + formatNumber(priceForDisplay);
+        document.getElementById('eqPriceWithTariff').textContent = priceDisplayText;
         
-        // Show/hide surplus with tariff based on display options
-        const showCSWithTariff = document.getElementById('showConsumerSurplusWithTariff').checked || (document.getElementById('showAll').checked && tariff > 0);
-        const showPSWithTariff = document.getElementById('showProducerSurplusWithTariff').checked || (document.getElementById('showAll').checked && tariff > 0);
-        
+        // Update surplus values with tariff based on display options (already defined earlier)
         if (showCSWithTariff) {
             document.getElementById('consumerSurplusWithTariff').textContent = formatNumber(consumerSurplusWithTariff);
         } else {
@@ -264,6 +267,7 @@ function calculate() {
             document.getElementById('producerSurplusWithTariff').textContent = '-';
         }
         
+        document.getElementById('tariffAmountDisplay').textContent = '$' + formatNumber(tariff);
         document.getElementById('priceChange').textContent = '+$' + formatNumber(priceChange);
         document.getElementById('passThroughRate').textContent = formatNumber(passThroughRate) + '%';
         
@@ -298,10 +302,12 @@ function calculate() {
         }
     } else {
         document.getElementById('eqQuantityWithTariff').textContent = '-';
+        document.getElementById('eqPriceWithTariffLabel').textContent = 'Price:';
         document.getElementById('eqPriceWithTariff').textContent = '-';
         document.getElementById('consumerSurplusWithTariff').textContent = '-';
         document.getElementById('producerSurplusWithTariff').textContent = '-';
         
+        document.getElementById('tariffAmountDisplay').textContent = '-';
         document.getElementById('priceChange').textContent = '-';
         document.getElementById('passThroughRate').textContent = '-';
         document.getElementById('tariffRevenueValue').textContent = '-';
