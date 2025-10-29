@@ -143,6 +143,11 @@ input[type="number"]:focus {
     font-weight: 600;
 }
 
+input[readonly] {
+    background-color: #e8eef9;
+    cursor: default;
+}
+
 .radio-group {
     display: flex;
     flex-direction: column;
