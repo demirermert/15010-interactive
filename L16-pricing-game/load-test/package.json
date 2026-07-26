@@ -1,0 +1,18 @@
+{
+  "name": "pricing-game-load-test",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Load testing for pricing game",
+  "scripts": {
+    "test": "node load-test.js",
+    "test:small": "NUM_STUDENTS=10 node load-test.js",
+    "test:medium": "NUM_STUDENTS=50 node load-test.js",
+    "test:large": "NUM_STUDENTS=100 node load-test.js",
+    "test:xlarge": "NUM_STUDENTS=200 node load-test.js",
+    "test:production": "node production-test.js"
+  },
+  "dependencies": {
+    "socket.io-client": "^4.7.5"
+  }
+}
+
