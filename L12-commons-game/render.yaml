@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: commons-game-server
+    env: node
+    plan: free
+    buildCommand: cd server && npm install
+    startCommand: cd server && npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: ALLOWED_ORIGINS
+        value: "*"
+
