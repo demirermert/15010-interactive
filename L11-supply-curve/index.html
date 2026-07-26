@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global Oil Supply Curve - Interactive Analysis Tool</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+</head>
+<body>
+    <div class="container">
+
+        <div class="content">
+            <!-- Left Panel - Region Data -->
+            <div class="panel input-panel">
+                <h2>🌍 Global Oil Production</h2>
+
+                <div class="button-group-horizontal">
+                    <button id="calculateBtn" class="btn-primary">Update Supply</button>
+                    <button id="resetBtn" class="btn-secondary">Reset to Default</button>
+                </div>
+
+                <div class="table-wrapper">
+                    <table class="regions-table">
+                        <thead>
+                            <tr>
+                                <th>Region</th>
+                                <th>Capacity (mbpd)</th>
+                                <th>Cost ($/bbl)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="regionsContainer">
+                            <!-- Regions will be added dynamically here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Middle Panel - Graph -->
+            <div class="panel graph-panel">
+                <h2>📈 Oil Supply & Demand</h2>
+                <canvas id="supplyCurveChart"></canvas>
+            </div>
+
+            <!-- Right Panel - Demand Function -->
+            <div class="panel demand-panel">
+                <h2>📉 Demand Function</h2>
+                
+                <div class="section">
+                    <h3>Inverse Demand: P = a - b×Q</h3>
+                    <div class="demand-inputs">
+                        <div class="input-group">
+                            <label for="demandIntercept">Intercept (a):</label>
+                            <input type="number" id="demandIntercept" value="120" step="1" placeholder="120">
+                        </div>
+                        <div class="input-group">
+                            <label for="demandSlope">Slope (b):</label>
+                            <input type="number" id="demandSlope" value="0.6" step="0.1" placeholder="0.6">
+                        </div>
+                    </div>
+                    
+                    <div class="checkbox-container">
+                        <input type="checkbox" id="showDemand">
+                        <label for="showDemand" class="checkbox-label">Show Demand Curve</label>
+                    </div>
+                </div>
+
+                <div class="equilibrium-card">
+                    <h3>⚖️ Original Equilibrium</h3>
+                    <div class="equilibrium-content">
+                        <div class="metric">
+                            <span class="label">Price:</span>
+                            <span class="value" id="eqPriceOriginal">-</span>
+                        </div>
+                        <div class="metric">
+                            <span class="label">Quantity:</span>
+                            <span class="value" id="eqQuantityOriginal">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="equilibrium-card updated">
+                    <h3>⚖️ Updated Equilibrium</h3>
+                    <div class="equilibrium-content">
+                        <div class="metric">
+                            <span class="label">Price:</span>
+                            <span class="value" id="eqPrice">-</span>
+                        </div>
+                        <div class="metric">
+                            <span class="label">Quantity:</span>
+                            <span class="value" id="eqQuantity">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Explanation Section -->
+        <div class="explanation">
+            <h2>📚 How to Use This Tool</h2>
+            <ol>
+                <li><strong>Add Regions:</strong> Click "+ Add Region" to add oil-producing regions</li>
+                <li><strong>Enter Data:</strong> For each region, input:
+                    <ul>
+                        <li>Region name (e.g., "Saudi Arabia", "Texas")</li>
+                        <li>Production capacity in million barrels per day (MMbpd)</li>
+                        <li>Marginal cost in dollars per barrel ($/bbl)</li>
+                    </ul>
+                </li>
+                <li><strong>Update Curve:</strong> Click "Update Supply Curve" to visualize the supply curve</li>
+                <li><strong>Analyze:</strong> The graph will show:
+                    <ul>
+                        <li>Supply curve built from lowest to highest marginal cost</li>
+                        <li>Each region's contribution as a step in the curve</li>
+                        <li>Total supply capacity and cost distribution</li>
+                    </ul>
+                </li>
+                <li><strong>Edit Values:</strong> Change capacities or costs and click "Update Supply Curve" to see real-time changes</li>
+            </ol>
+            
+            <h3>Key Concepts</h3>
+            <ul>
+                <li><strong>Supply Curve:</strong> Shows the relationship between price and quantity supplied. Regions with lower marginal costs produce first.</li>
+                <li><strong>Marginal Cost:</strong> The cost to produce one additional barrel of oil. This determines the order in which regions produce.</li>
+                <li><strong>Capacity:</strong> The maximum amount a region can produce. This determines the width of each step in the supply curve.</li>
+                <li><strong>Step Function:</strong> The supply curve is a step function because each region has a specific capacity and cost, creating discrete jumps.</li>
+            </ul>
+            
+            <h3>Example Scenario</h3>
+            <p>The default data includes major oil-producing regions with representative capacities and costs. You can modify these values to:</p>
+            <ul>
+                <li>Simulate changes in production costs due to technology or regulations</li>
+                <li>Analyze the impact of capacity expansions or reductions</li>
+                <li>Understand which regions would produce at different price levels</li>
+                <li>Study the competitiveness of different oil-producing regions</li>
+            </ul>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
+
