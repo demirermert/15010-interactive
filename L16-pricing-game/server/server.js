@@ -3,7 +3,6 @@ import express from 'express';
 import cors from 'cors';
 import { Server as SocketIOServer } from 'socket.io';
 import { createGameManager } from './gameLogic.js';
-import { createUltimatumGameManager } from './ultimatumGame.js';
 import * as db from './database.js';
 import { initializeOpenAI } from './aiPlayer.js';
 
@@ -34,7 +33,6 @@ app.options('*', cors(corsConfig));
 app.use(express.json());
 
 const manager = createGameManager(io);
-const ultimatumManager = createUltimatumGameManager(io);
 
 app.get('/', (_req, res) => {
   res.send('Price competition API is running. Use /health for status checks.');
@@ -46,24 +44,9 @@ app.get('/health', (_req, res) => {
 
 app.post('/session', async (req, res) => {
   try {
-    const { instructorName, sessionName, config, gameType } = req.body || {};
-    
-    if (gameType === 'ultimatum') {
-      const session = ultimatumManager.createSession(instructorName, sessionName, config);
-      // Save to database
-      db.saveSession({
-        code: session.code,
-        sessionName: session.sessionName,
-        instructorName: session.instructorName,
-        config: session.config,
-        status: session.status,
-        gameType: 'ultimatum'
-      });
-      res.status(201).json(session);
-    } else {
-      const session = await manager.createSession(instructorName, sessionName, config);
-      res.status(201).json(session);
-    }
+    const { instructorName, sessionName, config } = req.body || {};
+    const session = await manager.createSession(instructorName, sessionName, config);
+    res.status(201).json(session);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -101,7 +84,7 @@ app.get('/session/:code/export', (req, res) => {
     if (!sessionData) {
       return res.status(404).json({ error: 'Session not found' });
     }
-    
+
     // Generate CSV
     let csv = 'Round,Player Name,Price,Opponent Name,Opponent Price,Demand,Profit,Market Share\n';
     sessionData.rounds.forEach(round => {
@@ -109,7 +92,7 @@ app.get('/session/:code/export', (req, res) => {
         csv += `${round.round},"${result.playerName}",${result.price},"${result.opponentName}",${result.opponentPrice},${result.demand.toFixed(2)},${result.profit.toFixed(2)},${(result.marketShare * 100).toFixed(2)}%\n`;
       });
     });
-    
+
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="session-${code}.csv"`);
     res.send(csv);
@@ -131,25 +114,15 @@ app.delete('/session/:code', (req, res) => {
 
 io.on('connection', socket => {
   socket.on('joinSession', payload => {
-    // Try ultimatum first, then pricing game
-    const handled = ultimatumManager.handleJoin(socket, payload);
-    if (!handled) {
-      manager.handleJoin(socket, payload);
-    }
+    manager.handleJoin(socket, payload);
   });
 
   socket.on('openLobby', ({ sessionCode }) => {
-    const handled = ultimatumManager.handleOpenLobby(socket, sessionCode);
-    if (!handled) {
-      manager.handleOpenLobby(socket, sessionCode);
-    }
+    manager.handleOpenLobby(socket, sessionCode);
   });
 
   socket.on('startSession', ({ sessionCode }) => {
-    const handled = ultimatumManager.handleStartSession(socket, sessionCode);
-    if (!handled) {
-      manager.handleStartSession(socket, sessionCode);
-    }
+    manager.handleStartSession(socket, sessionCode);
   });
 
   socket.on('submitPrice', payload => {
@@ -161,19 +134,7 @@ io.on('connection', socket => {
   });
 
   socket.on('endSession', ({ sessionCode }) => {
-    const handled = ultimatumManager.handleEndSession(socket, sessionCode);
-    if (!handled) {
-      manager.handleEndSession(socket, sessionCode);
-    }
-  });
-
-  // Ultimatum game specific events
-  socket.on('ultimatum:makeOffer', payload => {
-    ultimatumManager.handleMakeOffer(socket, payload);
-  });
-
-  socket.on('ultimatum:makeDecision', payload => {
-    ultimatumManager.handleMakeDecision(socket, payload);
+    manager.handleEndSession(socket, sessionCode);
   });
 
   socket.on('heartbeat', () => {

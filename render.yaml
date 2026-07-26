@@ -1,0 +1,52 @@
+# Render Blueprint for the 15.010 interactive-apps monorepo.
+# One web service per game backend. Each sets rootDir to its own server folder, and a
+# buildFilter so a push only rebuilds the service whose files changed.
+services:
+  - type: web
+    name: commons-game-server
+    env: node
+    plan: free
+    rootDir: L12-commons-game/server
+    buildCommand: npm install
+    startCommand: npm start
+    buildFilter:
+      paths:
+        - L12-commons-game/server/**
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: ALLOWED_ORIGINS
+        value: "*"
+
+  - type: web
+    name: pricing-game-server
+    env: node
+    plan: free
+    rootDir: L16-pricing-game/server
+    buildCommand: npm install
+    startCommand: npm start
+    buildFilter:
+      paths:
+        - L16-pricing-game/server/**
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: ALLOWED_ORIGINS
+        value: "*"
+      # Set OPENAI_API_KEY in the Render dashboard (secret) to enable the ChatGPT AI player.
+
+  - type: web
+    name: ultimatum-game-server
+    env: node
+    plan: free
+    rootDir: L19-ultimatum/server
+    buildCommand: npm install
+    startCommand: npm start
+    buildFilter:
+      paths:
+        - L19-ultimatum/server/**
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: ALLOWED_ORIGINS
+        value: "*"

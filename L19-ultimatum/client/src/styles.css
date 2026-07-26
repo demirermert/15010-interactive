@@ -1,0 +1,345 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background-color: #f5f5f5;
+  color: #1f1f1f;
+}
+
+h1, h2, h3 {
+  margin: 0;
+}
+
+button {
+  cursor: pointer;
+}
+
+.app-shell {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 3rem;
+}
+
+.card {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+}
+
+.input-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+input[type="text"],
+input[type="number"],
+select {
+  padding: 0.75rem;
+  border-radius: 8px;
+  border: 1px solid #d0d7de;
+  font-size: 1rem;
+}
+
+/* Remove spinner arrows from number inputs */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* Slider styling for Ultimatum Game */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 12px;
+  border-radius: 6px;
+  outline: none;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #3b82f6;
+  cursor: pointer;
+  border: 4px solid white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  transition: transform 0.15s ease;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #3b82f6;
+  cursor: pointer;
+  border: 4px solid white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  transition: transform 0.15s ease;
+}
+
+input[type="range"]::-moz-range-thumb:hover {
+  transform: scale(1.1);
+}
+
+input[type="range"]::-moz-range-track {
+  height: 12px;
+  border-radius: 6px;
+  background: #e5e7eb;
+}
+
+button.primary {
+  background-color: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 0.75rem 1.25rem;
+  font-size: 1rem;
+  transition: background-color 0.15s ease;
+}
+
+button.primary:disabled {
+  background-color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.status-tag {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  background-color: #e0f2fe;
+  color: #0369a1;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table thead {
+  background-color: #eff6ff;
+}
+
+.table th,
+.table td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.timer {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #dc2626;
+}
+
+.history-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.history-item {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  font-size: 0.95rem;
+}
+
+@media (max-width: 600px) {
+  .history-item {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Student Page Styling - Mobile Friendly */
+.student-join-card {
+  position: relative;
+}
+
+.logos-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 2rem;
+  padding: 0.5rem 0;
+}
+
+.logo-left,
+.logo-right {
+  width: 140px;
+  height: auto;
+  opacity: 0.9;
+}
+
+.student-header {
+  text-align: center;
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.student-header h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 0.5rem;
+}
+
+.student-header p {
+  font-size: 1rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+.student-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.name-inputs {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .app-shell {
+    padding: 1rem 0.75rem 2rem;
+  }
+
+  .card {
+    padding: 1rem;
+    border-radius: 8px;
+  }
+
+  .logos-container {
+    /* Keep logos in corners, just smaller */
+    margin-bottom: 1.5rem;
+  }
+
+  .logo-left,
+  .logo-right {
+    width: 80px;  /* Smaller on mobile */
+  }
+
+  .student-header {
+    margin-top: 0.5rem;  /* Less space after logos */
+  }
+
+  .student-header h1 {
+    font-size: 1.25rem;
+  }
+
+  .student-header p {
+    font-size: 0.9rem;
+  }
+
+  .name-inputs {
+    grid-template-columns: 1fr;
+  }
+
+  input[type="text"],
+  input[type="number"],
+  select {
+    font-size: 16px; /* Prevents zoom on iOS */
+  }
+
+  button.primary {
+    padding: 0.875rem 1rem;
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .student-header h1 {
+    font-size: 1.1rem;
+  }
+
+  .student-header p {
+    font-size: 0.85rem;
+  }
+
+  .logo-left,
+  .logo-right {
+    width: 60px;  /* Even smaller on very small screens */
+  }
+}
+
+/* Price Chart Styling */
+.chart-ylabel {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.chart-xlabel {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.chart-legend {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.chart-axis-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* Mobile: Larger fonts for chart */
+@media (max-width: 768px) {
+  .chart-ylabel {
+    font-size: 28px;
+    font-weight: 600;
+  }
+
+  .chart-xlabel {
+    font-size: 28px;
+    font-weight: 600;
+  }
+
+  .chart-legend {
+    font-size: 24px;
+    font-weight: 600;
+  }
+
+  .chart-axis-title {
+    font-size: 24px;
+    font-weight: 700;
+  }
+
+  .price-chart-container {
+    padding: 0.5rem !important;
+  }
+}
+
+/* Loading spinner animation */
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
