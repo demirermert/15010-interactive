@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tariff Analysis Lab - Supply & Demand Interactive Tool</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <h1>Tariff Analysis Lab</h1>
+                <p class="subtitle">Interactive Supply & Demand Analysis Tool</p>
+            </div>
+        </header>
+
+        <div class="content">
+            <!-- Left Panel - Inputs -->
+            <div class="panel input-panel">
+                <h2>📊 Market Parameters</h2>
+                
+                <div class="section-group">
+                    <h3 class="section-group-title">Before Tariff</h3>
+                    
+                    <div class="section">
+                        <h3>Demand Curve</h3>
+                        <label for="demandFormula">Inverse Demand (P = ...):</label>
+                        <input type="text" id="demandFormula" value="120 - 2*Q" placeholder="e.g., 120 - 2*Q" readonly>
+                    </div>
+
+                    <div class="section">
+                        <h3>Supply Curve</h3>
+                        <label for="supplyFormula">Inverse Supply (P = ...):</label>
+                        <input type="text" id="supplyFormula" value="2*Q" placeholder="e.g., 2*Q" readonly>
+                    </div>
+                </div>
+
+                <div class="section-group">
+                    <h3 class="section-group-title">Tariff Analysis</h3>
+                    
+                    <div class="section">
+                        <label for="tariff">Tariff Amount ($):</label>
+                        <input type="number" id="tariff" value="0" min="0" step="0.5" placeholder="e.g., 4">
+                    </div>
+                    
+                    <div class="section">
+                        <label>Tariff is charged to:</label>
+                        <div class="radio-group" style="flex-direction: row; gap: 20px;">
+                            <div class="radio-container">
+                                <input type="radio" id="tariffOnSuppliers" name="tariffOn" value="suppliers" checked>
+                                <label for="tariffOnSuppliers" class="radio-label">Suppliers</label>
+                            </div>
+                            <div class="radio-container">
+                                <input type="radio" id="tariffOnBuyers" name="tariffOn" value="buyers">
+                                <label for="tariffOnBuyers" class="radio-label">Buyers</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section">
+                        <h3>Supply Curve (After Tariff)</h3>
+                        <div class="formula-display" id="supplyWithTariffDisplay">
+                            P = 2*Q
+                        </div>
+                        <p class="hint">This shows the supply curve shifted up by the tariff amount</p>
+                    </div>
+
+                    <div class="section">
+                        <h3>Demand Curve (After Tariff)</h3>
+                        <div class="formula-display" id="demandWithTariffDisplay">
+                            P = 120 - 2*Q
+                        </div>
+                        <p class="hint">This shows the demand curve shifted down by the tariff amount</p>
+                    </div>
+                </div>
+
+                <button id="resetBtn" class="btn-secondary">Reset to Default</button>
+            </div>
+
+            <!-- Middle Panel - Graph -->
+            <div class="panel graph-panel">
+                <h2>📈 Supply & Demand Visualization</h2>
+                <canvas id="supplyDemandChart"></canvas>
+                
+                <!-- Surplus Controls Below Chart -->
+                <div class="surplus-controls">
+                    <h3>📊 Display Options</h3>
+                    <div class="surplus-checkboxes">
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="showConsumerSurplus">
+                            <label for="showConsumerSurplus" class="checkbox-label">Consumer Surplus (No Tariff)</label>
+                        </div>
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="showProducerSurplus">
+                            <label for="showProducerSurplus" class="checkbox-label">Producer Surplus (No Tariff)</label>
+                        </div>
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="showConsumerSurplusWithTariff">
+                            <label for="showConsumerSurplusWithTariff" class="checkbox-label">Consumer Surplus (With Tariff)</label>
+                        </div>
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="showProducerSurplusWithTariff">
+                            <label for="showProducerSurplusWithTariff" class="checkbox-label">Producer Surplus (With Tariff)</label>
+                        </div>
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="showTariffRevenue">
+                            <label for="showTariffRevenue" class="checkbox-label">Show Tariff Revenue</label>
+                        </div>
+                        <div class="checkbox-container">
+                            <input type="checkbox" id="showDeadweightLoss">
+                            <label for="showDeadweightLoss" class="checkbox-label">Show Deadweight Loss</label>
+                        </div>
+                        <div class="checkbox-container" style="grid-column: 1 / -1;">
+                            <input type="checkbox" id="showAll">
+                            <label for="showAll" class="checkbox-label">Show All Regions</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel - Results -->
+            <div class="panel results-panel">
+                <h2>📋 Results</h2>
+                
+                <div class="result-card">
+                    <h3>🎯 Equilibrium w/o Tariff</h3>
+                    <div class="result-content">
+                        <div class="metric">
+                            <span class="label">Quantity:</span>
+                            <span class="value" id="eqQuantityNoTariff">-</span>
+                        </div>
+                        <div class="metric">
+                            <span class="label">Price:</span>
+                            <span class="value" id="eqPriceNoTariff">-</span>
+                        </div>
+                        <div class="metric" id="consumerSurplusNoTariffRow">
+                            <span class="label">Consumer Surplus:</span>
+                            <span class="value" id="consumerSurplusNoTariff">-</span>
+                        </div>
+                        <div class="metric" id="producerSurplusNoTariffRow">
+                            <span class="label">Producer Surplus:</span>
+                            <span class="value" id="producerSurplusNoTariff">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="result-card">
+                    <h3>🎯 Equilibrium With Tariff</h3>
+                    <div class="result-content">
+                        <div class="metric">
+                            <span class="label">Quantity:</span>
+                            <span class="value" id="eqQuantityWithTariff">-</span>
+                        </div>
+                        <div class="metric">
+                            <span class="label" id="eqPriceWithTariffLabel">Price:</span>
+                            <span class="value" id="eqPriceWithTariff">-</span>
+                        </div>
+                        <div class="metric" id="consumerSurplusWithTariffRow">
+                            <span class="label">Consumer Surplus:</span>
+                            <span class="value" id="consumerSurplusWithTariff">-</span>
+                        </div>
+                        <div class="metric" id="producerSurplusWithTariffRow">
+                            <span class="label">Producer Surplus:</span>
+                            <span class="value" id="producerSurplusWithTariff">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="result-card">
+                    <h3>📊 Tariff Analysis</h3>
+                    <div class="result-content">
+                        <div class="metric">
+                            <span class="label">Tariff Amount:</span>
+                            <span class="value" id="tariffAmountDisplay">-</span>
+                        </div>
+                        <div class="metric">
+                            <span class="label">Price Change:</span>
+                            <span class="value" id="priceChange">-</span>
+                        </div>
+                        <div class="metric">
+                            <span class="label">Pass-Through Rate:</span>
+                            <span class="value" id="passThroughRate">-</span>
+                        </div>
+                        <div class="metric" id="tariffRevenueRow">
+                            <span class="label">Tariff Revenue:</span>
+                            <span class="value" id="tariffRevenueValue">-</span>
+                        </div>
+                        <div class="metric" id="deadweightLossRow">
+                            <span class="label">Deadweight Loss:</span>
+                            <span class="value" id="deadweightLoss">-</span>
+                        </div>
+                        <div class="metric" id="changeConsumerSurplusRow">
+                            <span class="label">Change in Consumer Surplus:</span>
+                            <span class="value" id="changeConsumerSurplus">-</span>
+                        </div>
+                        <div class="metric" id="changeProducerSurplusRow">
+                            <span class="label">Change in Producer Surplus:</span>
+                            <span class="value" id="changeProducerSurplus">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Explanation Section -->
+        <div class="explanation">
+            <h2>📚 How to Use This Tool</h2>
+            <ol>
+                <li><strong>Enter Demand Formula:</strong> Input the inverse demand equation where P is price and Q is quantity (e.g., "120 - 2*Q")</li>
+                <li><strong>Enter Supply Formula:</strong> Input the inverse supply equation (e.g., "2*Q")</li>
+                <li><strong>Set Tariff Amount:</strong> Enter the tariff in thousands of dollars (e.g., 4 for $4,000)</li>
+                <li><strong>Calculate:</strong> Click "Calculate & Visualize" to see the results</li>
+                <li><strong>Analyze:</strong> The graph will show:
+                    <ul>
+                        <li>Original demand curve (blue)</li>
+                        <li>Original supply curve (red)</li>
+                        <li>New supply curve with tariff (orange, shifted up)</li>
+                        <li>Equilibrium points before and after tariff</li>
+                    </ul>
+                </li>
+            </ol>
+            
+            <h3>Key Concepts</h3>
+            <ul>
+                <li><strong>Equilibrium:</strong> The point where supply and demand curves intersect</li>
+                <li><strong>Pass-Through Rate:</strong> The percentage of the tariff that gets passed on to consumers through higher prices</li>
+                <li><strong>Deadweight Loss:</strong> The loss in economic efficiency when the equilibrium is not achieved (the triangle between the old and new equilibrium)</li>
+            </ul>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
+
