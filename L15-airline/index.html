@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>15010 Airline Competition Lab - Vertical Product Differentiation</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <h1>✈️ 15010 Airline Competition Lab</h1>
+            </div>
+        </header>
+
+        <!-- Main Two-Column Layout -->
+        <div class="main-layout">
+            <!-- Left Column - Student Form -->
+            <div class="left-column">
+                <div class="form-section-sidebar">
+                    <h2>📝 Submit Answers</h2>
+                    <iframe src="https://docs.google.com/forms/d/1GnXQhy5D65I53y2QBseFWSFuWFSJr_6JpkXbbisxzzE/viewform?embedded=true" width="100%" height="2200" frameborder="0" marginheight="0" marginwidth="0">Loading…</iframe>
+                </div>
+            </div>
+
+            <!-- Right Column - Game -->
+            <div class="right-column">
+                <!-- BA Response Mode - Top Row -->
+                <div class="mode-section">
+                    <h2>How is British Airways responding?</h2>
+                    <div class="mode-buttons">
+                        <div class="mode-button" id="modeButton1">
+                            <input type="radio" id="baNoResponse" name="baResponse" value="noresponse" checked>
+                            <label for="baNoResponse">
+                                <strong>BA didn't study Game Theory (fixed price)</strong>
+                                <span class="mode-desc">BA keeps price fixed at $1,200</span>
+                            </label>
+                        </div>
+                        <div class="mode-button" id="modeButton2">
+                            <input type="radio" id="baResponds" name="baResponse" value="responds">
+                            <label for="baResponds">
+                                <strong>BA studied Game Theory (optimal response)</strong>
+                                <span class="mode-desc">BA adjusts price to maximize profit</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+        <div class="content">
+            <!-- Left Panel - Inputs -->
+            <div class="panel input-panel">
+                <h2>🎮 Game Settings</h2>
+                
+                <div class="section-group">
+                    <h3 class="section-group-title">Ryan Air (Your Decisions)</h3>
+                    
+                    <div class="section">
+                        <label for="raPrice">Price ($):</label>
+                        <input type="number" id="raPrice" value="400" min="10" max="3000" step="10" placeholder="e.g., 400">
+                        <input type="range" id="raPriceSlider" min="10" max="3000" step="10" value="400" class="slider">
+                    </div>
+
+                    <div class="section">
+                        <label for="raQuality">Quality (Inches of Legroom):</label>
+                        <input type="number" id="raQuality" value="4" min="0" max="6" step="0.1" placeholder="e.g., 4.0">
+                        <input type="range" id="raQualitySlider" min="0" max="6" step="0.1" value="4" class="slider">
+                    </div>
+                </div>
+
+                <div class="section-group">
+                    <h3 class="section-group-title">BA (Competitor)</h3>
+                    
+                    <div class="section">
+                        <label for="baPrice">Price ($):</label>
+                        <input type="number" id="baPrice" value="1200" min="0" step="10" readonly>
+                        <p class="hint">Fixed at $1,200</p>
+                    </div>
+
+                    <div class="section">
+                        <label for="baQuality">Quality (Inches of Legroom):</label>
+                        <input type="number" id="baQuality" value="6" min="0" max="10" step="0.1" readonly>
+                        <p class="hint">Fixed at 6 inches of legroom</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Middle Panel - Market Visualization -->
+            <div class="panel market-panel">
+                <div class="chart-header">
+                    <h2>📊 Tickets Sold</h2>
+                    <div class="chart-legend-inline">
+                        <div class="legend-item">
+                            <span class="legend-color ba-color"></span>
+                            <span class="legend-label">British Airways</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color ra-color"></span>
+                            <span class="legend-label">RyanAir</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color nf-color"></span>
+                            <span class="legend-label">Not Buy</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="stacked-chart-container">
+                    <div class="stacked-chart">
+                        <div class="stack-segment ba-segment" id="baStackSegment" style="height: 60%;">
+                            <span class="segment-value" id="baStackValue">0.60</span>
+                        </div>
+                        <div class="stack-segment ra-segment" id="raStackSegment" style="height: 30%;">
+                            <span class="segment-value" id="raStackValue">0.30</span>
+                        </div>
+                        <div class="stack-segment nf-segment" id="nfStackSegment" style="height: 10%;">
+                            <span class="segment-value" id="nfStackValue">0.10</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel - Results -->
+            <div class="panel results-panel">
+                <h2>📋 Results</h2>
+                
+                <div class="result-card ra-card">
+                    <h3>✈️ Ryan Air</h3>
+                    <div class="result-content">
+                        <div class="metric">
+                            <span class="label">Price:</span>
+                            <span class="value" id="raPriceDisplay">$400</span>
+                        </div>
+                        <div class="metric">
+                            <span class="label">Quality (legroom):</span>
+                            <span class="value" id="raQualityDisplay">4.0 in</span>
+                        </div>
+                        <div class="metric">
+                            <span class="label">Market Share:</span>
+                            <span class="value" id="raMarketShare">30%</span>
+                        </div>
+                        <div class="metric highlight">
+                            <span class="label">Profit:</span>
+                            <span class="value profit" id="raProfit">$12,000</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="result-card ba-card">
+                    <h3>🇬🇧 British Airways</h3>
+                    <div class="result-content">
+                        <div class="metric">
+                            <span class="label">Price:</span>
+                            <span class="value" id="baPriceDisplay">$1,200</span>
+                        </div>
+                        <div class="metric">
+                            <span class="label">Quality (legroom):</span>
+                            <span class="value" id="baQualityDisplay">6.0 in</span>
+                        </div>
+                        <div class="metric">
+                            <span class="label">Market Share:</span>
+                            <span class="value" id="baMarketShare">60%</span>
+                        </div>
+                        <div class="metric highlight">
+                            <span class="label">Profit:</span>
+                            <span class="value profit" id="baProfit">$72,000</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Explanation Section -->
+        <div class="explanation">
+            <h2>📚 Scenario</h2>
+            <p><strong>You are Ryan Air</strong>, and you compete with British Airways. Your goal is to optimize Ryan Air's quality (inches of legroom). After Ryan Air sets a quality, British Airways competes on price. British Airways cannot respond with quality changes (they just bought new planes), so it can only respond by changing its prices.</p>
+            
+            <h3>How to Use This Tool:</h3>
+            <ul>
+                <li><strong>Adjust Ryan Air's Price:</strong> Change the price to find optimal profit levels</li>
+                <li><strong>Adjust Ryan Air's Quality:</strong> Use the slider or input box to change legroom (quality)</li>
+                <li><strong>Toggle BA Response:</strong> Switch between scenarios where BA cannot respond vs. responds optimally</li>
+                <li><strong>Observe Results:</strong> Watch how market shares and profits change in real-time</li>
+            </ul>
+        </div>
+
+        <!-- Optimal Pricing Chart Section -->
+        <div class="visualization-section" style="max-width: 100%; padding: 30px 60px; background: #f8f9fa; border-top: 2px solid #e0e0e0;">
+            <div style="text-align: center; margin-bottom: 20px;">
+                <button id="toggleChartBtn" class="btn-chart-toggle">
+                    📈 Show Ryan Air's Optimal Strategy by Quality Level (When BA Responds)
+                </button>
+            </div>
+            <div id="chartContainer" style="display: none;">
+                <p style="text-align: center; color: #666; font-style: italic; margin-bottom: 20px;">
+                    This chart shows the resulting profit for Ryan Air at each quality level, assuming BA responds optimally.
+                </p>
+                <div style="max-width: 900px; margin: 0 auto;">
+                    <div style="background: white; padding: 20px; border-radius: 10px;">
+                        <canvas id="optimalProfitChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
+
