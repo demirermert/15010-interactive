@@ -32,7 +32,7 @@ const HIT_BAND   = 55;     // px above/below the step the cursor may be and stil
    either and is remembered. */
 const DEFAULT_SERVER = location.protocol.startsWith('http')
   ? location.origin
-  : 'https://l1-demand-server.onrender.com';
+  : 'https://l1-demand.onrender.com';
 
 const DEFAULTS = { classSize: 45, responses: [], mode: 'students',
                    server: DEFAULT_SERVER, room: '15010' };

@@ -42,6 +42,18 @@ cd server && npm install && PORT=8090 npm start
 Then set the dashboard's server field to `http://127.0.0.1:8090` and open
 `http://127.0.0.1:8090/r/15010` on a phone on the same network.
 
+### Deployed
+
+**Live at `https://l1-demand.onrender.com`** — one service, both links:
+
+| | |
+|---|---|
+| Instructor dashboard | `https://l1-demand.onrender.com/dashboard/` |
+| Student form | `https://l1-demand.onrender.com/r/15010` |
+
+The room code is whatever follows `/r/`, so `/r/BE12` gives a separate room per section.
+On the Starter plan, so it does not spin down.
+
 ### Deploying
 
 `l1-demand-server` is the first service in the repo-root `render.yaml`, same pattern as the three
