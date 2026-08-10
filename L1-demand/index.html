@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Live demand curve — 15.010 Lecture 1</title>
+<link rel="stylesheet" href="styles.css?v=11">
+</head>
+<body>
+<div class="page">
+
+  <!-- ============================ header ============================ -->
+  <header class="masthead">
+    <div class="art" aria-hidden="true">
+      <!-- inline so the page works with no network -->
+      <svg viewBox="0 0 200 120" width="150" height="90">
+        <ellipse cx="100" cy="96" rx="76" ry="10" fill="#00000010"/>
+        <path d="M24 60c0-24 34-38 76-38s76 14 76 38z" fill="#e8b76a"/>
+        <circle cx="70" cy="38" r="2" fill="#fff2d8"/><circle cx="96" cy="31" r="2" fill="#fff2d8"/>
+        <circle cx="124" cy="37" r="2" fill="#fff2d8"/><circle cx="146" cy="47" r="2" fill="#fff2d8"/>
+        <circle cx="52" cy="48" r="2" fill="#fff2d8"/>
+        <path d="M22 60h156l-6 9H28z" fill="#8fbf5a"/>
+        <path d="M26 68h148l-7 8H33z" fill="#d9534f"/>
+        <path d="M30 75h140l-6 7H36z" fill="#e8a0a0"/>
+        <path d="M26 82c0 14 34 22 74 22s74-8 74-22z" fill="#e0aa5e"/>
+      </svg>
+    </div>
+    <div class="masthead-text">
+      <p class="eyebrow">Live demand curve · 15.010 Lecture 1</p>
+      <h1 id="titleLine">Demand curve of the class</h1>
+    </div>
+    <p class="lede" id="descLine">A hot Italian sub from the North End: mortadella, hot capicola, and Genoa salami, with sharp provolone, giardiniera, and shredded lettuce on a seeded roll. One sub, wrapped to take away.</p>
+  </header>
+
+  <!-- ======================= the two panels ======================= -->
+  <div class="panels">
+
+    <!-- -------- left: the figure -------- -->
+    <section class="panel chart-panel">
+      <div class="panel-head">
+        <p class="section-label">Demand curve</p>
+        <div class="modes" role="group" aria-label="What hovering shows">
+          <button class="mode-btn is-on" id="modeStudents" data-mode="students">Students</button>
+          <button class="mode-btn"       id="modePrice"    data-mode="price">Price</button>
+        </div>
+      </div>
+      <p class="section-note">Every student's maximum, highest first. Read across at any price to see
+         how many are still willing to buy. Each step is one student.</p>
+
+      <div class="canvas-wrap">
+        <canvas id="demandCanvas"></canvas>
+        <div class="tip" id="tip" hidden></div>
+        <div class="price-box" id="priceBox" hidden>
+          <span class="pb-label">Price</span>
+          <span class="pb-price" id="pbPrice">–</span>
+          <span class="pb-qty"   id="pbQty">–</span>
+          <span class="pb-share" id="pbShare"></span>
+          <span class="pb-pin"   id="pbPin"></span>
+        </div>
+        <p class="empty" id="emptyNote">No responses yet. Press <strong>Students arrive</strong>
+           to simulate a class.</p>
+      </div>
+      <p class="hover-hint" id="hoverHint">Hover anywhere along the curve to see who each student is.</p>
+    </section>
+
+    <!-- -------- right: the numbers -------- -->
+    <aside class="panel side-panel">
+
+      <p class="section-label">The class</p>
+      <div class="stat-list">
+        <div class="stat-row"><span class="stat-label">Responses</span><span class="stat-value" id="sResponses">0</span></div>
+        <div class="stat-row"><span class="stat-label">Highest</span><span class="stat-value" id="sMax">–</span></div>
+        <div class="stat-row"><span class="stat-label">Median</span><span class="stat-value" id="sMedian">–</span></div>
+        <div class="stat-row"><span class="stat-label">Mean</span><span class="stat-value" id="sMean">–</span></div>
+        <div class="stat-row"><span class="stat-label">Lowest</span><span class="stat-value" id="sMin">–</span></div>
+      </div>
+      <p class="stat-foot" id="statFoot"></p>
+
+      <hr class="rule">
+
+      <p class="section-label">Live submissions</p>
+      <div class="side-controls">
+        <input id="serverUrl" class="txt" placeholder="https://….onrender.com" spellcheck="false">
+        <div class="side-row">
+          <input id="roomCode" class="txt code" value="15010" maxlength="12" spellcheck="false">
+          <button id="liveBtn" class="btn">Go live</button>
+        </div>
+        <p class="live-status" id="liveStatus">Offline. The chart is showing simulated answers.</p>
+        <div class="join" id="joinBox" hidden>
+          <img class="qr" id="qrImg" alt="QR code to the student form">
+          <div class="join-text">
+            <span class="join-label">Students go to</span>
+            <code class="join-url" id="joinUrl"></code>
+          </div>
+        </div>
+      </div>
+
+      <hr class="rule">
+
+      <p class="section-label">Simulate a class</p>
+      <div class="side-controls">
+        <button id="arriveBtn" class="btn btn-primary wide">Students arrive</button>
+        <div class="side-row">
+          <button id="oneBtn" class="btn">Add one</button>
+          <button id="undoBtn" class="btn" disabled>Undo</button>
+        </div>
+        <div class="side-row">
+          <button id="clearBtn" class="btn">Clear all</button>
+          <input type="number" id="classSize" class="num" min="1" max="500" step="1" value="45"
+                 title="class size">
+          <span class="unit">students</span>
+        </div>
+      </div>
+      <p class="side-hint" id="sideHint">Stands in for the class until you go live.
+         They arrive every 0.3 seconds.</p>
+    </aside>
+  </div>
+
+  <!-- ============================ numbers ============================ -->
+  <details class="numbers">
+    <summary>Show the numbers</summary>
+    <div class="numbers-body">
+      <p class="numbers-line" id="numbersLine"></p>
+      <div class="chips" id="chipList"></div>
+    </div>
+  </details>
+
+  <!-- ============================ notes ============================ -->
+  <section class="notes">
+    <p class="section-label">What this is showing</p>
+
+    <details><summary>Where this curve comes from</summary>
+      <p>Nothing is assumed about it. Each student names the most they would pay; the answers are sorted
+         from highest to lowest and laid end to end. The first step is the person who wants it most,
+         the last step the person who wants it least. That staircase <em>is</em> the demand curve.</p></details>
+
+    <details><summary>Why it slopes down</summary>
+      <p>Not because anyone changed their mind at a higher price. It slopes down because people differ:
+         at a high price only the keenest buy, and every dollar you come down brings in whoever was
+         next in line. The slope is a fact about the spread of the class, not about any one student.</p></details>
+
+    <details><summary>Reading a quantity off it</summary>
+      <p>Pick a price and read across. Everyone whose step sits above the line buys; everyone below
+         walks away. That is where a demand schedule comes from — the same curve, read as a table.</p></details>
+
+    <details><summary>Why the textbook curve is smooth</summary>
+      <p>With 45 students you can see every step. With 45,000 buyers the steps would be invisible and
+         the staircase would look like a line. The smooth curve is a convenience of scale, not a claim
+         about how people behave.</p></details>
+
+    <details><summary>What this leaves out</summary>
+      <p>Everything except demand. No cost of making the sub, no seller deciding a price, no taxes, no
+         equilibrium. This page answers one question only: at each price, how many of this class would buy?</p></details>
+  </section>
+
+  <footer class="foot">15.010 · Economic Analysis for Business Decisions · Lecture 1</footer>
+</div>
+
+<script src="app.js?v=11"></script>
+</body>
+</html>

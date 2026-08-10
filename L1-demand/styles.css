@@ -1,0 +1,182 @@
+/* 15.010 L1 — Live demand curve (instructor dashboard)
+   Two panels: the figure on the left, the numbers and controls on the right.
+   Restrained editorial look: white ground, hairline rules, letterspaced labels,
+   monospace numerals, one blue for anything active. */
+
+:root{
+  --ink:#1a1a1a;
+  --ink-soft:#4a4a4a;
+  --muted:#8a8a8a;
+  --line:#e5e5e3;
+  --line-soft:#f0f0ee;
+  --blue:#2563eb;
+  --blue-dark:#1d4ed8;
+  --accent:#e05c3e;
+  --bg:#fdfdfc;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+}
+
+*{margin:0;padding:0;box-sizing:border-box}
+
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+.page{max-width:1180px;margin:0 auto;padding:44px 28px 72px}
+
+/* ------------------------------- masthead ------------------------------- */
+/* art beside the title, then the description on its own full-width row so it
+   stays on one line */
+.masthead{display:grid;grid-template-columns:auto 1fr;gap:8px 26px;align-items:center;
+  padding-bottom:22px;border-bottom:1px solid var(--line)}
+.art{grid-row:1}
+.masthead-text{grid-row:1}
+.eyebrow{font-size:11.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);
+  font-weight:600;margin-bottom:8px}
+h1{font-size:31px;line-height:1.15;font-weight:600;letter-spacing:-.02em}
+.lede{grid-column:1 / -1;font-size:14px;line-height:1.5;color:var(--ink-soft);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* -------------------------------- panels -------------------------------- */
+.panels{display:grid;grid-template-columns:1fr 320px;gap:24px;align-items:stretch;margin-top:28px}
+.panel{border:1px solid var(--line);border-radius:12px;background:#fff;padding:22px 24px}
+.section-label{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
+  font-weight:600;margin-bottom:9px}
+.section-note{font-size:13.5px;color:var(--ink-soft);margin-bottom:16px;line-height:1.55}
+
+/* left: the figure */
+.chart-panel{display:flex;flex-direction:column}
+.canvas-wrap{position:relative;flex:1;min-height:460px;display:flex}
+/* flex:1 gives the canvas a definite height without a percentage that can
+   resolve against the wrong box */
+#demandCanvas{flex:1;width:100%;min-height:0;display:block}
+.empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  text-align:center;color:var(--muted);font-size:14px;padding:0 30px}
+.empty.hidden{display:none}
+#demandCanvas.pointing{cursor:pointer}
+
+/* mode switch: what hovering does */
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:9px}
+.panel-head .section-label{margin-bottom:0}
+.modes{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#fff}
+.mode-btn{border:none;background:none;padding:6px 15px;font-size:12.5px;font-weight:600;
+  color:var(--muted);cursor:pointer;transition:background .12s,color .12s}
+.mode-btn + .mode-btn{border-left:1px solid var(--line)}
+.mode-btn:hover{background:#f6f6f4;color:var(--ink)}
+.mode-btn.is-on{background:var(--blue);color:#fff}
+.mode-btn.is-on:hover{background:var(--blue-dark)}
+
+/* price readout: fixed corner, so it stays readable from the back of the room */
+.price-box{position:absolute;top:8px;right:8px;z-index:4;pointer-events:none;
+  display:flex;flex-direction:column;gap:1px;min-width:132px;
+  background:#fff;border:1px solid var(--line);border-radius:9px;padding:10px 13px;
+  box-shadow:0 4px 14px rgba(0,0,0,.07)}
+.price-box[hidden]{display:none}
+.pb-label{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.pb-price{font:26px/1.15 var(--mono);font-weight:500;color:var(--accent);letter-spacing:-.02em}
+.pb-qty{font-size:14px;font-weight:600;color:var(--ink);margin-top:3px}
+.pb-share{font-size:12px;color:var(--muted)}
+.pb-pin{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--blue);
+  font-weight:700;margin-top:4px}
+.pb-pin:empty{display:none}
+
+/* hover card: one student */
+.tip{position:absolute;pointer-events:none;z-index:5;transform:translate(-50%,-100%);
+  background:#fff;border:1px solid var(--line);border-radius:8px;padding:7px 11px;
+  box-shadow:0 6px 18px rgba(0,0,0,.10);white-space:nowrap;line-height:1.35}
+.tip .tip-name{font-size:13px;font-weight:600;color:var(--ink)}
+.tip .tip-wtp{font:13px var(--mono);color:var(--blue)}
+.tip[hidden]{display:none}
+.hover-hint{font-size:12px;color:var(--muted);margin-top:10px}
+
+/* right: the numbers */
+.side-panel{display:flex;flex-direction:column}
+.stat-list{border-top:1px solid var(--line-soft)}
+.stat-row{display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+  padding:11px 0;border-bottom:1px solid var(--line-soft)}
+.stat-label{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.stat-value{font:22px/1.15 var(--mono);font-weight:500;letter-spacing:-.02em}
+.stat-foot{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.45;min-height:18px}
+.rule{border:none;border-top:1px solid var(--line);margin:22px 0 20px}
+
+.side-controls{display:flex;flex-direction:column;gap:9px}
+.side-row{display:flex;gap:9px;align-items:center}
+.side-row .btn{flex:1}
+.side-hint{font-size:12px;color:var(--muted);margin-top:12px;line-height:1.5}
+
+/* live submissions */
+.txt{border:1px solid var(--line);border-radius:7px;height:38px;padding:0 11px;
+  font-size:13px;background:#fff;color:var(--ink);outline:none;width:100%;min-width:0}
+.txt:focus{border-color:var(--blue)}
+.txt.code{font:15px var(--mono);text-transform:uppercase;letter-spacing:.06em;text-align:center;flex:0 0 96px}
+.side-row .btn{flex:1}
+.live-status{font-size:12px;color:var(--muted);line-height:1.45;margin-top:2px}
+.live-status.on{color:#0f9d58;font-weight:600}
+.live-status.err{color:#c0392b}
+.btn.live-on{background:#0f9d58;border-color:#0f9d58;color:#fff}
+.btn.live-on:hover{background:#0c7f47;border-color:#0c7f47}
+.join{display:flex;gap:11px;align-items:center;margin-top:4px;
+  border:1px solid var(--line);border-radius:9px;padding:10px}
+.join[hidden]{display:none}
+.qr{width:74px;height:74px;flex:none;display:block}
+.join-text{min-width:0}
+.join-label{display:block;font-size:10px;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--muted);font-weight:600;margin-bottom:3px}
+.join-url{font:12px var(--mono);color:var(--ink);word-break:break-all;line-height:1.35}
+
+/* -------------------------------- buttons ------------------------------- */
+.btn{height:38px;padding:0 15px;border:1px solid var(--line);background:#fff;border-radius:7px;
+  font-size:13.5px;font-weight:500;color:var(--ink);cursor:pointer;
+  transition:background .12s,border-color .12s;white-space:nowrap}
+.btn:hover:not(:disabled){background:#f6f6f4;border-color:#d8d8d4}
+.btn:disabled{color:#c4c4c4;cursor:default}
+.btn.wide{width:100%}
+.btn-primary{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn-primary:hover:not(:disabled){background:var(--blue-dark);border-color:var(--blue-dark)}
+/* while a class is filing in: click again to stop */
+.btn.running{background:var(--accent);border-color:var(--accent);color:#fff;
+  font-variant-numeric:tabular-nums}
+.btn.running:hover{background:#c94e33;border-color:#c94e33}
+
+.num{border:1px solid var(--line);border-radius:7px;height:38px;width:62px;text-align:center;
+  font:15px var(--mono);outline:none;background:#fff;color:var(--ink)}
+.num:focus{border-color:var(--blue)}
+.unit{font-size:12.5px;color:var(--muted);white-space:nowrap}
+
+/* ------------------------------- numbers -------------------------------- */
+.numbers{margin-top:26px;border-top:1px solid var(--line);padding-top:12px}
+.numbers>summary,.notes details>summary{cursor:pointer;font-size:14px;color:var(--ink-soft);
+  list-style:none;padding:7px 0;user-select:none}
+.numbers>summary::-webkit-details-marker,.notes summary::-webkit-details-marker{display:none}
+.numbers>summary::before,.notes summary::before{content:"+";color:var(--muted);margin-right:10px;font:14px var(--mono)}
+.numbers[open]>summary::before,.notes details[open]>summary::before{content:"–"}
+.numbers-body{padding:6px 0 14px}
+.numbers-line{font-size:13.5px;color:var(--ink-soft);margin-bottom:12px}
+.numbers-line code{font:13px var(--mono);color:var(--ink)}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chip{font:12.5px var(--mono);border:1px solid var(--line);border-radius:999px;padding:2px 9px;color:var(--ink-soft)}
+.chip.sim{background:#f7f7f5;color:var(--muted)}
+.chip.new{background:var(--blue);border-color:var(--blue);color:#fff}
+
+/* -------------------------------- notes --------------------------------- */
+.notes{margin-top:34px;border-top:1px solid var(--line);padding-top:22px}
+.notes details{border-bottom:1px solid var(--line-soft)}
+.notes details p{font-size:14px;color:var(--ink-soft);padding:2px 0 14px 24px;max-width:82ch;line-height:1.62}
+
+.foot{margin-top:44px;padding-top:16px;border-top:1px solid var(--line);
+  font-size:12.5px;color:var(--muted);text-align:center}
+
+/* ------------------------------ responsive ------------------------------ */
+@media (max-width:980px){
+  .panels{grid-template-columns:1fr}
+  .canvas-wrap{min-height:360px}
+  .masthead{grid-template-columns:auto 1fr;gap:8px 18px}
+  h1{font-size:24px}
+  /* no room for one line down here — let it wrap rather than truncate */
+  .lede{white-space:normal;text-overflow:clip}
+}
+@media (max-width:560px){
+  .page{padding:26px 16px 48px}
+}

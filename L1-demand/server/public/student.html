@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#fdfdfc">
+<title>15.010 — what would you pay?</title>
+<style>
+:root{
+  --ink:#1a1a1a; --ink-soft:#4a4a4a; --muted:#8a8a8a;
+  --line:#e5e5e3; --blue:#2563eb; --blue-dark:#1d4ed8; --green:#0f9d58;
+  --bg:#fdfdfc;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{background:var(--bg);color:var(--ink);
+  font:17px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;
+  min-height:100dvh;display:flex;align-items:flex-start;justify-content:center;padding:26px 18px 40px}
+.card{width:100%;max-width:430px}
+.eyebrow{font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);
+  font-weight:600;margin-bottom:10px}
+h1{font-size:25px;line-height:1.22;font-weight:600;letter-spacing:-.01em;margin-bottom:10px}
+.lede{font-size:14.5px;color:var(--ink-soft);margin-bottom:22px}
+
+label{display:block;font-size:11px;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--muted);font-weight:600;margin-bottom:6px}
+.row{display:flex;gap:10px;margin-bottom:16px}
+.f-first{flex:1}
+.f-init{width:96px}
+input{width:100%;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);
+  padding:13px 14px;font-size:17px;outline:none}      /* 17px: iOS zooms below 16 */
+input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+
+.money{display:flex;align-items:center;border:1px solid var(--line);border-radius:10px;
+  background:#fff;padding:0 14px}
+.money:focus-within{border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+.money span{font:26px var(--mono);color:var(--muted);margin-right:6px}
+.money input{border:none;box-shadow:none;padding:14px 0;font:30px var(--mono);text-align:right}
+
+button{width:100%;border:none;border-radius:10px;background:var(--blue);color:#fff;
+  font-size:17px;font-weight:600;padding:16px;cursor:pointer;margin-top:20px}
+button:active{background:var(--blue-dark)}
+button:disabled{background:#c9cdd3}
+.ghost{background:none;color:var(--blue);border:1px solid var(--line);margin-top:10px;font-weight:500}
+.ghost:active{background:#f4f4f2}
+
+.msg{margin-top:16px;font-size:14.5px;min-height:22px}
+.msg.err{color:#c0392b}
+.hint{font-size:13px;color:var(--muted);margin-top:14px;line-height:1.5}
+.room{font:12px var(--mono);color:var(--muted);margin-top:26px;text-align:center}
+
+/* after submitting */
+.done{display:none;text-align:center;padding:14px 0}
+.done .tick{width:56px;height:56px;border-radius:50%;background:var(--green);color:#fff;
+  display:flex;align-items:center;justify-content:center;font-size:30px;margin:0 auto 16px}
+.done .who{font-size:19px;font-weight:600;margin-bottom:4px}
+.done .amt{font:34px var(--mono);color:var(--blue);margin-bottom:10px}
+.done .sub{font-size:14px;color:var(--muted)}
+body.sent .form{display:none}
+body.sent .done{display:block}
+</style>
+</head>
+<body>
+<div class="card">
+
+  <div class="form">
+    <p class="eyebrow">15.010 · Lecture 1</p>
+    <h1>What is the most you would pay for this sub?</h1>
+    <p class="lede">A hot Italian sub from the North End. One sub, wrapped to take away.</p>
+
+    <form id="f" autocomplete="off" novalidate>
+      <div class="row">
+        <div class="f-first">
+          <label for="first">First name</label>
+          <input id="first" type="text" inputmode="text" autocapitalize="words"
+                 autocomplete="given-name" placeholder="Priya" maxlength="24" required>
+        </div>
+        <div class="f-init">
+          <label for="initial">Last initial</label>
+          <input id="initial" type="text" inputmode="text" autocapitalize="characters"
+                 placeholder="S" maxlength="1">
+        </div>
+      </div>
+
+      <label for="wtp">The most you would pay</label>
+      <div class="money">
+        <span>$</span>
+        <input id="wtp" type="number" inputmode="decimal" step="0.25" min="0" max="30"
+               placeholder="0.00" required>
+      </div>
+
+      <button type="submit" id="send">Submit</button>
+      <p class="msg" id="msg"></p>
+      <p class="hint">Answer for yourself, not for the class: the highest price at which you
+         would still buy it rather than go without. Anything from $0.00 to $30.00. You can
+         change your answer until we close the poll.</p>
+    </form>
+  </div>
+
+  <div class="done">
+    <div class="tick">✓</div>
+    <p class="who" id="doneWho"></p>
+    <p class="amt" id="doneAmt"></p>
+    <p class="sub">Your answer is on the board.</p>
+    <button class="ghost" id="again">Change my answer</button>
+  </div>
+
+  <p class="room" id="roomTag"></p>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+/* One answer per device. The token is what the server keys on, so answering a
+   second time replaces the first rather than adding another point to the curve. */
+const TOKEN_KEY = 'l1-demand-token', ME_KEY = 'l1-demand-me';
+let token = localStorage.getItem(TOKEN_KEY);
+if (!token) {
+  token = (crypto.randomUUID ? crypto.randomUUID()
+                             : String(Date.now()) + Math.random().toString(36).slice(2));
+  localStorage.setItem(TOKEN_KEY, token);
+}
+
+const room = (location.pathname.split('/r/')[1] || '15010')
+  .toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 12) || '15010';
+document.getElementById('roomTag').textContent = 'room ' + room;
+
+const $ = id => document.getElementById(id);
+const socket = io({ transports: ['websocket', 'polling'] });
+socket.on('connect', () => socket.emit('join', { room, role: 'student' }));
+
+// remember who they said they were, so changing an answer is one tap
+try {
+  const me = JSON.parse(localStorage.getItem(ME_KEY) || '{}');
+  if (me.first) $('first').value = me.first;
+  if (me.initial) $('initial').value = me.initial;
+} catch (e) { /* ignore */ }
+
+$('f').addEventListener('submit', e => {
+  e.preventDefault();
+  const first = $('first').value.trim();
+  const initial = $('initial').value.trim();
+  const wtp = Number($('wtp').value);
+
+  if (!first) return fail('Please put your first name in.');
+  if (!Number.isFinite(wtp) || $('wtp').value === '') return fail('Please enter an amount.');
+  if (wtp < 0 || wtp > 30) return fail('Anything from $0.00 to $30.00.');
+
+  $('send').disabled = true;
+  $('msg').textContent = 'Sending…';
+  $('msg').className = 'msg';
+
+  socket.emit('submit', { room, token, first, initial, wtp }, res => {
+    $('send').disabled = false;
+    if (!res || !res.ok) return fail(res && res.error ? res.error : 'Could not send — try again.');
+    localStorage.setItem(ME_KEY, JSON.stringify({ first, initial }));
+    $('doneWho').textContent = res.name;
+    $('doneAmt').textContent = '$' + Number(res.wtp).toFixed(2);
+    document.body.classList.add('sent');
+    $('msg').textContent = '';
+  });
+});
+
+$('again').addEventListener('click', () => {
+  document.body.classList.remove('sent');
+  $('wtp').focus();
+});
+
+function fail(text) {
+  $('msg').textContent = text;
+  $('msg').className = 'msg err';
+  $('send').disabled = false;
+}
+
+socket.on('disconnect', () => {
+  if (!document.body.classList.contains('sent')) fail('Lost the connection — reconnecting…');
+});
+socket.on('connect', () => {
+  if ($('msg').classList.contains('err')) { $('msg').textContent = ''; $('msg').className = 'msg'; }
+});
+</script>
+</body>
+</html>

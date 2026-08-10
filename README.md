@@ -6,12 +6,27 @@ plain HTML/JS; the game apps are Vite (React) clients with Node/Express/Socket.i
 
 | Folder | Lecture | Concept | Type | Deploy |
 |--------|---------|---------|------|--------|
+| `L1-demand` | L1 | Live demand curve from student willingness to pay | Client + server | Render (one service serves both) |
+| `L2-demand` | L2 | Simulated market research / demand estimation (assignment brief) | Static | open `index.html` |
 | `L11-supply-curve` | L11 | Oil supply curve / equilibrium | Static | open `index.html` |
 | `L11-tariff` | L11 | Tariffs, pass-through, deadweight loss | Static | open `index.html` |
 | `L12-commons-game` | L12 | Tragedy of the commons (fishing) | Client + server | Vercel + Render |
 | `L15-airline` | L15 | Vertical differentiation (Ryan Air vs BA) | Static | open `index.html` |
 | `L16-pricing-game` | L16 | Bertrand price competition | Client + server | Vercel + Render |
 | `L19-ultimatum` | L19 | Ultimatum game (behavioral) | Client + server | Vercel + Render |
+
+## Running the L1 demand app
+
+One Render service serves both links:
+
+| | |
+|---|---|
+| Instructor dashboard | `<server>/dashboard/` |
+| Student form | `<server>/r/<room>` |
+
+Locally: `cd L1-demand/server && npm install && npm start`, then open `http://localhost:3000/`.
+The dashboard also opens straight off disk (`L1-demand/index.html`) and runs on simulated
+answers with no network — the fallback if the wifi fails.
 
 ## Running a static app
 

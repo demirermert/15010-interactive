@@ -3,6 +3,25 @@
 # buildFilter so a push only rebuilds the service whose files changed.
 services:
   - type: web
+    name: l1-demand-server
+    env: node
+    plan: free
+    rootDir: L1-demand/server
+    buildCommand: npm install
+    startCommand: npm start
+    buildFilter:
+      paths:
+        - L1-demand/server/**
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: ALLOWED_ORIGINS
+        value: "*"
+    # Free tier sleeps after 15 min idle and takes 30-60s to wake. Open the
+    # dashboard and press "Go live" a couple of minutes before class, or set
+    # plan: starter to remove the cold start entirely.
+
+  - type: web
     name: commons-game-server
     env: node
     plan: free
