@@ -9,7 +9,8 @@
  * a server restart empties the room — so the dashboard keeps its own copy and
  * offers it back via `restore` when it reconnects to an empty room.
  *
- * Deployed from the repo-root render.yaml as `l1-demand-server`.
+ * Deployed to Render as `l1-demand`, source bound to the GitHub connection
+ * so pushes to main deploy automatically.
  */
 
 import express from 'express';
