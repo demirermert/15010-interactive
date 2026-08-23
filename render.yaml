@@ -11,7 +11,10 @@ services:
     startCommand: npm start
     buildFilter:
       paths:
-        - L1-demand/server/**
+        # the whole folder, not just server/: this service also serves the
+        # instructor dashboard (index.html, app.js, styles.css) from one level
+        # up, so a dashboard-only edit has to trigger a rebuild too
+        - L1-demand/**
     envVars:
       - key: NODE_VERSION
         value: 20

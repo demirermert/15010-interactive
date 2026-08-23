@@ -57,8 +57,10 @@
           <span class="pb-share" id="pbShare"></span>
           <span class="pb-pin"   id="pbPin"></span>
         </div>
-        <p class="empty" id="emptyNote">No responses yet. Press <strong>Students arrive</strong>
-           to simulate a class.</p>
+        <!-- one span, so the sentence stays a single flex item: flex would otherwise
+             split it at <strong> and strip the spaces either side of the button name -->
+        <p class="empty" id="emptyNote"><span>No responses yet. Press <strong>Students arrive</strong>
+           to simulate a class.</span></p>
       </div>
       <p class="hover-hint" id="hoverHint">Hover anywhere along the curve to see who each student is.</p>
     </section>
