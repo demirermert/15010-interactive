@@ -608,7 +608,34 @@ function renderOptimal() {
   if (split) renderSegmentBlocks(cast, c);
   else       renderPooledBlocks(n, p, c, best);
 
-  drawProfit();
+  holdProfitHeight();
+  drawProfit();                                   // after the floor, so it measures the final box
+}
+
+/* The two panels share a grid row and are stretched to the same height, so a
+   shorter Profit view drags the chart on the left down with it — flipping
+   Segments to Pooled was resizing the demand curve by a hundred pixels.
+   Both arrangements are measured the first time the panel is built, and the
+   taller one becomes a floor, so the flip after that moves nothing. */
+let profitFloor = 0;
+
+function holdProfitHeight() {
+  const el = $('viewOptimal');
+  if (el.hidden) return;
+  el.style.minHeight = '';
+
+  if (!profitFloor) {
+    // Measure the arrangement we are NOT showing, so the very first flip is
+    // steady too. Worth two reflows once; not worth doing on every arrival.
+    const blocks = [$('segBlocks'), $('pooledBlocks'), $('yourPriceBlock')];
+    const was = blocks.map(b => b.hidden);
+    blocks.forEach((b, i) => { b.hidden = !was[i]; });
+    profitFloor = el.offsetHeight;
+    blocks.forEach((b, i) => { b.hidden = was[i]; });
+  }
+
+  profitFloor = Math.max(profitFloor, el.offsetHeight);
+  el.style.minHeight = profitFloor + 'px';
 }
 
 function renderPooledBlocks(n, p, c, best) {
@@ -971,6 +998,8 @@ function setSegCount(n) {
     : "Every student's maximum, highest first. Read across at any price to see how many are still willing to buy. Each step is one student.";
 
   if (changed) { hoverIdx = -1; $('tip').hidden = true; }
+  // Three segments need a row more than two, so the floor is remeasured.
+  if (changed) profitFloor = 0;
   save();
   if (changed) { renderJoin(); render(); }
 }

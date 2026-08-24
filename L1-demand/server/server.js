@@ -24,6 +24,19 @@ import { fileURLToPath } from 'url';
 
 const PORT      = process.env.PORT || 3000;
 const ORIGINS   = process.env.ALLOWED_ORIGINS || '*';
+
+/* A secret path segment in front of the dashboard, set as DASH_KEY in the
+   environment — the dashboard then lives at /<key>/dashboard/ instead of
+   /dashboard/. Students are handed /r/<room>, and the bare host is a short walk
+   from there to a panel with "Clear all" on it; this puts the panel behind
+   something they cannot guess.
+   It is an env var and not a constant because this repo is public: a secret
+   committed to it is not a secret. Unset — as when running locally — the
+   dashboard stays at /dashboard/ and nothing changes.
+   Obscurity, not authentication: anyone who sees the URL over your shoulder or
+   in a screen share has it for good. Rotate it by changing the variable. */
+const DASH_KEY = String(process.env.DASH_KEY || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64);
+const PREFIX   = DASH_KEY ? '/' + DASH_KEY : '';
 const MAX_WTP   = 30;          // must match MAX_WTP in the dashboard
 const MAX_NAME  = 24;
 const MAX_ROOMS = 50;          // a stray room code should not grow memory forever
@@ -107,10 +120,13 @@ const DASH = path.join(__dirname, '..');
 const sendDash = (file, type) => (_req, res) =>
   res.type(type).sendFile(path.join(DASH, file));
 
-app.get('/dashboard', (_req, res) => res.redirect('/dashboard/'));   // keep relative asset paths working
-app.get('/dashboard/', sendDash('index.html', 'html'));
-app.get('/dashboard/app.js', sendDash('app.js', 'application/javascript'));
-app.get('/dashboard/styles.css', sendDash('styles.css', 'text/css'));
+/* Mounted under PREFIX, so with DASH_KEY set the whole dashboard — page, script
+   and stylesheet — moves together. The page asks for styles.css and app.js
+   relatively, so they have to sit beside it wherever it is served from. */
+app.get(PREFIX + '/dashboard', (_req, res) => res.redirect(PREFIX + '/dashboard/')); // keep relative asset paths working
+app.get(PREFIX + '/dashboard/', sendDash('index.html', 'html'));
+app.get(PREFIX + '/dashboard/app.js', sendDash('app.js', 'application/javascript'));
+app.get(PREFIX + '/dashboard/styles.css', sendDash('styles.css', 'text/css'));
 
 /* The projector screen: big QR codes and the addresses under them, one card per
    segment. Its own URL rather than a popup the dashboard paints, so it can be
@@ -118,7 +134,11 @@ app.get('/dashboard/styles.css', sendDash('styles.css', 'text/css'));
    Rooms come from the query string — /join?room=15010&segs=2 */
 app.get('/join', sendDash('join.html', 'html'));
 
-app.get('/', (_req, res) => res.redirect('/dashboard/'));
+/* Without a key the bare host is a convenience shortcut to the dashboard. With
+   one, that shortcut would hand back the very thing the key is hiding, so it
+   goes to the join screen instead — which is public by design. */
+app.get('/', (_req, res) =>
+  res.redirect(DASH_KEY ? '/join' : '/dashboard/'));
 
 /* --------------------------------------------------------------- sockets */
 
