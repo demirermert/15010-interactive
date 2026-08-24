@@ -37,6 +37,16 @@ const ORIGINS   = process.env.ALLOWED_ORIGINS || '*';
    in a screen share has it for good. Rotate it by changing the variable. */
 const DASH_KEY = String(process.env.DASH_KEY || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64);
 const PREFIX   = DASH_KEY ? '/' + DASH_KEY : '';
+
+/* Bitly, for the link students type off the projector. Set BITLY_TOKEN to a
+   generic access token; BITLY_GROUP and BITLY_DOMAIN are optional and only
+   needed for a specific group or a branded short domain.
+   Shortening happens HERE and never in the browser: a token handed to the page
+   is a token handed to every student in the room. Unset, the full links are
+   used and nothing changes. */
+const BITLY_TOKEN  = String(process.env.BITLY_TOKEN  || '').trim();
+const BITLY_GROUP  = String(process.env.BITLY_GROUP  || '').trim();
+const BITLY_DOMAIN = String(process.env.BITLY_DOMAIN || '').trim();
 const MAX_WTP   = 30;          // must match MAX_WTP in the dashboard
 const MAX_NAME  = 24;
 const MAX_ROOMS = 50;          // a stray room code should not grow memory forever
@@ -89,6 +99,9 @@ const app = express();
 // Without this, '/dashboard' and '/dashboard/' are the same route and the
 // redirect below would point at itself.
 app.set('strict routing', true);
+// Render terminates TLS in front of us; without this req.protocol reads http
+// and every link built from it would be an https page handing out http URLs.
+app.set('trust proxy', true);
 app.use(cors({ origin: ORIGINS === '*' ? true : ORIGINS.split(',') }));
 app.use(express.json({ limit: '256kb' }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -99,6 +112,62 @@ app.get('/health', (_req, res) =>
 // the student form; the room code is read from the path by the page itself
 app.get('/r/:room', (_req, res) =>
   res.sendFile(path.join(__dirname, 'public', 'student.html')));
+
+/* Shortened once and remembered. Bitly returns the same short link for a URL
+   it has already seen, so this is about latency and quota rather than
+   correctness — /links is hit every time the join screen opens.
+   Failures are deliberately NOT cached: a Bitly outage five minutes before
+   class should not poison the link for the rest of the process's life. The
+   caller falls back to the full URL, which always works. */
+const shortCache = new Map();
+
+async function shorten(longUrl) {
+  if (!BITLY_TOKEN) return null;
+  if (shortCache.has(longUrl)) return shortCache.get(longUrl);
+
+  const body = { long_url: longUrl };
+  if (BITLY_GROUP)  body.group_guid = BITLY_GROUP;
+  if (BITLY_DOMAIN) body.domain     = BITLY_DOMAIN;
+
+  try {
+    const r = await fetch('https://api-ssl.bitly.com/v4/shorten', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + BITLY_TOKEN, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(6000)      // a slow shortener must not hang the projector
+    });
+    if (!r.ok) {
+      console.warn(`bitly ${r.status} for ${longUrl}: ${(await r.text().catch(() => '')).slice(0, 200)}`);
+      return null;
+    }
+    const link = (await r.json()).link;
+    if (typeof link !== 'string' || !link) return null;
+    const url = link.startsWith('http') ? link : 'https://' + link;   // v4 may omit the scheme
+    shortCache.set(longUrl, url);
+    return url;
+  } catch (e) {
+    console.warn('bitly failed:', e.message);
+    return null;
+  }
+}
+
+/* The student links for a room, shortened where possible. One place builds
+   them, so the dashboard and the projector screen can never disagree about
+   what a group was told to type. */
+app.get('/links', async (req, res) => {
+  const room = normRoom(req.query.room);
+  const segs = Math.min(3, Math.max(1, parseInt(req.query.segs, 10) || 1));
+  const base = `${req.protocol}://${req.get('host')}`;
+
+  const links = await Promise.all(
+    Array.from({ length: segs }, async (_, k) => {
+      const r   = segs === 1 ? room : `${room}-${'ABC'[k]}`;
+      const url = `${base}/r/${r}`;
+      return { seg: segs === 1 ? null : 'ABC'[k], room: r, url, short: await shorten(url) };
+    })
+  );
+  res.set('Cache-Control', 'no-store').json({ shortening: Boolean(BITLY_TOKEN), links });
+});
 
 // QR for the projector, rendered server-side so the dashboard needs no library
 app.get('/qr.svg', async (req, res) => {

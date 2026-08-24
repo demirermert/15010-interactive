@@ -84,35 +84,53 @@
   const cards = document.getElementById('cards');
   cards.className = segs === 1 ? 'one' : '';
 
-  for (let k = 0; k < segs; k++) {
-    // One segment keeps the bare room, matching the links the dashboard hands out
-    const r   = segs === 1 ? room : `${room}-${SEG_NAMES[k]}`;
-    const url = `${base}/r/${r}`;
+  /* The server builds the links and shortens them, so a shortener outage or a
+     missing token shows up as the full URL rather than an empty screen. The
+     long form is drawn first and quietly swapped for the short one, because a
+     projector with nothing on it is worse than one with a long address. */
+  function draw(links) {
+    cards.innerHTML = '';
+    links.forEach((l, k) => {
+      const shown = l.short || l.url;
 
-    const card = document.createElement('div');
-    card.className = 'card';
+      const card = document.createElement('div');
+      card.className = 'card';
 
-    if (segs > 1) {
-      const seg = document.createElement('p');
-      seg.className = 'seg';
-      seg.textContent = 'Group ' + SEG_NAMES[k];
-      seg.style.color = `var(${SEG_VARS[k]})`;
-      card.appendChild(seg);
-    }
+      if (l.seg) {
+        const seg = document.createElement('p');
+        seg.className = 'seg';
+        seg.textContent = 'Group ' + l.seg;
+        seg.style.color = `var(${SEG_VARS[k]})`;
+        card.appendChild(seg);
+      }
 
-    const img = document.createElement('img');
-    img.className = 'qr';
-    img.alt = `QR code to join ${r}`;
-    img.src = `${base}/qr.svg?text=${encodeURIComponent(url)}`;
-    card.appendChild(img);
+      const img = document.createElement('img');
+      img.className = 'qr';
+      img.alt = `QR code to join ${l.room}`;
+      // the code and the text underneath it are the same address, so nobody has
+      // to wonder whether they scanned the right thing
+      img.src = `${base}/qr.svg?text=${encodeURIComponent(shown)}`;
+      card.appendChild(img);
 
-    const a = document.createElement('p');
-    a.className = 'url';
-    a.textContent = url.replace(/^https?:\/\//, '');
-    card.appendChild(a);
+      const a = document.createElement('p');
+      a.className = 'url';
+      a.textContent = shown.replace(/^https?:\/\//, '');
+      card.appendChild(a);
 
-    cards.appendChild(card);
+      cards.appendChild(card);
+    });
   }
+
+  const fallback = Array.from({ length: segs }, (_, k) => {
+    const r = segs === 1 ? room : `${room}-${SEG_NAMES[k]}`;
+    return { seg: segs === 1 ? null : SEG_NAMES[k], room: r, url: `${base}/r/${r}`, short: null };
+  });
+  draw(fallback);
+
+  fetch(`${base}/links?room=${encodeURIComponent(room)}&segs=${segs}`)
+    .then(r => r.ok ? r.json() : null)
+    .then(d => { if (d && Array.isArray(d.links) && d.links.length === segs) draw(d.links); })
+    .catch(() => {});                      // the long links are already on screen
 
   document.getElementById('foot').textContent = segs > 1
     ? 'Scan the code for your group, or type the address underneath it.'

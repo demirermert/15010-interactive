@@ -1162,8 +1162,10 @@ function renderJoin() {
   const split = state.segCount > 1;
 
   roomsNow().forEach((room, k) => {
+    // Replaced with the shortened form below, once the server has been asked.
     const url = `${base}/r/${room}`;
     const wrap = document.createElement('div');
+    wrap.dataset.room = room;
     wrap.className = 'join' + (split ? ' tagged' : '');
     if (split) wrap.style.borderLeftColor = css.getPropertyValue(SEG_VARS[k]).trim();
 
@@ -1187,6 +1189,27 @@ function renderJoin() {
     wrap.append(img, text);
     box.appendChild(wrap);
   });
+
+  applyShortLinks(base);
+}
+
+/* Swap the full links for their shortened form once the server answers. Drawn
+   long first and replaced in place, so a shortener that is slow or switched off
+   costs nothing — the links on screen work either way. */
+function applyShortLinks(base) {
+  fetch(`${base}/links?room=${encodeURIComponent(normRoom(state.room))}&segs=${state.segCount}`)
+    .then(r => r.ok ? r.json() : null)
+    .then(d => {
+      if (!d || !Array.isArray(d.links)) return;
+      d.links.forEach(l => {
+        if (!l.short) return;
+        const wrap = document.querySelector(`#joinBoxes .join[data-room="${l.room}"]`);
+        if (!wrap) return;                        // room changed while we waited
+        wrap.querySelector('.join-url').textContent = l.short.replace(/^https?:\/\//, '');
+        wrap.querySelector('.qr').src = `${base}/qr.svg?text=${encodeURIComponent(l.short)}`;
+      });
+    })
+    .catch(() => {});
 }
 
 async function goLive() {
