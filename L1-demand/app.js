@@ -1149,9 +1149,8 @@ function renderJoin() {
 
 async function goLive() {
   const base = DEFAULT_SERVER;
-  const room = normRoom($('roomCode').value);
+  const room = normRoom(state.room);
   state.server = base; state.room = room;
-  $('roomCode').value = room;
   save();
 
   liveStatus('Connecting…');
@@ -1227,9 +1226,6 @@ function setLive(on) {
   $('classSize').disabled = on;
   // Re-splitting mid-stream would point at rooms nobody was sent to.
   [1, 2, 3].forEach(i => { $('seg' + i).disabled = on; });
-  $('sideHint').textContent = on
-    ? 'Simulation is paused while live. Press Stop to use it as a fallback.'
-    : 'Stands in for the class until you go live. They arrive every 0.3 seconds.';
 }
 
 /* ---------------------------------------------------------------- wiring */
@@ -1287,12 +1283,11 @@ document.addEventListener('DOMContentLoaded', () => {
   cv.addEventListener('mouseleave', onLeave);
   cv.addEventListener('click', onClick);
 
-  $('roomCode').value  = state.room || '15010';
+  // A stale code saved from an earlier session would silently send this class
+  // to a room nobody was given a link to, and there is no field left to spot it
+  // in — so the room is pinned to the default on every load.
+  state.room = DEFAULTS.room;
   $('liveBtn').addEventListener('click', () => (live ? goOffline() : goLive()));
-  $('roomCode').addEventListener('change', e => {
-    state.room = normRoom(e.target.value); e.target.value = state.room; save();
-    if (live) { goOffline(); goLive(); }
-  });
 
   $('modeStudents').addEventListener('click', () => setMode('students'));
   $('modePrice').addEventListener('click',    () => setMode('price'));

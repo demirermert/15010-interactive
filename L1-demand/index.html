@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Live demand curve — 15.010 Lecture 1</title>
-<link rel="stylesheet" href="styles.css?v=23">
+<link rel="stylesheet" href="styles.css?v=24">
 </head>
 <body>
 <div class="page">
@@ -104,13 +104,12 @@
 
       <p class="section-label">Live submissions</p>
       <div class="side-controls">
-        <!-- No server field: this page is served BY the submission server, so the
-             address is simply wherever it came from. One less thing to get wrong
-             five minutes before class. -->
-        <div class="side-row">
-          <input id="roomCode" class="txt code" value="15010" maxlength="12" spellcheck="false">
-          <button id="liveBtn" class="btn">Go live</button>
-        </div>
+        <!-- No server field and no room code. The page is served BY the
+             submission server, so the address is wherever it came from, and the
+             room is always 15010 (plus -A/-B/-C once split). Two fewer things
+             to get wrong five minutes before class; use Clear all between
+             back-to-back sections rather than a different code. -->
+        <button id="liveBtn" class="btn wide">Go live</button>
 
         <!-- Split the class before going live: each segment gets its own room,
              its own link and its own QR code, so who gets which link is the
@@ -144,9 +143,6 @@
           <span class="unit">students</span>
         </div>
       </div>
-      <p class="side-hint" id="sideHint">Stands in for the class until you go live.
-         They arrive every 0.3 seconds.</p>
-
       </div><!-- /controls-card -->
       </div><!-- /viewClass -->
 
@@ -247,6 +243,6 @@
   <footer class="foot">15.010 · Economic Analysis for Business Decisions · Lecture 1</footer>
 </div>
 
-<script src="app.js?v=23"></script>
+<script src="app.js?v=24"></script>
 </body>
 </html>
