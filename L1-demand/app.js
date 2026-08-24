@@ -1107,6 +1107,19 @@ function roomFor(k) {
 }
 const roomsNow = () => Array.from({ length: state.segCount }, (_, k) => roomFor(k));
 
+/* The projector screen, in its own tab: big QR codes and the addresses under
+   them, one card per segment. Named so a second Go live reuses the same tab
+   rather than stacking up windows behind the one on the wall. */
+const joinUrl = () =>
+  `${(state.server || DEFAULT_SERVER).replace(/\/$/, '')}/join` +
+  `?room=${encodeURIComponent(normRoom(state.room))}&segs=${state.segCount}`;
+
+function openJoinScreen() {
+  const w = window.open(joinUrl(), 'l1-join');
+  if (w) w.focus();
+  else liveStatus('Allow pop-ups to open the join screen, or press it again.', 'err');
+}
+
 /* A join box per segment, each with its own QR, its own link and the colour of
    the curve its students will draw. Which link a student is handed IS which
    segment they land in — that is the whole mechanism. */
@@ -1162,6 +1175,7 @@ async function goLive() {
   }
 
   const rooms = roomsNow();
+  let opened = false;
   socket = window.io(base, { transports: ['websocket', 'polling'], timeout: 8000 });
 
   socket.on('connect', () => {
@@ -1176,6 +1190,7 @@ async function goLive() {
     });
     setLive(true);
     renderJoin();
+    if (!opened) { opened = true; openJoinScreen(); }   // once per Go live, not per reconnect
   });
 
   socket.on('responses', payload => {
@@ -1221,6 +1236,7 @@ function setLive(on) {
   live = on;
   $('liveBtn').textContent = on ? 'Stop' : 'Go live';
   $('liveBtn').classList.toggle('live-on', on);
+  $('joinBtn').hidden = !on;
   // Simulated answers would desync from the server the moment one arrived.
   ['arriveBtn', 'oneBtn', 'undoBtn'].forEach(id => { $(id).disabled = on; });
   $('classSize').disabled = on;
@@ -1288,6 +1304,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // in — so the room is pinned to the default on every load.
   state.room = DEFAULTS.room;
   $('liveBtn').addEventListener('click', () => (live ? goOffline() : goLive()));
+  $('joinBtn').addEventListener('click', openJoinScreen);
 
   $('modeStudents').addEventListener('click', () => setMode('students'));
   $('modePrice').addEventListener('click',    () => setMode('price'));

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Live demand curve — 15.010 Lecture 1</title>
-<link rel="stylesheet" href="styles.css?v=24">
+<link rel="stylesheet" href="styles.css?v=25">
 </head>
 <body>
 <div class="page">
@@ -110,6 +110,9 @@
              to get wrong five minutes before class; use Clear all between
              back-to-back sections rather than a different code. -->
         <button id="liveBtn" class="btn wide">Go live</button>
+        <!-- Opens with Go live, and stays here to reopen: a blocked popup or a
+             closed tab should not mean going offline and back on again. -->
+        <button id="joinBtn" class="btn wide" hidden>Open join screen</button>
 
         <!-- Split the class before going live: each segment gets its own room,
              its own link and its own QR code, so who gets which link is the
@@ -243,6 +246,6 @@
   <footer class="foot">15.010 · Economic Analysis for Business Decisions · Lecture 1</footer>
 </div>
 
-<script src="app.js?v=24"></script>
+<script src="app.js?v=25"></script>
 </body>
 </html>

@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Join — 15.010 Lecture 1</title>
+<!--
+  The projector screen. Nothing here but what a student in the back row needs:
+  which group they are in, a QR to point a phone at, and the same address typed
+  out for anyone whose camera will not cooperate.
+
+  Self-contained on purpose — no stylesheet, no script file. It opens in its own
+  tab beside the dashboard, and the fewer things it depends on the fewer things
+  can be missing when it goes up on the wall.
+
+  Rooms come in on the query string: ?room=15010&segs=2
+-->
+<style>
+  :root{
+    --ink:#1a1a1a; --muted:#8a8a8a; --line:#e5e5e3; --bg:#fdfdfc;
+    --seg-a:#2563eb; --seg-b:#e05c3e; --seg-c:#7c3aed;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);min-height:100vh;
+    font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    display:flex;flex-direction:column;padding:3.2vh 3vw}
+
+  header{text-align:center;flex:none}
+  .eyebrow{font-size:clamp(11px,1.15vw,17px);letter-spacing:.16em;text-transform:uppercase;
+    color:var(--muted);font-weight:600}
+  h1{font-size:clamp(22px,3.4vw,54px);line-height:1.1;font-weight:600;letter-spacing:-.02em;
+    margin-top:.35em}
+
+  /* The cards share the row and shrink to fit however many there are. */
+  main{flex:1;display:flex;align-items:center;justify-content:center;gap:3vw;
+    padding:3vh 0 1vh;min-height:0}
+  .card{flex:1 1 0;max-width:46vw;display:flex;flex-direction:column;align-items:center;
+    min-width:0;min-height:0}
+  main.one .card{max-width:min(70vh,60vw)}
+
+  .seg{font-size:clamp(15px,1.9vw,32px);font-weight:700;letter-spacing:.1em;
+    text-transform:uppercase;margin-bottom:1.6vh}
+  .qr{width:100%;height:auto;max-height:58vh;object-fit:contain;display:block;
+    border:1px solid var(--line);border-radius:12px;background:#fff;padding:1.4vh}
+  main.one .qr{max-height:62vh}
+
+  .url{margin-top:2.2vh;font:600 clamp(13px,1.55vw,27px)/1.25 var(--mono);
+    letter-spacing:-.01em;text-align:center;word-break:break-all;max-width:100%}
+
+  footer{flex:none;text-align:center;font-size:clamp(11px,1.05vw,16px);color:var(--muted);
+    padding-top:1vh}
+  .err{margin:auto;text-align:center;color:var(--muted);font-size:18px}
+
+  /* A phone held up to check the screen should still get something readable. */
+  @media (max-aspect-ratio:1/1){
+    main{flex-direction:column;gap:4vh;overflow:auto}
+    .card{max-width:min(78vw,50vh)}
+    .qr{max-height:none}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <p class="eyebrow">15.010 · Lecture 1</p>
+  <h1 id="heading">What would you pay?</h1>
+</header>
+
+<main id="cards"></main>
+
+<footer id="foot"></footer>
+
+<script>
+  const SEG_NAMES = ['A', 'B', 'C'];
+  const SEG_VARS  = ['--seg-a', '--seg-b', '--seg-c'];
+
+  const q     = new URLSearchParams(location.search);
+  const room  = (q.get('room') || '15010').toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 12);
+  const segs  = Math.min(3, Math.max(1, parseInt(q.get('segs'), 10) || 1));
+  const base  = location.origin;
+
+  const cards = document.getElementById('cards');
+  cards.className = segs === 1 ? 'one' : '';
+
+  for (let k = 0; k < segs; k++) {
+    // One segment keeps the bare room, matching the links the dashboard hands out
+    const r   = segs === 1 ? room : `${room}-${SEG_NAMES[k]}`;
+    const url = `${base}/r/${r}`;
+
+    const card = document.createElement('div');
+    card.className = 'card';
+
+    if (segs > 1) {
+      const seg = document.createElement('p');
+      seg.className = 'seg';
+      seg.textContent = 'Group ' + SEG_NAMES[k];
+      seg.style.color = `var(${SEG_VARS[k]})`;
+      card.appendChild(seg);
+    }
+
+    const img = document.createElement('img');
+    img.className = 'qr';
+    img.alt = `QR code to join ${r}`;
+    img.src = `${base}/qr.svg?text=${encodeURIComponent(url)}`;
+    card.appendChild(img);
+
+    const a = document.createElement('p');
+    a.className = 'url';
+    a.textContent = url.replace(/^https?:\/\//, '');
+    card.appendChild(a);
+
+    cards.appendChild(card);
+  }
+
+  document.getElementById('foot').textContent = segs > 1
+    ? 'Scan the code for your group, or type the address underneath it.'
+    : 'Scan the code, or type the address underneath it.';
+</script>
+
+</body>
+</html>

@@ -112,6 +112,12 @@ app.get('/dashboard/', sendDash('index.html', 'html'));
 app.get('/dashboard/app.js', sendDash('app.js', 'application/javascript'));
 app.get('/dashboard/styles.css', sendDash('styles.css', 'text/css'));
 
+/* The projector screen: big QR codes and the addresses under them, one card per
+   segment. Its own URL rather than a popup the dashboard paints, so it can be
+   reloaded, bookmarked, or opened on a second machine driving the projector.
+   Rooms come from the query string — /join?room=15010&segs=2 */
+app.get('/join', sendDash('join.html', 'html'));
+
 app.get('/', (_req, res) => res.redirect('/dashboard/'));
 
 /* --------------------------------------------------------------- sockets */
