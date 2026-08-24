@@ -47,6 +47,15 @@ const PREFIX   = DASH_KEY ? '/' + DASH_KEY : '';
 const BITLY_TOKEN  = String(process.env.BITLY_TOKEN  || '').trim();
 const BITLY_GROUP  = String(process.env.BITLY_GROUP  || '').trim();
 const BITLY_DOMAIN = String(process.env.BITLY_DOMAIN || '').trim();
+
+/* BITLY_SLUG turns the random back-half into a chosen one: set it to "l1" and
+   the groups get <domain>/l1-A and <domain>/l1-B, or plain <domain>/l1 when the
+   class is not split.
+   Custom back-halves are a paid feature and, per Bitly's own docs, really meant
+   for a branded domain — on plain bit.ly the claim can come back 402, and a
+   keyword someone else already owns comes back 4xx too. Either way the random
+   short link is used instead, so a name that cannot be had costs nothing. */
+const BITLY_SLUG = String(process.env.BITLY_SLUG || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40);
 const MAX_WTP   = 30;          // must match MAX_WTP in the dashboard
 const MAX_NAME  = 24;
 const MAX_ROOMS = 50;          // a stray room code should not grow memory forever
@@ -121,29 +130,62 @@ app.get('/r/:room', (_req, res) =>
    caller falls back to the full URL, which always works. */
 const shortCache = new Map();
 
-async function shorten(longUrl) {
+const bitly = (path, method, body) => fetch('https://api-ssl.bitly.com/v4' + path, {
+  method,
+  headers: { Authorization: 'Bearer ' + BITLY_TOKEN, 'Content-Type': 'application/json' },
+  body: JSON.stringify(body),
+  signal: AbortSignal.timeout(6000)          // a slow shortener must not hang the projector
+});
+
+const withScheme = s => (s.startsWith('http') ? s : 'https://' + s);   // v4 may omit it
+
+/* Claim a chosen back-half for a Bitlink we just made.
+   POST creates the keyword; if it already exists — same class next term, or a
+   second Go live — PATCH moves it onto the new Bitlink instead. That makes the
+   pretty link permanent and repointable rather than something that only works
+   the first time. */
+async function claimCustom(bitlinkId, custom) {
+  try {
+    let r = await bitly('/custom_bitlinks', 'POST', { bitlink_id: bitlinkId, custom_bitlink: custom });
+    if (!r.ok) {
+      r = await bitly('/custom_bitlinks/' + encodeURIComponent(custom), 'PATCH', { bitlink_id: bitlinkId });
+    }
+    if (!r.ok) {
+      console.warn(`bitly custom ${r.status} for ${custom}: ${(await r.text().catch(() => '')).slice(0, 200)}`);
+      return null;
+    }
+    return withScheme(custom);
+  } catch (e) {
+    console.warn('bitly custom failed:', e.message);
+    return null;
+  }
+}
+
+async function shorten(longUrl, slug) {
   if (!BITLY_TOKEN) return null;
-  if (shortCache.has(longUrl)) return shortCache.get(longUrl);
+  const key = longUrl + '|' + (slug || '');
+  if (shortCache.has(key)) return shortCache.get(key);
 
   const body = { long_url: longUrl };
   if (BITLY_GROUP)  body.group_guid = BITLY_GROUP;
   if (BITLY_DOMAIN) body.domain     = BITLY_DOMAIN;
 
   try {
-    const r = await fetch('https://api-ssl.bitly.com/v4/shorten', {
-      method: 'POST',
-      headers: { Authorization: 'Bearer ' + BITLY_TOKEN, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(6000)      // a slow shortener must not hang the projector
-    });
+    const r = await bitly('/shorten', 'POST', body);
     if (!r.ok) {
       console.warn(`bitly ${r.status} for ${longUrl}: ${(await r.text().catch(() => '')).slice(0, 200)}`);
       return null;
     }
-    const link = (await r.json()).link;
-    if (typeof link !== 'string' || !link) return null;
-    const url = link.startsWith('http') ? link : 'https://' + link;   // v4 may omit the scheme
-    shortCache.set(longUrl, url);
+    const j = await r.json();
+    if (typeof j.link !== 'string' || !j.link) return null;
+
+    // A chosen name if one can be had, the random one if not.
+    let url = withScheme(j.link);
+    if (slug && j.id) {
+      const custom = `${BITLY_DOMAIN || 'bit.ly'}/${slug}`;
+      url = (await claimCustom(j.id, custom)) || url;
+    }
+    shortCache.set(key, url);
     return url;
   } catch (e) {
     console.warn('bitly failed:', e.message);
@@ -161,9 +203,10 @@ app.get('/links', async (req, res) => {
 
   const links = await Promise.all(
     Array.from({ length: segs }, async (_, k) => {
-      const r   = segs === 1 ? room : `${room}-${'ABC'[k]}`;
-      const url = `${base}/r/${r}`;
-      return { seg: segs === 1 ? null : 'ABC'[k], room: r, url, short: await shorten(url) };
+      const r    = segs === 1 ? room : `${room}-${'ABC'[k]}`;
+      const url  = `${base}/r/${r}`;
+      const slug = !BITLY_SLUG ? '' : segs === 1 ? BITLY_SLUG : `${BITLY_SLUG}-${'ABC'[k]}`;
+      return { seg: segs === 1 ? null : 'ABC'[k], room: r, url, short: await shorten(url, slug) };
     })
   );
   res.set('Cache-Control', 'no-store').json({ shortening: Boolean(BITLY_TOKEN), links });
