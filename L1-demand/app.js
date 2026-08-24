@@ -34,9 +34,18 @@ const DEFAULT_SERVER = location.protocol.startsWith('http')
   ? location.origin
   : 'https://l1-demand.onrender.com';
 
+/* The class can be split into up to three segments. Each is a separate room on
+   the server — <ROOM>-A, <ROOM>-B, <ROOM>-C — with its own link and QR code, so
+   who ends up in which segment is decided by which link they were handed. With
+   one segment the plain <ROOM> is used, so every existing student link and
+   printed QR keeps working. */
+const SEG_NAMES = ['A', 'B', 'C'];
+const SEG_VARS  = ['--seg-a', '--seg-b', '--seg-c'];
+
 const DEFAULTS = { classSize: 45, responses: [], mode: 'students',
                    server: DEFAULT_SERVER, room: '15010',
-                   view: 'class', cost: 0, price: null, sort: 'desc' };
+                   view: 'class', cost: 0, price: null, sort: 'desc',
+                   segCount: 1, demandView: 'segments', profitView: 'segments' };
 let state = structuredClone(DEFAULTS);
 let newestId = null;
 let arrivalTimer = null;   // non-null while a class is arriving
@@ -70,11 +79,31 @@ window.addEventListener('storage', e => { if (e.key === KEY) applyRemote(); });
 
 /* ------------------------------------------------------------------- data */
 
-// Sorted highest first — that ordering IS the demand curve.
-const ranked = () => state.responses.slice().sort((a, b) => b.wtp - a.wtp);
+/* Answers carry the segment they came from. Dropping the segment count from 3
+   to 2 hides segment C rather than deleting it, so the choice is reversible and
+   nothing a student typed is ever thrown away behind their back. */
+const segOf = r => Math.min(Math.max(r.seg | 0, 0), 2);
+const visible = () => state.responses.filter(r => segOf(r) < state.segCount);
+const inSeg = k => state.responses.filter(r => segOf(r) === k);
 
-function summary() {
-  const s = ranked().map(r => r.wtp), n = s.length;
+// Sorted highest first — that ordering IS the demand curve.
+const rankedOf = list => list.slice().sort((a, b) => b.wtp - a.wtp);
+const ranked = () => rankedOf(visible());
+
+/* One entry per curve to draw. Pooled is the whole class as a single market;
+   segments are the separate ones. Everything downstream — the chart, the profit
+   view, the legend — reads this rather than deciding for itself. */
+function series(mode) {
+  if (state.segCount < 2 || mode === 'pooled') {
+    return [{ k: -1, label: 'The class', rows: ranked(), varName: '--blue' }];
+  }
+  return Array.from({ length: state.segCount }, (_, k) => ({
+    k, label: 'Segment ' + SEG_NAMES[k], rows: rankedOf(inSeg(k)), varName: SEG_VARS[k]
+  }));
+}
+
+function summaryOf(list) {
+  const s = rankedOf(list).map(r => r.wtp), n = s.length;
   if (!n) return { n: 0 };
   const mid = Math.floor(n / 2);
   return {
@@ -83,9 +112,11 @@ function summary() {
     median: n % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2
   };
 }
+const summary = () => summaryOf(visible());
 
 // Everyone whose maximum is at or above the price buys one unit.
-const quantityAt = p => state.responses.reduce((n, r) => n + (r.wtp >= p ? 1 : 0), 0);
+const qtyIn = (list, p) => list.reduce((n, r) => n + (r.wtp >= p ? 1 : 0), 0);
+const quantityAt = p => qtyIn(visible(), p);
 
 /* ------------------------------------------------------------- simulation */
 
@@ -101,22 +132,39 @@ function simulatedName() {
   return `${FIRST[Math.floor(Math.random() * FIRST.length)]} ${LAST[Math.floor(Math.random() * LAST.length)]}.`;
 }
 
-/* Right-skewed draw: most of the class clusters, a few enthusiasts sit high. */
-function simulatedWtp() {
+/* Right-skewed draw: most of the class clusters, a few enthusiasts sit high.
+ *
+ * Each segment gets its own centre, because a rehearsal where the segments come
+ * out identical teaches the opposite of the point — the whole reason to split a
+ * market is that the halves are not the same. A is the ordinary class; B sits
+ * lower and C higher, far enough apart to be obvious from the back of the room.
+ * With one segment the original centre is kept, so the single-market demo looks
+ * exactly as it always has. */
+const SIM_CENTRE = [14, 8, 20];
+
+function simulatedWtp(seg) {
   let u = 0, v = 0;
   while (u === 0) u = Math.random();
   while (v === 0) v = Math.random();
   const z = Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
-  const x = Math.exp(Math.log(11) + 0.42 * z);
+  const centre = state.segCount < 2 ? 11 : SIM_CENTRE[seg] ?? 14;
+  const spread = state.segCount < 2 ? 0.42 : 0.34;
+  const x = Math.exp(Math.log(centre) + spread * z);
   return Math.max(0, Math.min(MAX_WTP, Math.round(x * 4) / 4));   // quarters, as people answer
 }
 
-function addResponse(wtp, name, sim = false) {
-  const r = { id: crypto.randomUUID(), name, wtp, ts: Date.now(), sim };
+function addResponse(wtp, name, sim = false, seg = 0) {
+  const r = { id: crypto.randomUUID(), name, wtp, ts: Date.now(), sim, seg };
   state.responses.push(r);
   return r;
 }
-const addSimulated = () => addResponse(simulatedWtp(), simulatedName(), true);
+
+/* Round-robin rather than random, so the curves grow at the same rate and the
+   room watches both fill in together instead of one racing ahead. */
+function addSimulated() {
+  const seg = state.segCount < 2 ? 0 : state.responses.length % state.segCount;
+  return addResponse(simulatedWtp(seg), simulatedName(), true, seg);
+}
 
 /* ------------------------------------------------------------------ chart */
 
@@ -136,12 +184,13 @@ function drawChart() {
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   g.clearRect(0, 0, W, H);
 
-  const rows = ranked();
+  const cast = series(state.demandView);
+  const all  = ranked();
   const css = getComputedStyle(document.documentElement);
   const LINE  = css.getPropertyValue('--line').trim()  || '#e5e5e3';
   const MUTED = css.getPropertyValue('--muted').trim() || '#8a8a8a';
-  const BLUE  = css.getPropertyValue('--blue').trim()  || '#2563eb';
   const ACCENT= css.getPropertyValue('--accent').trim()|| '#e05c3e';
+  const colour = s => css.getPropertyValue(s.varName).trim() || '#2563eb';
 
   // padL has to clear both the "$00.00" ticks and the rotated axis title
   const padL = 88, padR = 18, padT = 26, padB = 46;
@@ -151,18 +200,22 @@ function drawChart() {
 
   // While a class is filing in, hold the frame at the full class size so the
   // curve grows rightward into fixed axes instead of rescaling on every arrival.
-  const nMax = Math.max(rows.length, arrivalTimer ? state.classSize : 0, 10);
+  // Split in two, each segment only expects its share of the seats.
+  const longest = Math.max(...cast.map(s => s.rows.length), 0);
+  const expect  = arrivalTimer ? state.classSize / (state.demandView === 'pooled' ? 1 : state.segCount) : 0;
+  const nMax = Math.max(longest, expect, 10);
 
   // The y-axis follows the data, rounded up to a tick, so no answer ever sits
-  // off the top of the plot.
-  const top = rows.length ? rows[0].wtp : 10;
+  // off the top of the plot. It follows the WHOLE class, not the curve being
+  // drawn, so switching between segments and pooled never rescales underfoot.
+  const top = all.length ? all[0].wtp : 10;
   const tick = top <= 10 ? 2 : top <= 30 ? 5 : 10;
   const yMax = Math.max(tick * 2, Math.ceil(top / tick) * tick);
 
   const X = q => padL + (q / nMax) * plotW;
   const Y = p => padT + plotH - (p / yMax) * plotH;
 
-  geom = { padL, padT, plotW, plotH, nMax, yMax, n: rows.length };
+  geom = { padL, padT, plotW, plotH, nMax, yMax, n: longest };
 
   // ---- grid + y ticks
   g.font = '11px ui-monospace, SFMono-Regular, Menlo, monospace';
@@ -192,36 +245,44 @@ function drawChart() {
   g.fillText('most they would pay', 0, 0);
   g.restore();
 
-  if (!rows.length) return;
-
-  // ---- the staircase: one step per student, one unit wide
-  g.beginPath();
-  rows.forEach((r, i) => {
-    const y = Y(r.wtp);
-    if (i === 0) g.moveTo(X(0), y); else g.lineTo(X(i), y);
-    g.lineTo(X(i + 1), y);
-  });
-  g.strokeStyle = BLUE; g.lineWidth = 2; g.lineJoin = 'round';
-  g.stroke();
+  if (!all.length) return;
 
   const priceMode = state.mode === 'price';
 
-  // ---- one point per submission, at the middle of that student's step
-  // Always recorded (hit-testing needs them); only drawn in students mode, where
-  // they are the thing you are pointing at.
-  const dense = rows.length > 90;                 // dots would merge into a smear
-  rows.forEach((r, i) => {
-    const x = X(i + 0.5), y = Y(r.wtp);
-    points.push({ x, y, name: r.name, wtp: r.wtp, id: r.id });
-    // In price mode the dots are off — except the one being pointed at in the
-    // list below, which should still be findable without changing mode first.
-    if (priceMode && i !== hoverIdx) return;
-    if (dense && i !== hoverIdx) return;
-    const on = i === hoverIdx;
-    g.beginPath(); g.arc(x, y, on ? 5.5 : 3, 0, Math.PI * 2);
-    g.fillStyle = on ? BLUE : '#fff';
-    g.fill();
-    g.lineWidth = on ? 2 : 1.5; g.strokeStyle = BLUE; g.stroke();
+  // ---- a staircase per curve: one step per student, one unit wide.
+  // points[] is flat across every curve, because hit-testing and the list
+  // below both address a student by their position in it.
+  cast.forEach(s => {
+    const col = colour(s);
+    if (!s.rows.length) return;
+
+    g.beginPath();
+    s.rows.forEach((r, i) => {
+      const y = Y(r.wtp);
+      if (i === 0) g.moveTo(X(0), y); else g.lineTo(X(i), y);
+      g.lineTo(X(i + 1), y);
+    });
+    g.strokeStyle = col; g.lineWidth = 2; g.lineJoin = 'round';
+    g.stroke();
+
+    // one point per submission, at the middle of that student's step. Always
+    // recorded (hit-testing needs them); only drawn in students mode, where
+    // they are the thing you are pointing at.
+    const dense = s.rows.length > 90;             // dots would merge into a smear
+    s.rows.forEach((r, i) => {
+      const x = X(i + 0.5), y = Y(r.wtp);
+      const idx = points.length;
+      points.push({ x, y, name: r.name, wtp: r.wtp, id: r.id, seg: segOf(r), col, step: i });
+      // In price mode the dots are off — except the one being pointed at in the
+      // list below, which should still be findable without changing mode first.
+      if (priceMode && idx !== hoverIdx) return;
+      if (dense && idx !== hoverIdx) return;
+      const on = idx === hoverIdx;
+      g.beginPath(); g.arc(x, y, on ? 5.5 : 3, 0, Math.PI * 2);
+      g.fillStyle = on ? col : '#fff';
+      g.fill();
+      g.lineWidth = on ? 2 : 1.5; g.strokeStyle = col; g.stroke();
+    });
   });
 
   // ---- guides to both axes for the student under the cursor, wherever the
@@ -229,7 +290,7 @@ function drawChart() {
   if (hoverIdx >= 0 && points[hoverIdx]) {
     const p = points[hoverIdx];
     g.save();
-    g.setLineDash([3, 4]); g.strokeStyle = BLUE; g.globalAlpha = .45; g.lineWidth = 1;
+    g.setLineDash([3, 4]); g.strokeStyle = p.col; g.globalAlpha = .45; g.lineWidth = 1;
     g.beginPath(); g.moveTo(padL, p.y); g.lineTo(p.x, p.y);
     g.moveTo(p.x, p.y); g.lineTo(p.x, padT + plotH); g.stroke();
     g.restore();
@@ -238,30 +299,32 @@ function drawChart() {
   // ---- price mode: a horizontal line at the cursor, and who is above it
   if (priceMode && hoverPrice !== null) {
     const y = Y(hoverPrice);
-    const q = quantityAt(hoverPrice);
-    const xq = X(q);
+    // one crossing per curve — the same price sells a different amount into
+    // each segment, which is the entire point of splitting them
+    const cuts = cast.map(s => ({ q: qtyIn(s.rows, hoverPrice), col: colour(s) }));
+    const qMax = Math.max(...cuts.map(c => c.q), 0);
 
-    // The line runs from the price axis only as far as the curve — that IS the
-    // quantity, so extending it past the intersection would draw a length that
-    // means nothing. When nobody buys there is no intersection, so a short stub
-    // stands in, otherwise the cursor's price would be invisible.
+    // The line runs from the price axis only as far as the furthest curve —
+    // that IS the quantity, so extending it past the last crossing would draw a
+    // length that means nothing. When nobody buys there is no intersection, so
+    // a short stub stands in, otherwise the cursor's price would be invisible.
     // No shaded block: a wash of colour behind the curve reads badly on a
-    // projector. The line, the drop and the readout carry it.
-    const xEnd = q > 0 ? xq : padL + 18;
-
+    // projector. The line, the drops and the readout carry it.
     g.save();
     g.setLineDash([6, 4]); g.strokeStyle = ACCENT; g.lineWidth = 1.75;
-    g.beginPath(); g.moveTo(padL, y); g.lineTo(xEnd, y); g.stroke();
-    if (q > 0) {                                   // drop to the axis at the quantity
-      g.globalAlpha = .55;
-      g.beginPath(); g.moveTo(xq, y); g.lineTo(xq, padT + plotH); g.stroke();
-    }
+    g.beginPath(); g.moveTo(padL, y); g.lineTo(qMax > 0 ? X(qMax) : padL + 18, y); g.stroke();
     g.restore();
 
-    if (q > 0) {
+    cuts.forEach(c => {
+      if (!c.q) return;
+      const xq = X(c.q);
+      g.save();
+      g.setLineDash([6, 4]); g.strokeStyle = c.col; g.lineWidth = 1.75; g.globalAlpha = .55;
+      g.beginPath(); g.moveTo(xq, y); g.lineTo(xq, padT + plotH); g.stroke();
+      g.restore();
       g.beginPath(); g.arc(xq, y, 4.5, 0, Math.PI * 2);
-      g.fillStyle = ACCENT; g.fill();
-    }
+      g.fillStyle = c.col; g.fill();
+    });
 
     // ---- label each line where it meets its axis, so the numbers are read
     // off the axes rather than out of a box in the corner. Each label is
@@ -277,8 +340,11 @@ function drawChart() {
     g.fillStyle = ACCENT;
     g.fillText(pLabel, padL - 7, y);
 
-    if (q > 0) {                                      // quantity, on the x-axis
-      const qLabel = String(q);
+    // Only one curve? Put its quantity on the axis too. With several, the
+    // numbers would crowd each other along a short stretch of axis, so they go
+    // to the readout box instead, one line per segment.
+    if (cuts.length === 1 && cuts[0].q > 0) {
+      const qLabel = String(cuts[0].q), xq = X(cuts[0].q);
       g.textAlign = 'center'; g.textBaseline = 'top';
       const qw = g.measureText(qLabel).width;
       g.fillStyle = '#fff';
@@ -298,17 +364,19 @@ function drawChart() {
  * lands exactly ON someone's stated maximum — which is the point worth making
  * in class, and why this searches the answers themselves rather than a grid of
  * prices. Ties go to the lower price, so the seller keeps more buyers. */
-const profitAt = (p, c) => (p - c) * quantityAt(p);
+const profitIn = (list, p, c) => (p - c) * qtyIn(list, p);
+const profitAt = (p, c) => profitIn(visible(), p, c);
 
-function optimum(c) {
+function optimumIn(list, c) {
   let best = null;
-  for (const p of [...new Set(state.responses.map(r => r.wtp))].sort((a, b) => a - b)) {
+  for (const p of [...new Set(list.map(r => r.wtp))].sort((a, b) => a - b)) {
     if (p < c) continue;                       // selling below cost is never the answer
-    const profit = profitAt(p, c);
-    if (!best || profit > best.profit) best = { price: p, qty: quantityAt(p), profit };
+    const profit = profitIn(list, p, c);
+    if (!best || profit > best.profit) best = { price: p, qty: qtyIn(list, p), profit };
   }
   return best;
 }
+const optimum = c => optimumIn(visible(), c);
 
 /* The price axis of the profit chart, and the range of the price slider under
    it. Shared so the two can never drift apart. */
@@ -343,11 +411,13 @@ function drawProfit() {
   const css = getComputedStyle(document.documentElement);
   const LINE  = css.getPropertyValue('--line').trim()  || '#e5e5e3';
   const MUTED = css.getPropertyValue('--muted').trim() || '#8a8a8a';
-  const BLUE  = css.getPropertyValue('--blue').trim()  || '#2563eb';
   const ACCENT= css.getPropertyValue('--accent').trim()|| '#e05c3e';
 
-  const rows = ranked();
-  if (!rows.length) return;
+  const all = ranked();
+  if (!all.length) return;
+
+  const cast = series(state.profitView);
+  const colour = s => css.getPropertyValue(s.varName).trim() || '#2563eb';
 
   const c = state.cost;
   const padL = 44, padR = 12, padT = 12, padB = 30;
@@ -356,7 +426,7 @@ function drawProfit() {
 
   // Price runs across the same range as the demand chart's y-axis, so the two
   // charts share a scale and "$8 over there" is "$8 over here".
-  const top  = rows[0].wtp;
+  const top  = all[0].wtp;
   const tick = top <= 10 ? 2 : top <= 30 ? 5 : 10;
   const pMax = priceMax();
 
@@ -366,8 +436,11 @@ function drawProfit() {
   sl.style.marginLeft  = (padL - 9.5) + 'px';
   sl.style.marginRight = (padR - 9.5) + 'px';
 
-  const best = optimum(c);
-  const yMax = Math.max(best ? best.profit : 0, 1) * 1.12;
+  // One optimum per curve. They share a profit axis so the hills are directly
+  // comparable — a segment worth half as much should look half as tall.
+  const peaks = cast.map(s => optimumIn(s.rows, c));
+  const best = peaks[0];                          // pooled: the only one there is
+  const yMax = Math.max(...peaks.map(b => b ? b.profit : 0), 1) * 1.12;
 
   const X = p => padL + (p / pMax) * plotW;
   const Y = v => padT + plotH - (v / yMax) * plotH;
@@ -377,7 +450,11 @@ function drawProfit() {
   // one is dropped outright, rather than left half-covered by its white patch.
   const up = Math.max(0, Math.min(pMax, state.price ?? defaultPrice()));
   const ux = X(up);
-  const bx = best && best.profit > 0 ? X(best.price) : null;
+  // Only one curve gets its best price written on the axis. With three peaks
+  // plus your own price the strip of axis turns to soup, so in segments mode
+  // the numbers live in the table underneath and the chart keeps just the dots.
+  const single = cast.length === 1;
+  const bx = single && best && best.profit > 0 ? X(best.price) : null;
 
   const MARK_FONT = 'bold 11px ui-monospace, SFMono-Regular, Menlo, monospace';
   const TICK_FONT = '10px ui-monospace, SFMono-Regular, Menlo, monospace';
@@ -421,33 +498,39 @@ function drawProfit() {
   // class should see is a hill with a peak, and the sawtooth of the exact
   // function is a distraction at this size. Nothing below the axis — under cost
   // profit dives steeply negative and would flatten everything worth looking at.
-  g.beginPath();
-  let started = false;
   const steps = Math.max(60, Math.round(plotW));
-  for (let i = 0; i <= steps; i++) {
-    const p = (i / steps) * pMax;
-    const v = profitAt(p, c);
-    if (v < 0) { started = false; continue; }
-    const x = X(p), y = Y(v);
-    if (!started) { g.moveTo(x, y); started = true; } else g.lineTo(x, y);
-  }
-  g.strokeStyle = BLUE; g.lineWidth = 2; g.lineJoin = 'round'; g.stroke();
+  cast.forEach(s => {
+    if (!s.rows.length) return;
+    g.beginPath();
+    let started = false;
+    for (let i = 0; i <= steps; i++) {
+      const p = (i / steps) * pMax;
+      const v = profitIn(s.rows, p, c);
+      if (v < 0) { started = false; continue; }
+      const x = X(p), y = Y(v);
+      if (!started) { g.moveTo(x, y); started = true; } else g.lineTo(x, y);
+    }
+    g.strokeStyle = colour(s); g.lineWidth = 2; g.lineJoin = 'round'; g.stroke();
+  });
 
   // ---- the price you have set: a plain vertical line the full height of the
   // plot, so it stays visible even where profit is zero and the curve is flat
   // on the axis. Drawn before the peak so the accent marker sits on top of it.
   const INK = css.getPropertyValue('--ink').trim() || '#1a1a1a';
-  const uv = profitAt(up, c);
 
   g.save();
   g.strokeStyle = INK; g.lineWidth = 1.5; g.globalAlpha = .5;
   g.beginPath(); g.moveTo(ux, padT); g.lineTo(ux, Y(0)); g.stroke();
   g.restore();
 
-  if (uv > 0) {
+  // a dot where your price meets each curve — charge one price to everyone and
+  // this is what each segment hands back
+  cast.forEach(s => {
+    const uv = profitIn(s.rows, up, c);
+    if (uv <= 0) return;
     g.beginPath(); g.arc(ux, Y(uv), 4, 0, Math.PI * 2);
     g.fillStyle = INK; g.fill();
-  }
+  });
 
   // its price on the axis, on a white patch so it covers the tick beneath
   const uLbl = money(up);
@@ -459,17 +542,22 @@ function drawProfit() {
   g.fillStyle = INK;
   g.fillText(uLbl, uxc, padT + plotH + 6);
 
-  if (!best || best.profit <= 0) return;
+  // ---- each peak: a drop to the price axis and a dot, in that curve's colour.
+  // Pooled uses the accent so it reads as "the answer"; split, each peak wears
+  // its own segment's colour so it is obvious which hill it tops.
+  peaks.forEach((b, i) => {
+    if (!b || b.profit <= 0) return;
+    const px = X(b.price), py = Y(b.profit);
+    const col = single ? ACCENT : colour(cast[i]);
+    g.save();
+    g.setLineDash([4, 4]); g.strokeStyle = col; g.lineWidth = 1.5; g.globalAlpha = .75;
+    g.beginPath(); g.moveTo(px, py); g.lineTo(px, Y(0)); g.stroke();
+    g.restore();
+    g.beginPath(); g.arc(px, py, 4, 0, Math.PI * 2);
+    g.fillStyle = col; g.fill();
+  });
 
-  // ---- the peak: a drop to the price axis, a dot, and the price on the axis
-  const by = Y(best.profit);
-  g.save();
-  g.setLineDash([4, 4]); g.strokeStyle = ACCENT; g.lineWidth = 1.5; g.globalAlpha = .75;
-  g.beginPath(); g.moveTo(bx, by); g.lineTo(bx, Y(0)); g.stroke();
-  g.restore();
-
-  g.beginPath(); g.arc(bx, by, 4, 0, Math.PI * 2);
-  g.fillStyle = ACCENT; g.fill();
+  if (bx === null) return;                        // split: no label on the axis
 
   const lbl = money(best.price);
   g.font = MARK_FONT;
@@ -509,6 +597,18 @@ function renderOptimal() {
 
   $('profitEmpty').classList.toggle('hidden', n > 0);
 
+  const cast = series(state.profitView);
+  const split = cast.length > 1;
+  $('pooledBlocks').hidden = split;
+  $('segBlocks').hidden    = !split;
+
+  if (split) renderSegmentBlocks(cast, p, c);
+  else       renderPooledBlocks(n, p, c, best);
+
+  drawProfit();
+}
+
+function renderPooledBlocks(n, p, c, best) {
   // ---- what YOUR price does
   const qty = n ? quantityAt(p) : 0;
   const mine = n ? profitAt(p, c) : 0;
@@ -534,7 +634,79 @@ function renderOptimal() {
       ? 'That is the price you have set — you found it.'
       : `${money(gap)} more than your price makes.`;
   }
-  drawProfit();
+}
+
+/* One price for everyone against a price per segment — which is the whole
+   argument for splitting a market, laid out as two totals you can compare. */
+function renderSegmentBlocks(cast, p, c) {
+  const css = getComputedStyle(document.documentElement);
+  const cell = (text, cls) => {
+    const td = document.createElement('td');
+    td.textContent = text;
+    if (cls) td.className = cls;
+    return td;
+  };
+  const table = (el, head, rows, total) => {
+    el.innerHTML = '';
+    const thead = document.createElement('thead');
+    const hr = document.createElement('tr');
+    head.forEach(h => { const th = document.createElement('th'); th.textContent = h; hr.appendChild(th); });
+    thead.appendChild(hr); el.appendChild(thead);
+    const tb = document.createElement('tbody');
+    rows.forEach(r => {
+      const tr = document.createElement('tr');
+      r.cells.forEach((t, i) => {
+        const td = cell(t);
+        if (i === 0 && r.colour) td.style.color = r.colour;
+        tr.appendChild(td);
+      });
+      tb.appendChild(tr);
+    });
+    if (total) {
+      const tr = document.createElement('tr');
+      tr.className = 'total';
+      total.forEach(t => tr.appendChild(cell(t)));
+      tb.appendChild(tr);
+    }
+    el.appendChild(tb);
+  };
+
+  const col = s => css.getPropertyValue(s.varName).trim();
+
+  // ---- one price, charged to everyone
+  let uniform = 0;
+  const atRows = cast.map(s => {
+    const q = qtyIn(s.rows, p), v = Math.max(0, profitIn(s.rows, p, c));
+    uniform += v;
+    return { colour: col(s), cells: [SEG_NAMES[s.k], `${q}/${s.rows.length}`, money(v)] };
+  });
+  table($('segAtPrice'), ['Seg', 'Buy', 'Profit'], atRows, ['Total', '', money(uniform)]);
+  $('segFootA').textContent = `One price of ${money(p)} charged to every segment.`;
+
+  // ---- the best price for each segment on its own
+  let apart = 0;
+  const bestRows = cast.map(s => {
+    const b = optimumIn(s.rows, c);
+    if (b) apart += b.profit;
+    return {
+      colour: col(s),
+      cells: [SEG_NAMES[s.k], b ? money(b.price) : '–',
+              b ? `${b.qty}/${s.rows.length}` : '–', b ? money(b.profit) : '–']
+    };
+  });
+  table($('segBest'), ['Seg', 'Price', 'Buy', 'Profit'], bestRows,
+        ['Total', '', '', money(apart)]);
+
+  // The honest comparison is against the best SINGLE price, not against
+  // whatever you happen to have the slider set to — otherwise the gain shown
+  // is mostly a measure of how badly the slider is placed.
+  const one = optimum(c);
+  const gain = apart - (one ? one.profit : 0);
+  $('segFootB').textContent = !one || one.profit <= 0
+    ? 'No price covers the cost in any segment.'
+    : gain <= 0.001
+      ? `The same as the best single price of ${money(one.price)}: these segments do not differ enough to be worth splitting.`
+      : `${money(gain)} more than the best single price for everyone (${money(one.price)} → ${money(one.profit)}).`;
 }
 
 function setView(view) {
@@ -557,16 +729,21 @@ function setView(view) {
  * and impossible once the class is large enough that steps are narrow. */
 function pickPoint(mx, my) {
   if (!geom || !geom.n) return -1;
-  const { padL, padT, plotW, plotH, nMax, n } = geom;
+  const { padL, padT, plotW, plotH, nMax } = geom;
   if (mx < padL || mx > padL + plotW || my < padT || my > padT + plotH) return -1;
 
   const i = Math.floor(((mx - padL) / plotW) * nMax);
-  if (i < 0 || i >= n) return -1;                       // past the last student
+  if (i < 0) return -1;
 
-  // ...and vertically near that student's step, so hovering empty space does nothing
-  const p = points[i];
-  if (!p) return -1;
-  return Math.abs(my - p.y) <= HIT_BAND ? i : -1;
+  // Several curves can own the same column, so the column narrows the field and
+  // height decides between them — nearest curve to the cursor wins.
+  let best = -1, bestDy = Infinity;
+  points.forEach((p, idx) => {
+    if (p.step !== i) return;
+    const dy = Math.abs(my - p.y);
+    if (dy <= HIT_BAND && dy < bestDy) { best = idx; bestDy = dy; }
+  });
+  return best;
 }
 
 /* Read the cursor's height back as a price. */
@@ -637,10 +814,22 @@ function showPriceBox() {
     box.hidden = true;
     return;
   }
-  const q = quantityAt(hoverPrice), n = state.responses.length;
+  const cast = series(state.demandView);
+  const n = visible().length;
   $('pbPrice').textContent = money(hoverPrice);
-  $('pbQty').textContent   = `${q} would buy`;
-  $('pbShare').textContent = `${Math.round(100 * q / n)}% of the class`;
+
+  if (cast.length === 1) {
+    const q = qtyIn(cast[0].rows, hoverPrice);
+    $('pbQty').textContent   = `${q} would buy`;
+    $('pbShare').textContent = `${Math.round(100 * q / n)}% of the class`;
+  } else {
+    // With the class split, one price sells a different amount into each
+    // segment — so the box lists them rather than a single misleading total.
+    const q = cast.map(s => qtyIn(s.rows, hoverPrice));
+    $('pbQty').textContent = q.reduce((a, b) => a + b, 0) + ' would buy';
+    $('pbShare').textContent = cast
+      .map((s, i) => `${SEG_NAMES[s.k]} ${q[i]}/${s.rows.length}`).join(' · ');
+  }
   $('pbPin').textContent   = pricePinned ? 'locked — click to release' : '';
   box.hidden = false;
 }
@@ -669,29 +858,55 @@ function setMode(mode) {
 /* Every answer as a row you can point at. Rank is always by willingness to pay,
  * highest = 1, so a student keeps the same number whichever way you sort — the
  * list reorders, the identity does not. */
+let listStale = false;
+
 function renderList() {
+  // "Show the numbers" is shut most of the time, and rebuilding a few hundred
+  // rows into a multi-column layout nobody can see is the single most expensive
+  // thing an arrival does. Defer it to the moment it is opened.
+  if (!$('numbersBox').open) { listStale = true; return; }
+  listStale = false;
+
   const list = $('wtpList');
   const rows = ranked();
   const order = state.sort === 'asc' ? rows.slice().reverse() : rows;
+  const split = state.segCount > 1;
 
   // Ranks come from one pass, not a lookup per row: renderList runs on every
   // arrival, and a 500-student class would otherwise re-sort 500 times per
-  // frame while they file in.
-  const rank1 = new Map(rows.map((r, i) => [r.id, i + 1]));
+  // frame while they file in. Split, a student is ranked within their OWN
+  // segment, because that is the curve they are a step on.
+  const rank1 = new Map();
+  if (split) {
+    for (let k = 0; k < state.segCount; k++) {
+      rankedOf(inSeg(k)).forEach((r, i) => rank1.set(r.id, i + 1));
+    }
+  } else {
+    rows.forEach((r, i) => rank1.set(r.id, i + 1));
+  }
+
+  const css = getComputedStyle(document.documentElement);
+  const segCol = k => css.getPropertyValue(SEG_VARS[k]).trim();
 
   list.innerHTML = '';
   order.forEach(r => {
-    const rank = rank1.get(r.id);
     const li = document.createElement('li');
     li.className = 'wtp-row' + (r.sim ? ' sim' : '') + (r.id === newestId ? ' new' : '');
     li.dataset.id = r.id;
+    const k = document.createElement('span'); k.className = 'wtp-rank';
+    k.textContent = '#' + rank1.get(r.id);
     const n = document.createElement('span'); n.className = 'wtp-name';
     n.textContent = r.name || 'Anonymous';
-    const k = document.createElement('span'); k.className = 'wtp-rank';
-    k.textContent = '#' + rank;
     const w = document.createElement('span'); w.className = 'wtp-wtp';
     w.textContent = money(r.wtp);
-    li.append(k, n, w);
+    if (split) {
+      const s = document.createElement('span'); s.className = 'wtp-seg';
+      s.textContent = SEG_NAMES[segOf(r)];
+      s.style.color = segCol(segOf(r));
+      li.append(k, s, n, w);
+    } else {
+      li.append(k, n, w);
+    }
     list.appendChild(li);
   });
 
@@ -699,8 +914,11 @@ function renderList() {
     ? 'Hover a row to find that student on the curve.' : '';
 }
 
-// Where this student sits on the curve — which is also their index in points[].
-function rankOf(id) { return ranked().findIndex(r => r.id === id); }
+/* Which drawn point is this student? points[] is rebuilt on every draw and is
+   the only thing that knows the current layout — with the class pooled a
+   student sits in one place, split they sit in another, and in pooled view a
+   segment's students are not drawn separately at all. */
+function rankOf(id) { return points.findIndex(p => p.id === id); }
 
 /* Hovering the list drives the same highlight the chart's own hover does, and
    hovering the chart lights the matching row. One hovered student, two views
@@ -719,6 +937,68 @@ function hoverStudent(id) {
   hoverIdx = i;
   markRow(i < 0 ? null : id);
   drawChart();
+}
+
+/* ---------------------------------------------------------------- segments */
+
+function renderLegend() {
+  const box = $('legend');
+  const cast = series(state.demandView);
+  if (cast.length < 2) { box.hidden = true; box.innerHTML = ''; return; }
+
+  const css = getComputedStyle(document.documentElement);
+  box.innerHTML = '';
+  cast.forEach(s => {
+    const item = document.createElement('span'); item.className = 'legend-item';
+    const sw = document.createElement('span'); sw.className = 'legend-swatch';
+    sw.style.background = css.getPropertyValue(s.varName).trim();
+    const label = document.createElement('span'); label.textContent = s.label;
+    const n = document.createElement('span'); n.className = 'legend-n';
+    n.textContent = s.rows.length ? `${s.rows.length} answers` : 'waiting';
+    item.append(sw, label, n);
+    box.appendChild(item);
+  });
+  box.hidden = false;
+}
+
+/* Changing the count HIDES segments rather than deleting them, so going 3 → 2
+   and back brings segment C's answers straight back. Nothing a student typed is
+   thrown away by a click on a toggle. */
+function setSegCount(n) {
+  const next = Math.min(3, Math.max(1, n | 0));
+  const changed = next !== state.segCount;
+  state.segCount = next;
+  SEG_NAMES.forEach((_, i) => $('seg' + (i + 1)).classList.toggle('is-on', i + 1 === next));
+
+  const split = next > 1;
+  $('demandViewToggle').hidden = !split;
+  $('profitViewToggle').hidden = !split;
+  $('chartNote').textContent = split
+    ? 'One curve per segment, each drawn from its own link. Read across at any price to see how many in each would still buy.'
+    : "Every student's maximum, highest first. Read across at any price to see how many are still willing to buy. Each step is one student.";
+
+  if (changed) { hoverIdx = -1; $('tip').hidden = true; }
+  save();
+  if (changed) { renderJoin(); render(); }
+}
+
+function setDemandView(v) {
+  state.demandView = v === 'pooled' ? 'pooled' : 'segments';
+  $('demandSegs').classList.toggle('is-on', state.demandView === 'segments');
+  $('demandPool').classList.toggle('is-on', state.demandView === 'pooled');
+  hoverIdx = -1; $('tip').hidden = true;        // points[] is about to be rebuilt
+  save();
+  renderLegend();
+  drawChart();
+  showPriceBox();
+}
+
+function setProfitView(v) {
+  state.profitView = v === 'pooled' ? 'pooled' : 'segments';
+  $('profitSegs').classList.toggle('is-on', state.profitView === 'segments');
+  $('profitPool').classList.toggle('is-on', state.profitView === 'pooled');
+  save();
+  if (state.view === 'optimal') renderOptimal();
 }
 
 function setSort(sort) {
@@ -756,12 +1036,16 @@ function render() {
 
   renderList();
   drawChart();
+  renderLegend();
   showPriceBox();
   if (state.view === 'optimal') renderOptimal();
 }
 
 function syncInputs() {
   $('classSize').value = state.classSize;
+  setSegCount(state.segCount);  // also shows or hides the two segment toggles
+  setDemandView(state.demandView);
+  setProfitView(state.profitView);
   setMode(state.mode);
   setSort(state.sort);
   setView(state.view);          // renderOptimal() fills both sliders from state
@@ -822,11 +1106,52 @@ function liveStatus(text, cls = '') {
   el.className = 'live-status' + (cls ? ' ' + cls : '');
 }
 
-function showJoin(base, room) {
-  const url = `${base.replace(/\/$/, '')}/r/${room}`;
-  $('joinUrl').textContent = url.replace(/^https?:\/\//, '');
-  $('qrImg').src = `${base.replace(/\/$/, '')}/qr.svg?text=${encodeURIComponent(url)}`;
-  $('joinBox').hidden = false;
+/* Segment k's room. One segment keeps the bare room code, so every student link
+   and printed QR from before the split still works. */
+function roomFor(k) {
+  const room = normRoom(state.room);
+  return state.segCount < 2 ? room : `${room}-${SEG_NAMES[k]}`;
+}
+const roomsNow = () => Array.from({ length: state.segCount }, (_, k) => roomFor(k));
+
+/* A join box per segment, each with its own QR, its own link and the colour of
+   the curve its students will draw. Which link a student is handed IS which
+   segment they land in — that is the whole mechanism. */
+function renderJoin() {
+  const box = $('joinBoxes');
+  box.innerHTML = '';
+  if (!live) return;
+
+  const base = (state.server || DEFAULT_SERVER).replace(/\/$/, '');
+  const css = getComputedStyle(document.documentElement);
+  const split = state.segCount > 1;
+
+  roomsNow().forEach((room, k) => {
+    const url = `${base}/r/${room}`;
+    const wrap = document.createElement('div');
+    wrap.className = 'join' + (split ? ' tagged' : '');
+    if (split) wrap.style.borderLeftColor = css.getPropertyValue(SEG_VARS[k]).trim();
+
+    const img = document.createElement('img');
+    img.className = 'qr'; img.alt = `QR code for ${room}`;
+    img.src = `${base}/qr.svg?text=${encodeURIComponent(url)}`;
+
+    const text = document.createElement('div'); text.className = 'join-text';
+    if (split) {
+      const seg = document.createElement('span'); seg.className = 'join-seg';
+      seg.textContent = 'Segment ' + SEG_NAMES[k];
+      seg.style.color = css.getPropertyValue(SEG_VARS[k]).trim();
+      text.appendChild(seg);
+    }
+    const lab = document.createElement('span'); lab.className = 'join-label';
+    lab.textContent = 'Students go to';
+    const code = document.createElement('code'); code.className = 'join-url';
+    code.textContent = url.replace(/^https?:\/\//, '');
+    text.append(lab, code);
+
+    wrap.append(img, text);
+    box.appendChild(wrap);
+  });
 }
 
 async function goLive() {
@@ -844,35 +1169,51 @@ async function goLive() {
     return;
   }
 
+  const rooms = roomsNow();
   socket = window.io(base, { transports: ['websocket', 'polling'], timeout: 8000 });
 
   socket.on('connect', () => {
-    socket.emit('join', { room, role: 'dashboard' }, res => {
-      // A restart on the free tier looks like an empty room. Offer our copy back.
-      if (res && !res.responses.length && state.responses.length) {
-        socket.emit('restore', { room, responses: state.responses });
-      } else if (res) {
-        adoptRemote(res.responses);
-      }
+    rooms.forEach((r, k) => {
+      socket.emit('join', { room: r, role: 'dashboard' }, res => {
+        if (!res) return;
+        // A restart on the free tier looks like an empty room. Offer our copy back.
+        const mine = inSeg(k);
+        if (!res.responses.length && mine.length) socket.emit('restore', { room: r, responses: mine });
+        else adoptRemote(k, res.responses);
+      });
     });
     setLive(true);
-    showJoin(base, room);
+    renderJoin();
   });
 
   socket.on('responses', payload => {
-    if (!payload || payload.room !== room) return;
-    adoptRemote(payload.responses);
-    liveStatus(`Live · ${payload.responses.length} submitted · ${payload.online} on the form`, 'on');
+    if (!payload) return;
+    const k = rooms.indexOf(payload.room);
+    if (k < 0) return;                            // a room we are not showing
+    adoptRemote(k, payload.responses);
+    liveStatus(liveLine(), 'on');
   });
 
   socket.on('connect_error', () => liveStatus('Server unreachable — retrying…', 'err'));
   socket.on('disconnect', () => { if (live) liveStatus('Disconnected — retrying…', 'err'); });
 }
 
-function adoptRemote(responses) {
-  state.responses = (responses || []).map(r => ({
-    id: r.id, name: r.name, wtp: r.wtp, ts: r.ts, sim: false
+// Per segment while split, because "23 submitted" across two rooms hides the
+// thing you actually want to know: whether both links are being used.
+function liveLine() {
+  if (state.segCount < 2) return `Live · ${visible().length} submitted`;
+  return 'Live · ' + SEG_NAMES.slice(0, state.segCount)
+    .map((nm, k) => `${nm} ${inSeg(k).length}`).join(' · ');
+}
+
+/* Replaces one segment's answers, leaving the others alone — each room pushes
+   its own full list, so merging by segment is what keeps them independent. */
+function adoptRemote(k, responses) {
+  const others = state.responses.filter(r => segOf(r) !== k);
+  const mine = (responses || []).map(r => ({
+    id: r.id, name: r.name, wtp: r.wtp, ts: r.ts, sim: false, seg: k
   }));
+  state.responses = others.concat(mine);
   save();
   render();
 }
@@ -880,7 +1221,7 @@ function adoptRemote(responses) {
 function goOffline() {
   if (socket) { socket.close(); socket = null; }
   setLive(false);
-  $('joinBox').hidden = true;
+  $('joinBoxes').innerHTML = '';
   liveStatus('Offline. The chart is showing simulated answers.');
 }
 
@@ -891,6 +1232,8 @@ function setLive(on) {
   // Simulated answers would desync from the server the moment one arrived.
   ['arriveBtn', 'oneBtn', 'undoBtn'].forEach(id => { $(id).disabled = on; });
   $('classSize').disabled = on;
+  // Re-splitting mid-stream would point at rooms nobody was sent to.
+  [1, 2, 3].forEach(i => { $('seg' + i).disabled = on; });
   $('sideHint').textContent = on
     ? 'Simulation is paused while live. Press Stop to use it as a fallback.'
     : 'Stands in for the class until you go live. They arrive every 0.3 seconds.';
@@ -969,9 +1312,17 @@ document.addEventListener('DOMContentLoaded', () => {
   $('sortDesc').addEventListener('click', () => setSort('desc'));
   $('sortAsc').addEventListener('click',  () => setSort('asc'));
 
+  [1, 2, 3].forEach(i => $('seg' + i).addEventListener('click', () => setSegCount(i)));
+  $('demandSegs').addEventListener('click', () => setDemandView('segments'));
+  $('demandPool').addEventListener('click', () => setDemandView('pooled'));
+  $('profitSegs').addEventListener('click', () => setProfitView('segments'));
+  $('profitPool').addEventListener('click', () => setProfitView('pooled'));
+
   // Delegated, because the rows are rebuilt on every arrival — binding each row
   // would mean rebinding 45 listeners several times a second while a class
   // files in. 'mouseover' rather than 'mouseenter': only the former bubbles.
+  $('numbersBox').addEventListener('toggle', () => { if (listStale) renderList(); });
+
   const wtp = $('wtpList');
   wtp.addEventListener('mouseover', e => {
     const row = e.target.closest('.wtp-row');

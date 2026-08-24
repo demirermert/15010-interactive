@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Live demand curve — 15.010 Lecture 1</title>
-<link rel="stylesheet" href="styles.css?v=18">
+<link rel="stylesheet" href="styles.css?v=20">
 </head>
 <body>
 <div class="page">
@@ -39,12 +39,19 @@
     <section class="panel chart-panel">
       <div class="panel-head">
         <p class="section-label">Demand curve</p>
-        <div class="modes" role="group" aria-label="What hovering shows">
-          <button class="mode-btn is-on" id="modeStudents" data-mode="students">Students</button>
-          <button class="mode-btn"       id="modePrice"    data-mode="price">Price</button>
+        <div class="head-tools">
+          <!-- only worth showing once the class has been split -->
+          <div class="modes" role="group" aria-label="Segments or pooled" id="demandViewToggle" hidden>
+            <button class="mode-btn is-on" id="demandSegs" data-dv="segments">Segments</button>
+            <button class="mode-btn"       id="demandPool" data-dv="pooled">Pooled</button>
+          </div>
+          <div class="modes" role="group" aria-label="What hovering shows">
+            <button class="mode-btn is-on" id="modeStudents" data-mode="students">Students</button>
+            <button class="mode-btn"       id="modePrice"    data-mode="price">Price</button>
+          </div>
         </div>
       </div>
-      <p class="section-note">Every student's maximum, highest first. Read across at any price to see
+      <p class="section-note" id="chartNote">Every student's maximum, highest first. Read across at any price to see
          how many are still willing to buy. Each step is one student.</p>
 
       <div class="canvas-wrap">
@@ -62,6 +69,7 @@
         <p class="empty" id="emptyNote"><span>No responses yet. Press <strong>Students arrive</strong>
            to simulate a class.</span></p>
       </div>
+      <div class="legend" id="legend" hidden></div>
       <p class="hover-hint" id="hoverHint">Hover anywhere along the curve to see who each student is.</p>
     </section>
 
@@ -73,7 +81,7 @@
 
       <div class="modes full" role="tablist" aria-label="Right panel">
         <button class="mode-btn is-on" id="viewClassBtn"   data-view="class">The class</button>
-        <button class="mode-btn"       id="viewOptimalBtn" data-view="optimal">Optimal</button>
+        <button class="mode-btn"       id="viewOptimalBtn" data-view="optimal">Profit</button>
       </div>
 
       <div class="side-view" id="viewClass">
@@ -97,14 +105,21 @@
           <input id="roomCode" class="txt code" value="15010" maxlength="12" spellcheck="false">
           <button id="liveBtn" class="btn">Go live</button>
         </div>
-        <p class="live-status" id="liveStatus">Offline. The chart is showing simulated answers.</p>
-        <div class="join" id="joinBox" hidden>
-          <img class="qr" id="qrImg" alt="QR code to the student form">
-          <div class="join-text">
-            <span class="join-label">Students go to</span>
-            <code class="join-url" id="joinUrl"></code>
+
+        <!-- Split the class before going live: each segment gets its own room,
+             its own link and its own QR code, so who gets which link is the
+             instructor's choice at the door. -->
+        <div class="side-row seg-row">
+          <span class="seg-label">Segments</span>
+          <div class="modes" role="group" aria-label="Number of segments">
+            <button class="mode-btn is-on" id="seg1" data-segs="1">1</button>
+            <button class="mode-btn"       id="seg2" data-segs="2">2</button>
+            <button class="mode-btn"       id="seg3" data-segs="3">3</button>
           </div>
         </div>
+
+        <p class="live-status" id="liveStatus">Offline. The chart is showing simulated answers.</p>
+        <div id="joinBoxes"></div>
       </div>
 
       <hr class="rule">
@@ -130,6 +145,11 @@
 
       <!-- -------- the optimal-price view -------- -->
       <div class="side-view" id="viewOptimal" hidden>
+
+        <div class="modes full" role="group" aria-label="Segments or pooled" id="profitViewToggle" hidden>
+          <button class="mode-btn is-on" id="profitSegs" data-pv="segments">Segments</button>
+          <button class="mode-btn"       id="profitPool" data-pv="pooled">Pooled</button>
+        </div>
 
         <div class="slide-head">
           <p class="section-label">Cost to make one</p>
@@ -160,28 +180,44 @@
           <output class="slide-val" id="priceVal" for="priceSlider">$10.00</output>
         </div>
 
-        <div class="stat-list">
-          <div class="stat-row"><span class="stat-label">Buyers</span><span class="stat-value" id="uQty">–</span></div>
-          <div class="stat-row"><span class="stat-label">Profit</span><span class="stat-value" id="uProfit">–</span></div>
-        </div>
-        <p class="stat-foot" id="uFoot"></p>
+        <!-- pooled: one market, one price, one answer -->
+        <div id="pooledBlocks">
+          <div class="stat-list">
+            <div class="stat-row"><span class="stat-label">Buyers</span><span class="stat-value" id="uQty">–</span></div>
+            <div class="stat-row"><span class="stat-label">Profit</span><span class="stat-value" id="uProfit">–</span></div>
+          </div>
+          <p class="stat-foot" id="uFoot"></p>
 
-        <hr class="rule">
+          <hr class="rule">
 
-        <p class="section-label">Best you could do</p>
-        <div class="stat-list">
-          <div class="stat-row"><span class="stat-label">Best price</span><span class="stat-value" id="oPrice">–</span></div>
-          <div class="stat-row"><span class="stat-label">Buyers</span><span class="stat-value" id="oQty">–</span></div>
-          <div class="stat-row"><span class="stat-label">Profit</span><span class="stat-value" id="oProfit">–</span></div>
+          <p class="section-label">Best you could do</p>
+          <div class="stat-list">
+            <div class="stat-row"><span class="stat-label">Best price</span><span class="stat-value" id="oPrice">–</span></div>
+            <div class="stat-row"><span class="stat-label">Buyers</span><span class="stat-value" id="oQty">–</span></div>
+            <div class="stat-row"><span class="stat-label">Profit</span><span class="stat-value" id="oProfit">–</span></div>
+          </div>
+          <p class="stat-foot" id="oFoot"></p>
         </div>
-        <p class="stat-foot" id="oFoot"></p>
+
+        <!-- segments: the same single price charged to everyone, segment by
+             segment, against the best price for each segment on its own -->
+        <div id="segBlocks" hidden>
+          <table class="seg-table" id="segAtPrice"></table>
+          <p class="stat-foot" id="segFootA"></p>
+
+          <hr class="rule">
+
+          <p class="section-label">Best price for each segment</p>
+          <table class="seg-table" id="segBest"></table>
+          <p class="stat-foot" id="segFootB"></p>
+        </div>
 
       </div><!-- /viewOptimal -->
     </aside>
   </div>
 
   <!-- ============================ numbers ============================ -->
-  <details class="numbers">
+  <details class="numbers" id="numbersBox">
     <summary>Show the numbers</summary>
     <div class="numbers-body">
       <div class="numbers-head">
@@ -203,6 +239,6 @@
   <footer class="foot">15.010 · Economic Analysis for Business Decisions · Lecture 1</footer>
 </div>
 
-<script src="app.js?v=18"></script>
+<script src="app.js?v=20"></script>
 </body>
 </html>
