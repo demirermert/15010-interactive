@@ -168,7 +168,12 @@ h1{font-size:31px;line-height:1.15;font-weight:600;letter-spacing:-.02em}
   color:var(--ink-soft);font-weight:700;margin-bottom:13px;padding-bottom:10px;
   border-bottom:1px solid var(--line)}
 .controls-card .rule{margin:17px 0 15px}
-.controls-card .txt,.controls-card .num,.controls-card .btn:not(.btn-primary),
+/* White grounds for the things you type in and press — but NOT for a button that
+   has been given a colour of its own. This rule outranks .btn.live-on, so
+   without the exclusion the green Stop button kept its white text and lost its
+   green fill, and read as an empty box. */
+.controls-card .txt,.controls-card .num,
+.controls-card .btn:not(.btn-primary):not(.live-on),
 .controls-card .modes,.controls-card .join{background:#fff}
 
 .side-controls{display:flex;flex-direction:column;gap:9px}
