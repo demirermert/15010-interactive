@@ -36,7 +36,7 @@ const DEFAULT_SERVER = location.protocol.startsWith('http')
 
 const DEFAULTS = { classSize: 45, responses: [], mode: 'students',
                    server: DEFAULT_SERVER, room: '15010',
-                   view: 'class', cost: 0, price: null };
+                   view: 'class', cost: 0, price: null, sort: 'desc' };
 let state = structuredClone(DEFAULTS);
 let newestId = null;
 let arrivalTimer = null;   // non-null while a class is arriving
@@ -213,7 +213,9 @@ function drawChart() {
   rows.forEach((r, i) => {
     const x = X(i + 0.5), y = Y(r.wtp);
     points.push({ x, y, name: r.name, wtp: r.wtp, id: r.id });
-    if (priceMode) return;
+    // In price mode the dots are off — except the one being pointed at in the
+    // list below, which should still be findable without changing mode first.
+    if (priceMode && i !== hoverIdx) return;
     if (dense && i !== hoverIdx) return;
     const on = i === hoverIdx;
     g.beginPath(); g.arc(x, y, on ? 5.5 : 3, 0, Math.PI * 2);
@@ -222,8 +224,9 @@ function drawChart() {
     g.lineWidth = on ? 2 : 1.5; g.strokeStyle = BLUE; g.stroke();
   });
 
-  // ---- students mode: guides to both axes for the student under the cursor
-  if (!priceMode && hoverIdx >= 0 && points[hoverIdx]) {
+  // ---- guides to both axes for the student under the cursor, wherever the
+  // cursor is — over the curve itself, or over their row in the list
+  if (hoverIdx >= 0 && points[hoverIdx]) {
     const p = points[hoverIdx];
     g.save();
     g.setLineDash([3, 4]); g.strokeStyle = BLUE; g.globalAlpha = .45; g.lineWidth = 1;
@@ -593,6 +596,7 @@ function onMove(e) {
   if (idx !== hoverIdx) {
     hoverIdx = idx;
     cv.classList.toggle('pointing', idx >= 0);
+    markRow(idx >= 0 && points[idx] ? points[idx].id : null);
     drawChart();
   }
   const tip = $('tip');
@@ -614,7 +618,7 @@ function onLeave() {
     if (pricePinned) return;                        // keep it up while it is locked
     if (hoverPrice !== null) { hoverPrice = null; drawChart(); showPriceBox(); }
   } else if (hoverIdx !== -1) {
-    hoverIdx = -1; drawChart();
+    hoverIdx = -1; markRow(null); drawChart();
   }
   $('tip').hidden = true;
   $('demandCanvas').classList.remove('pointing');
@@ -660,6 +664,71 @@ function setMode(mode) {
   drawChart();
 }
 
+/* ------------------------------------------------------------- the numbers */
+
+/* Every answer as a row you can point at. Rank is always by willingness to pay,
+ * highest = 1, so a student keeps the same number whichever way you sort — the
+ * list reorders, the identity does not. */
+function renderList() {
+  const list = $('wtpList');
+  const rows = ranked();
+  const order = state.sort === 'asc' ? rows.slice().reverse() : rows;
+
+  // Ranks come from one pass, not a lookup per row: renderList runs on every
+  // arrival, and a 500-student class would otherwise re-sort 500 times per
+  // frame while they file in.
+  const rank1 = new Map(rows.map((r, i) => [r.id, i + 1]));
+
+  list.innerHTML = '';
+  order.forEach(r => {
+    const rank = rank1.get(r.id);
+    const li = document.createElement('li');
+    li.className = 'wtp-row' + (r.sim ? ' sim' : '') + (r.id === newestId ? ' new' : '');
+    li.dataset.id = r.id;
+    const n = document.createElement('span'); n.className = 'wtp-name';
+    n.textContent = r.name || 'Anonymous';
+    const k = document.createElement('span'); k.className = 'wtp-rank';
+    k.textContent = '#' + rank;
+    const w = document.createElement('span'); w.className = 'wtp-wtp';
+    w.textContent = money(r.wtp);
+    li.append(k, n, w);
+    list.appendChild(li);
+  });
+
+  $('numbersHint').textContent = rows.length
+    ? 'Hover a row to find that student on the curve.' : '';
+}
+
+// Where this student sits on the curve — which is also their index in points[].
+function rankOf(id) { return ranked().findIndex(r => r.id === id); }
+
+/* Hovering the list drives the same highlight the chart's own hover does, and
+   hovering the chart lights the matching row. One hovered student, two views
+   of it. */
+function markRow(id) {
+  document.querySelectorAll('.wtp-row.on').forEach(el => el.classList.remove('on'));
+  if (id) {
+    const el = document.querySelector(`.wtp-row[data-id="${id}"]`);
+    if (el) el.classList.add('on');
+  }
+}
+
+function hoverStudent(id) {
+  const i = id === null ? -1 : rankOf(id);
+  if (i === hoverIdx) return;
+  hoverIdx = i;
+  markRow(i < 0 ? null : id);
+  drawChart();
+}
+
+function setSort(sort) {
+  state.sort = sort === 'asc' ? 'asc' : 'desc';
+  $('sortDesc').classList.toggle('is-on', state.sort === 'desc');
+  $('sortAsc').classList.toggle('is-on',  state.sort === 'asc');
+  save();
+  renderList();
+}
+
 /* ----------------------------------------------------------------- render */
 
 function render() {
@@ -685,15 +754,7 @@ function render() {
     $('numbersLine').textContent = 'Nothing submitted yet.';
   }
 
-  const chips = $('chipList');
-  chips.innerHTML = '';
-  state.responses.slice().reverse().forEach(r => {
-    const el = document.createElement('span');
-    el.className = 'chip' + (r.sim ? ' sim' : '') + (r.id === newestId ? ' new' : '');
-    el.textContent = `${r.name || 'Anonymous'} ${money(r.wtp)}`;
-    chips.appendChild(el);
-  });
-
+  renderList();
   drawChart();
   showPriceBox();
   if (state.view === 'optimal') renderOptimal();
@@ -702,6 +763,7 @@ function render() {
 function syncInputs() {
   $('classSize').value = state.classSize;
   setMode(state.mode);
+  setSort(state.sort);
   setView(state.view);          // renderOptimal() fills both sliders from state
 }
 function commit() { save(); render(); }
@@ -903,6 +965,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
   $('viewClassBtn').addEventListener('click',   () => setView('class'));
   $('viewOptimalBtn').addEventListener('click', () => setView('optimal'));
+
+  $('sortDesc').addEventListener('click', () => setSort('desc'));
+  $('sortAsc').addEventListener('click',  () => setSort('asc'));
+
+  // Delegated, because the rows are rebuilt on every arrival — binding each row
+  // would mean rebinding 45 listeners several times a second while a class
+  // files in. 'mouseover' rather than 'mouseenter': only the former bubbles.
+  const wtp = $('wtpList');
+  wtp.addEventListener('mouseover', e => {
+    const row = e.target.closest('.wtp-row');
+    if (row) hoverStudent(row.dataset.id);
+  });
+  wtp.addEventListener('mouseleave', () => hoverStudent(null));
 
   // 'input' rather than 'change' so everything moves WHILE the handle is being
   // dragged. Watching the peak walk up as cost rises is the whole point of it.

@@ -199,10 +199,25 @@ h1{font-size:31px;line-height:1.15;font-weight:600;letter-spacing:-.02em}
 .numbers-body{padding:6px 0 14px}
 .numbers-line{font-size:13.5px;color:var(--ink-soft);margin-bottom:12px}
 .numbers-line code{font:13px var(--mono);color:var(--ink)}
-.chips{display:flex;flex-wrap:wrap;gap:5px}
-.chip{font:12.5px var(--mono);border:1px solid var(--line);border-radius:999px;padding:2px 9px;color:var(--ink-soft)}
-.chip.sim{background:#f7f7f5;color:var(--muted)}
-.chip.new{background:var(--blue);border-color:var(--blue);color:#fff}
+.numbers-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;
+  gap:10px 16px;margin-bottom:14px}
+.numbers-head .numbers-line{margin-bottom:0}
+
+/* CSS columns rather than a grid: a ranked list should read DOWN a column and
+   then across, the way a leaderboard does. A grid would lay it out left to
+   right and put rank 2 beside rank 1. */
+.wtp-list{columns:4;column-gap:24px;list-style:none;margin:0;padding:0}
+.wtp-row{break-inside:avoid;display:flex;align-items:baseline;gap:9px;
+  padding:4px 7px;border-bottom:1px solid var(--line-soft);border-radius:5px;cursor:default}
+.wtp-row:hover,.wtp-row.on{background:#eef3fe}
+.wtp-row.on{border-bottom-color:transparent}
+.wtp-rank{font:11px var(--mono);color:var(--muted);flex:0 0 24px}
+.wtp-name{font-size:13.5px;color:var(--ink);flex:1;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wtp-row.sim .wtp-name{color:var(--muted)}
+.wtp-wtp{font:13.5px var(--mono);font-weight:500;color:var(--ink)}
+.wtp-row.new .wtp-wtp{color:var(--blue)}
+.numbers-hint{font-size:12px;color:var(--muted);margin-top:12px}
 
 
 .foot{margin-top:44px;padding-top:16px;border-top:1px solid var(--line);
@@ -216,7 +231,9 @@ h1{font-size:31px;line-height:1.15;font-weight:600;letter-spacing:-.02em}
   h1{font-size:24px}
   /* no room for one line down here — let it wrap rather than truncate */
   .lede{white-space:normal;text-overflow:clip}
+  .wtp-list{columns:2}
 }
 @media (max-width:560px){
   .page{padding:26px 16px 48px}
+  .wtp-list{columns:1}
 }

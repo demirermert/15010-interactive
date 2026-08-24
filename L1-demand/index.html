@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Live demand curve — 15.010 Lecture 1</title>
-<link rel="stylesheet" href="styles.css?v=16">
+<link rel="stylesheet" href="styles.css?v=18">
 </head>
 <body>
 <div class="page">
@@ -184,8 +184,18 @@
   <details class="numbers">
     <summary>Show the numbers</summary>
     <div class="numbers-body">
-      <p class="numbers-line" id="numbersLine"></p>
-      <div class="chips" id="chipList"></div>
+      <div class="numbers-head">
+        <p class="numbers-line" id="numbersLine"></p>
+        <div class="modes" role="group" aria-label="Sort order">
+          <button class="mode-btn is-on" id="sortDesc" data-sort="desc">High to low</button>
+          <button class="mode-btn"       id="sortAsc"  data-sort="asc">Low to high</button>
+        </div>
+      </div>
+      <!-- Hovering a row lights that student up on the demand curve. The rank is
+           always by willingness to pay, so a student keeps the same number
+           whichever way the list is sorted. -->
+      <ul class="wtp-list" id="wtpList"></ul>
+      <p class="numbers-hint" id="numbersHint"></p>
     </div>
   </details>
 
@@ -193,6 +203,6 @@
   <footer class="foot">15.010 · Economic Analysis for Business Decisions · Lecture 1</footer>
 </div>
 
-<script src="app.js?v=16"></script>
+<script src="app.js?v=18"></script>
 </body>
 </html>
