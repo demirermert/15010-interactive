@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Live demand curve — 15.010 Lecture 1</title>
-<link rel="stylesheet" href="styles.css?v=20">
+<link rel="stylesheet" href="styles.css?v=21">
 </head>
 <body>
 <div class="page">
@@ -29,7 +29,7 @@
       <p class="eyebrow">Live demand curve · 15.010 Lecture 1</p>
       <h1 id="titleLine">Demand curve of the class</h1>
     </div>
-    <p class="lede" id="descLine">A hot Italian sub from the North End: mortadella, hot capicola, and Genoa salami, with sharp provolone, giardiniera, and shredded lettuce on a seeded roll. One sub, wrapped to take away.</p>
+    <p class="lede" id="descLine">A hot Italian sub from the North End: mortadella and Genoa salami, with sharp provolone, giardiniera, and shredded lettuce on a seeded roll. One sub, wrapped to take away.</p>
   </header>
 
   <!-- ======================= the two panels ======================= -->
@@ -100,7 +100,9 @@
 
       <p class="section-label">Live submissions</p>
       <div class="side-controls">
-        <input id="serverUrl" class="txt" placeholder="https://….onrender.com" spellcheck="false">
+        <!-- No server field: this page is served BY the submission server, so the
+             address is simply wherever it came from. One less thing to get wrong
+             five minutes before class. -->
         <div class="side-row">
           <input id="roomCode" class="txt code" value="15010" maxlength="12" spellcheck="false">
           <button id="liveBtn" class="btn">Go live</button>
@@ -168,16 +170,22 @@
           <p class="empty" id="profitEmpty"><span>No responses yet.</span></p>
         </div>
 
-        <!-- The price slider sits directly under the chart and is given the same
-             range and the same side padding, so the handle lines up with the
-             point on the curve it is picking out. -->
-        <div class="price-slide" id="priceSlideWrap">
-          <input type="range" id="priceSlider" class="slider price" min="0" max="30" step="0.25" value="10"
-                 aria-label="the price you set">
-        </div>
-        <div class="slide-head">
-          <p class="section-label">Your price</p>
-          <output class="slide-val" id="priceVal" for="priceSlider">$10.00</output>
+        <!-- Setting one price only makes sense against one market. Split, the
+             answer is a price PER segment, and a single slider sitting over
+             three curves invites exactly the confusion the split is meant to
+             clear up — so the whole block goes when segments are showing. -->
+        <div id="yourPriceBlock">
+          <!-- The price slider sits directly under the chart and is given the same
+               range and the same side padding, so the handle lines up with the
+               point on the curve it is picking out. -->
+          <div class="price-slide" id="priceSlideWrap">
+            <input type="range" id="priceSlider" class="slider price" min="0" max="30" step="0.25" value="10"
+                   aria-label="the price you set">
+          </div>
+          <div class="slide-head">
+            <p class="section-label">Your price</p>
+            <output class="slide-val" id="priceVal" for="priceSlider">$10.00</output>
+          </div>
         </div>
 
         <!-- pooled: one market, one price, one answer -->
@@ -202,11 +210,6 @@
         <!-- segments: the same single price charged to everyone, segment by
              segment, against the best price for each segment on its own -->
         <div id="segBlocks" hidden>
-          <table class="seg-table" id="segAtPrice"></table>
-          <p class="stat-foot" id="segFootA"></p>
-
-          <hr class="rule">
-
           <p class="section-label">Best price for each segment</p>
           <table class="seg-table" id="segBest"></table>
           <p class="stat-foot" id="segFootB"></p>
@@ -239,6 +242,6 @@
   <footer class="foot">15.010 · Economic Analysis for Business Decisions · Lecture 1</footer>
 </div>
 
-<script src="app.js?v=20"></script>
+<script src="app.js?v=21"></script>
 </body>
 </html>

@@ -466,7 +466,7 @@ function drawProfit() {
   // as wide as the label, so a fixed threshold clips a tick at one price range
   // and drops too many at another.
   const buried = (x, half) =>
-    Math.abs(x - ux) < uw / 2 + half + 5 ||
+    (single && Math.abs(x - ux) < uw / 2 + half + 5) ||
     (bx !== null && Math.abs(x - bx) < bw / 2 + half + 5);
 
   // ---- axes: baseline and price ticks
@@ -517,30 +517,29 @@ function drawProfit() {
   // plot, so it stays visible even where profit is zero and the curve is flat
   // on the axis. Drawn before the peak so the accent marker sits on top of it.
   const INK = css.getPropertyValue('--ink').trim() || '#1a1a1a';
+  let uxc = -1e6;                                 // off-plot until there is a line
 
-  g.save();
-  g.strokeStyle = INK; g.lineWidth = 1.5; g.globalAlpha = .5;
-  g.beginPath(); g.moveTo(ux, padT); g.lineTo(ux, Y(0)); g.stroke();
-  g.restore();
+  if (single) {
+    g.save();
+    g.strokeStyle = INK; g.lineWidth = 1.5; g.globalAlpha = .5;
+    g.beginPath(); g.moveTo(ux, padT); g.lineTo(ux, Y(0)); g.stroke();
+    g.restore();
 
-  // a dot where your price meets each curve — charge one price to everyone and
-  // this is what each segment hands back
-  cast.forEach(s => {
-    const uv = profitIn(s.rows, up, c);
-    if (uv <= 0) return;
-    g.beginPath(); g.arc(ux, Y(uv), 4, 0, Math.PI * 2);
-    g.fillStyle = INK; g.fill();
-  });
+    const uv = profitIn(cast[0].rows, up, c);
+    if (uv > 0) {
+      g.beginPath(); g.arc(ux, Y(uv), 4, 0, Math.PI * 2);
+      g.fillStyle = INK; g.fill();
+    }
 
-  // its price on the axis, on a white patch so it covers the tick beneath
-  const uLbl = money(up);
-  g.font = MARK_FONT;
-  g.textAlign = 'center'; g.textBaseline = 'top';
-  const uxc = Math.min(Math.max(ux, padL + uw / 2 + 4), W - padR - uw / 2 - 4);
-  g.fillStyle = '#fff';
-  g.fillRect(uxc - uw / 2 - 4, padT + plotH + 4, uw + 8, 15);
-  g.fillStyle = INK;
-  g.fillText(uLbl, uxc, padT + plotH + 6);
+    // its price on the axis, on a white patch so it covers the tick beneath
+    g.font = MARK_FONT;
+    g.textAlign = 'center'; g.textBaseline = 'top';
+    uxc = Math.min(Math.max(ux, padL + uw / 2 + 4), W - padR - uw / 2 - 4);
+    g.fillStyle = '#fff';
+    g.fillRect(uxc - uw / 2 - 4, padT + plotH + 4, uw + 8, 15);
+    g.fillStyle = INK;
+    g.fillText(money(up), uxc, padT + plotH + 6);
+  }
 
   // ---- each peak: a drop to the price axis and a dot, in that curve's colour.
   // Pooled uses the accent so it reads as "the answer"; split, each peak wears
@@ -599,10 +598,14 @@ function renderOptimal() {
 
   const cast = series(state.profitView);
   const split = cast.length > 1;
-  $('pooledBlocks').hidden = split;
-  $('segBlocks').hidden    = !split;
+  $('pooledBlocks').hidden   = split;
+  $('segBlocks').hidden      = !split;
+  // One price only means something against one market. Split, the answer is a
+  // price per segment, and a single slider laid over three curves invites the
+  // exact confusion the split exists to clear up.
+  $('yourPriceBlock').hidden = split;
 
-  if (split) renderSegmentBlocks(cast, p, c);
+  if (split) renderSegmentBlocks(cast, c);
   else       renderPooledBlocks(n, p, c, best);
 
   drawProfit();
@@ -636,9 +639,10 @@ function renderPooledBlocks(n, p, c, best) {
   }
 }
 
-/* One price for everyone against a price per segment — which is the whole
-   argument for splitting a market, laid out as two totals you can compare. */
-function renderSegmentBlocks(cast, p, c) {
+/* The best price for each segment on its own, and what that adds up to against
+   the best single price for everyone — which is the whole argument for
+   splitting a market, in one line. */
+function renderSegmentBlocks(cast, c) {
   const css = getComputedStyle(document.documentElement);
   const cell = (text, cls) => {
     const td = document.createElement('td');
@@ -673,16 +677,6 @@ function renderSegmentBlocks(cast, p, c) {
 
   const col = s => css.getPropertyValue(s.varName).trim();
 
-  // ---- one price, charged to everyone
-  let uniform = 0;
-  const atRows = cast.map(s => {
-    const q = qtyIn(s.rows, p), v = Math.max(0, profitIn(s.rows, p, c));
-    uniform += v;
-    return { colour: col(s), cells: [SEG_NAMES[s.k], `${q}/${s.rows.length}`, money(v)] };
-  });
-  table($('segAtPrice'), ['Seg', 'Buy', 'Profit'], atRows, ['Total', '', money(uniform)]);
-  $('segFootA').textContent = `One price of ${money(p)} charged to every segment.`;
-
   // ---- the best price for each segment on its own
   let apart = 0;
   const bestRows = cast.map(s => {
@@ -697,9 +691,8 @@ function renderSegmentBlocks(cast, p, c) {
   table($('segBest'), ['Seg', 'Price', 'Buy', 'Profit'], bestRows,
         ['Total', '', '', money(apart)]);
 
-  // The honest comparison is against the best SINGLE price, not against
-  // whatever you happen to have the slider set to — otherwise the gain shown
-  // is mostly a measure of how badly the slider is placed.
+  // Against the best SINGLE price — the fair benchmark, and the reason there is
+  // no price slider on this view to muddle it with.
   const one = optimum(c);
   const gain = apart - (one ? one.profit : 0);
   $('segFootB').textContent = !one || one.profit <= 0
@@ -1155,7 +1148,7 @@ function renderJoin() {
 }
 
 async function goLive() {
-  const base = $('serverUrl').value.trim() || DEFAULT_SERVER;
+  const base = DEFAULT_SERVER;
   const room = normRoom($('roomCode').value);
   state.server = base; state.room = room;
   $('roomCode').value = room;
@@ -1294,10 +1287,8 @@ document.addEventListener('DOMContentLoaded', () => {
   cv.addEventListener('mouseleave', onLeave);
   cv.addEventListener('click', onClick);
 
-  $('serverUrl').value = state.server || DEFAULT_SERVER;
   $('roomCode').value  = state.room || '15010';
   $('liveBtn').addEventListener('click', () => (live ? goOffline() : goLive()));
-  $('serverUrl').addEventListener('change', e => { state.server = e.target.value.trim(); save(); });
   $('roomCode').addEventListener('change', e => {
     state.room = normRoom(e.target.value); e.target.value = state.room; save();
     if (live) { goOffline(); goLive(); }
