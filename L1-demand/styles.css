@@ -108,12 +108,42 @@ h1{font-size:31px;line-height:1.15;font-weight:600;letter-spacing:-.02em}
 .modes.full .mode-btn{flex:1;padding:7px 0}
 .side-view[hidden]{display:none}
 
-/* optimal view: cost box, then the profit curve */
-.cost-row{margin-bottom:2px}
-.cost-cur{font:17px var(--mono);color:var(--muted)}
-.profit-wrap{position:relative;height:190px;margin-bottom:18px;display:flex}
+/* optimal view: two sliders and the profit curve between them */
+.slide-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.slide-head .section-label{margin-bottom:0}
+.slide-val{font:19px var(--mono);font-weight:500;letter-spacing:-.02em}
+.profit-wrap{position:relative;height:190px;margin-bottom:2px;display:flex}
 #profitCanvas{flex:1;width:100%;min-height:0;display:block}
 .profit-wrap .empty{font-size:13px}
+
+/* Range inputs are styled by hand rather than left native: the default control
+   is a different colour and weight in every browser, and this one has to read
+   from the back of a lecture hall. */
+.slider{-webkit-appearance:none;appearance:none;width:100%;height:26px;margin:6px 0 4px;
+  background:none;cursor:pointer;display:block}
+.slider::-webkit-slider-runnable-track{height:5px;border-radius:3px;background:var(--line)}
+.slider::-moz-range-track{height:5px;border-radius:3px;background:var(--line)}
+.slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:19px;height:19px;
+  margin-top:-7px;border-radius:50%;background:var(--blue);border:2px solid #fff;
+  box-shadow:0 1px 3px #0003}
+.slider::-moz-range-thumb{width:19px;height:19px;border-radius:50%;background:var(--blue);
+  border:2px solid #fff;box-shadow:0 1px 3px #0003}
+.slider:focus{outline:none}
+.slider:focus::-webkit-slider-thumb{box-shadow:0 0 0 3px #2563eb33}
+.slider:focus::-moz-range-thumb{box-shadow:0 0 0 3px #2563eb33}
+/* The price slider is marked on the chart above it, so it takes ink rather than
+   blue — blue already means "the profit curve" and accent already means "the
+   best price", and a third meaning for either would muddy both. The wrapper's
+   margins are set from JS to the chart's own padding, so the handle travels in
+   step with the line it is picking out; the input itself fills the wrapper,
+   because width:auto on an input resolves to its intrinsic size, not the
+   container's. */
+.price-slide{margin:0 0 2px}
+.slider.price{margin:0}
+.slider.price::-webkit-slider-thumb{background:var(--ink)}
+.slider.price::-moz-range-thumb{background:var(--ink)}
+.slider.price:focus::-webkit-slider-thumb{box-shadow:0 0 0 3px #1a1a1a33}
+.slider.price:focus::-moz-range-thumb{box-shadow:0 0 0 3px #1a1a1a33}
 
 .side-controls{display:flex;flex-direction:column;gap:9px}
 .side-row{display:flex;gap:9px;align-items:center}

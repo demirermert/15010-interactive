@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Live demand curve — 15.010 Lecture 1</title>
-<link rel="stylesheet" href="styles.css?v=13">
+<link rel="stylesheet" href="styles.css?v=16">
 </head>
 <body>
 <div class="page">
@@ -131,15 +131,14 @@
       <!-- -------- the optimal-price view -------- -->
       <div class="side-view" id="viewOptimal" hidden>
 
-        <p class="section-label">Cost</p>
-        <div class="side-row cost-row">
-          <span class="cost-cur">$</span>
-          <input type="number" id="costInput" class="num" min="0" max="30" step="0.25" value="0"
-                 title="what one sub costs to make">
-          <span class="unit">to make one</span>
+        <div class="slide-head">
+          <p class="section-label">Cost to make one</p>
+          <output class="slide-val" id="costVal" for="costSlider">$0.00</output>
         </div>
+        <input type="range" id="costSlider" class="slider" min="0" max="30" step="0.25" value="0"
+               aria-label="cost to make one">
         <p class="side-hint">Profit at a price is <strong>(price − cost) × how many buy</strong>.
-           Leave cost at $0 and the best price is the one that maximises revenue.</p>
+           Drag cost up and watch the best price climb with it.</p>
 
         <hr class="rule">
 
@@ -149,6 +148,27 @@
           <p class="empty" id="profitEmpty"><span>No responses yet.</span></p>
         </div>
 
+        <!-- The price slider sits directly under the chart and is given the same
+             range and the same side padding, so the handle lines up with the
+             point on the curve it is picking out. -->
+        <div class="price-slide" id="priceSlideWrap">
+          <input type="range" id="priceSlider" class="slider price" min="0" max="30" step="0.25" value="10"
+                 aria-label="the price you set">
+        </div>
+        <div class="slide-head">
+          <p class="section-label">Your price</p>
+          <output class="slide-val" id="priceVal" for="priceSlider">$10.00</output>
+        </div>
+
+        <div class="stat-list">
+          <div class="stat-row"><span class="stat-label">Buyers</span><span class="stat-value" id="uQty">–</span></div>
+          <div class="stat-row"><span class="stat-label">Profit</span><span class="stat-value" id="uProfit">–</span></div>
+        </div>
+        <p class="stat-foot" id="uFoot"></p>
+
+        <hr class="rule">
+
+        <p class="section-label">Best you could do</p>
         <div class="stat-list">
           <div class="stat-row"><span class="stat-label">Best price</span><span class="stat-value" id="oPrice">–</span></div>
           <div class="stat-row"><span class="stat-label">Buyers</span><span class="stat-value" id="oQty">–</span></div>
@@ -173,6 +193,6 @@
   <footer class="foot">15.010 · Economic Analysis for Business Decisions · Lecture 1</footer>
 </div>
 
-<script src="app.js?v=13"></script>
+<script src="app.js?v=16"></script>
 </body>
 </html>

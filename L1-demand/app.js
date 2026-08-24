@@ -36,7 +36,7 @@ const DEFAULT_SERVER = location.protocol.startsWith('http')
 
 const DEFAULTS = { classSize: 45, responses: [], mode: 'students',
                    server: DEFAULT_SERVER, room: '15010',
-                   view: 'class', cost: 0 };
+                   view: 'class', cost: 0, price: null };
 let state = structuredClone(DEFAULTS);
 let newestId = null;
 let arrivalTimer = null;   // non-null while a class is arriving
@@ -307,6 +307,23 @@ function optimum(c) {
   return best;
 }
 
+/* The price axis of the profit chart, and the range of the price slider under
+   it. Shared so the two can never drift apart. */
+function priceMax() {
+  const rows = ranked();
+  const top  = rows.length ? rows[0].wtp : 10;
+  const tick = top <= 10 ? 2 : top <= 30 ? 5 : 10;
+  return Math.max(tick * 2, Math.ceil(top / tick) * tick);
+}
+
+/* Where the price slider starts before anyone has touched it: the median of the
+   class, which is the guess most people make out loud anyway, and is reliably
+   wrong in the interesting direction. */
+function defaultPrice() {
+  const st = summary();
+  return st.n ? Math.round(st.median * 4) / 4 : 10;
+}
+
 function drawProfit() {
   const cv = $('profitCanvas');
   if (!cv || $('viewOptimal').hidden) return;   // no size to measure while hidden
@@ -338,7 +355,13 @@ function drawProfit() {
   // charts share a scale and "$8 over there" is "$8 over here".
   const top  = rows[0].wtp;
   const tick = top <= 10 ? 2 : top <= 30 ? 5 : 10;
-  const pMax = Math.max(tick * 2, Math.ceil(top / tick) * tick);
+  const pMax = priceMax();
+
+  // Line the slider's travel up with the plot. The thumb's centre stops half a
+  // thumb short of each end, so the margins are the chart's padding less that.
+  const sl = $('priceSlideWrap');
+  sl.style.marginLeft  = (padL - 9.5) + 'px';
+  sl.style.marginRight = (padR - 9.5) + 'px';
 
   const best = optimum(c);
   const yMax = Math.max(best ? best.profit : 0, 1) * 1.12;
@@ -346,13 +369,36 @@ function drawProfit() {
   const X = p => padL + (p / pMax) * plotW;
   const Y = v => padT + plotH - (v / yMax) * plotH;
 
+  // Both markers write their own price onto the axis further down. Their
+  // positions are needed up here so a tick label that would end up underneath
+  // one is dropped outright, rather than left half-covered by its white patch.
+  const up = Math.max(0, Math.min(pMax, state.price ?? defaultPrice()));
+  const ux = X(up);
+  const bx = best && best.profit > 0 ? X(best.price) : null;
+
+  const MARK_FONT = 'bold 11px ui-monospace, SFMono-Regular, Menlo, monospace';
+  const TICK_FONT = '10px ui-monospace, SFMono-Regular, Menlo, monospace';
+  g.font = MARK_FONT;
+  const uw = g.measureText(money(up)).width;
+  const bw = bx === null ? 0 : g.measureText(money(best.price)).width;
+
+  // Measured rather than guessed at: the white patch behind a marker's label is
+  // as wide as the label, so a fixed threshold clips a tick at one price range
+  // and drops too many at another.
+  const buried = (x, half) =>
+    Math.abs(x - ux) < uw / 2 + half + 5 ||
+    (bx !== null && Math.abs(x - bx) < bw / 2 + half + 5);
+
   // ---- axes: baseline and price ticks
   g.strokeStyle = '#d8d8d4'; g.lineWidth = 1;
   g.beginPath(); g.moveTo(padL, Y(0) + .5); g.lineTo(W - padR, Y(0) + .5); g.stroke();
 
-  g.font = '10px ui-monospace, SFMono-Regular, Menlo, monospace';
+  g.font = TICK_FONT;
   g.fillStyle = MUTED; g.textAlign = 'center'; g.textBaseline = 'top';
-  for (let p = 0; p <= pMax + 0.001; p += tick) g.fillText('$' + p, X(p), padT + plotH + 6);
+  for (let p = 0; p <= pMax + 0.001; p += tick) {
+    const lbl = '$' + p;
+    if (!buried(X(p), g.measureText(lbl).width / 2)) g.fillText(lbl, X(p), padT + plotH + 6);
+  }
   g.textAlign = 'center';
   g.font = '11px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif';
   g.fillText('price', padL + plotW / 2, padT + plotH + 19);
@@ -384,10 +430,36 @@ function drawProfit() {
   }
   g.strokeStyle = BLUE; g.lineWidth = 2; g.lineJoin = 'round'; g.stroke();
 
+  // ---- the price you have set: a plain vertical line the full height of the
+  // plot, so it stays visible even where profit is zero and the curve is flat
+  // on the axis. Drawn before the peak so the accent marker sits on top of it.
+  const INK = css.getPropertyValue('--ink').trim() || '#1a1a1a';
+  const uv = profitAt(up, c);
+
+  g.save();
+  g.strokeStyle = INK; g.lineWidth = 1.5; g.globalAlpha = .5;
+  g.beginPath(); g.moveTo(ux, padT); g.lineTo(ux, Y(0)); g.stroke();
+  g.restore();
+
+  if (uv > 0) {
+    g.beginPath(); g.arc(ux, Y(uv), 4, 0, Math.PI * 2);
+    g.fillStyle = INK; g.fill();
+  }
+
+  // its price on the axis, on a white patch so it covers the tick beneath
+  const uLbl = money(up);
+  g.font = MARK_FONT;
+  g.textAlign = 'center'; g.textBaseline = 'top';
+  const uxc = Math.min(Math.max(ux, padL + uw / 2 + 4), W - padR - uw / 2 - 4);
+  g.fillStyle = '#fff';
+  g.fillRect(uxc - uw / 2 - 4, padT + plotH + 4, uw + 8, 15);
+  g.fillStyle = INK;
+  g.fillText(uLbl, uxc, padT + plotH + 6);
+
   if (!best || best.profit <= 0) return;
 
   // ---- the peak: a drop to the price axis, a dot, and the price on the axis
-  const bx = X(best.price), by = Y(best.profit);
+  const by = Y(best.profit);
   g.save();
   g.setLineDash([4, 4]); g.strokeStyle = ACCENT; g.lineWidth = 1.5; g.globalAlpha = .75;
   g.beginPath(); g.moveTo(bx, by); g.lineTo(bx, Y(0)); g.stroke();
@@ -397,33 +469,67 @@ function drawProfit() {
   g.fillStyle = ACCENT; g.fill();
 
   const lbl = money(best.price);
-  g.font = 'bold 11px ui-monospace, SFMono-Regular, Menlo, monospace';
+  g.font = MARK_FONT;
   g.textAlign = 'center'; g.textBaseline = 'top';
-  const w = g.measureText(lbl).width;
+  const w = bw;
+  const bxc = Math.min(Math.max(bx, padL + w / 2 + 4), W - padR - w / 2 - 4);
+
+  // Both labels live on the same strip of axis. When the price you have set is
+  // near the best one they would overprint, and the dropped line already says
+  // where the peak is — so the peak's label gives way rather than smear.
+  if (Math.abs(bxc - uxc) < (w + uw) / 2 + 6) return;
+
   g.fillStyle = '#fff';
-  g.fillRect(Math.min(Math.max(bx - w / 2 - 4, padL), W - padR - w - 8), padT + plotH + 4, w + 8, 15);
+  g.fillRect(bxc - w / 2 - 4, padT + plotH + 4, w + 8, 15);
   g.fillStyle = ACCENT;
-  g.fillText(lbl, Math.min(Math.max(bx, padL + w / 2 + 4), W - padR - w / 2 - 4), padT + plotH + 6);
+  g.fillText(lbl, bxc, padT + plotH + 6);
 }
 
 function renderOptimal() {
   const c = state.cost;
-  const best = state.responses.length ? optimum(c) : null;
+  const n = state.responses.length;
+  const best = n ? optimum(c) : null;
+  const pMax = priceMax();
 
-  $('profitEmpty').classList.toggle('hidden', state.responses.length > 0);
+  // The price slider only spans prices that exist on the chart, and the chart's
+  // range moves with the class, so its bounds are reset on every render.
+  if (state.price === null) state.price = defaultPrice();
+  state.price = Math.max(0, Math.min(pMax, state.price));
+  const p = state.price;
+
+  const ps = $('priceSlider');
+  ps.max = String(pMax);
+  ps.value = String(p);
+  $('priceVal').textContent = money(p);
+  $('costSlider').value = String(c);
+  $('costVal').textContent = money(c);
+
+  $('profitEmpty').classList.toggle('hidden', n > 0);
+
+  // ---- what YOUR price does
+  const qty = n ? quantityAt(p) : 0;
+  const mine = n ? profitAt(p, c) : 0;
+  $('uQty').textContent    = n ? String(qty)  : '–';
+  $('uProfit').textContent = n ? money(mine)  : '–';
+  $('uFoot').textContent = !n ? ''
+    : p < c ? `Below the ${money(c)} it costs to make — every sale loses money.`
+    : qty === 0 ? 'Nobody in the class would pay that much.'
+    : `${qty} of ${n} buy; ${n - qty} walk away. Margin ${money(p - c)} each.`;
+
+  // ---- and what the best price does
   $('oPrice').textContent  = best ? money(best.price) : '–';
   $('oQty').textContent    = best ? String(best.qty)  : '–';
   $('oProfit').textContent = best ? money(best.profit) : '–';
 
-  if (!state.responses.length) {
+  if (!n) {
     $('oFoot').textContent = '';
   } else if (!best || best.profit <= 0) {
     $('oFoot').textContent = `Nobody is willing to pay ${money(c)}, so there is no price worth setting.`;
   } else {
-    const missed = state.responses.length - best.qty;
-    $('oFoot').textContent =
-      `${best.qty} of ${state.responses.length} buy at ${money(best.price)}; ` +
-      `${missed} walk away. Margin ${money(best.price - c)} each.`;
+    const gap = best.profit - mine;
+    $('oFoot').textContent = gap <= 0.001
+      ? 'That is the price you have set — you found it.'
+      : `${money(gap)} more than your price makes.`;
   }
   drawProfit();
 }
@@ -595,9 +701,8 @@ function render() {
 
 function syncInputs() {
   $('classSize').value = state.classSize;
-  $('costInput').value = state.cost;
   setMode(state.mode);
-  setView(state.view);
+  setView(state.view);          // renderOptimal() fills both sliders from state
 }
 function commit() { save(); render(); }
 
@@ -799,11 +904,18 @@ document.addEventListener('DOMContentLoaded', () => {
   $('viewClassBtn').addEventListener('click',   () => setView('class'));
   $('viewOptimalBtn').addEventListener('click', () => setView('optimal'));
 
-  // 'input' rather than 'change' so the curve and the peak move as you drag the
-  // stepper — the point of the box is watching the best price walk up with cost.
-  $('costInput').addEventListener('input', e => {
+  // 'input' rather than 'change' so everything moves WHILE the handle is being
+  // dragged. Watching the peak walk up as cost rises is the whole point of it.
+  $('costSlider').addEventListener('input', e => {
     const v = Number(e.target.value);
     state.cost = Number.isFinite(v) ? Math.max(0, Math.min(MAX_WTP, v)) : 0;
+    save();
+    renderOptimal();
+  });
+
+  $('priceSlider').addEventListener('input', e => {
+    const v = Number(e.target.value);
+    state.price = Number.isFinite(v) ? Math.max(0, Math.min(priceMax(), v)) : 0;
     save();
     renderOptimal();
   });
