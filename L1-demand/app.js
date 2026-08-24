@@ -1166,6 +1166,14 @@ async function goLive() {
   state.server = base; state.room = room;
   save();
 
+  /* Opened HERE, before the first await, and not once the socket connects:
+     a browser only honours window.open while the click that caused it is still
+     the current user gesture, and two awaits later it is not. Called from the
+     connect handler this was silently blocked every time, which is what the
+     "Open join screen" button was quietly papering over.
+     Nothing here depends on the connection — the rooms come from state. */
+  openJoinScreen();
+
   liveStatus('Connecting…');
   try {
     await loadSocketIo(base);
@@ -1175,7 +1183,6 @@ async function goLive() {
   }
 
   const rooms = roomsNow();
-  let opened = false;
   socket = window.io(base, { transports: ['websocket', 'polling'], timeout: 8000 });
 
   socket.on('connect', () => {
@@ -1190,7 +1197,6 @@ async function goLive() {
     });
     setLive(true);
     renderJoin();
-    if (!opened) { opened = true; openJoinScreen(); }   // once per Go live, not per reconnect
   });
 
   socket.on('responses', payload => {
