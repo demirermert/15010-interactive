@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Live demand curve — 15.010 Lecture 1</title>
-<link rel="stylesheet" href="styles.css?v=11">
+<link rel="stylesheet" href="styles.css?v=12">
 </head>
 <body>
 <div class="page">
@@ -66,7 +66,17 @@
     </section>
 
     <!-- -------- right: the numbers -------- -->
+    <!-- Two views behind one tab strip. "The class" is what the panel has always
+         been; "Optimal" swaps the whole panel for the profit curve, so the
+         demand chart on the left is never covered up. -->
     <aside class="panel side-panel">
+
+      <div class="modes full" role="tablist" aria-label="Right panel">
+        <button class="mode-btn is-on" id="viewClassBtn"   data-view="class">The class</button>
+        <button class="mode-btn"       id="viewOptimalBtn" data-view="optimal">Optimal</button>
+      </div>
+
+      <div class="side-view" id="viewClass">
 
       <p class="section-label">The class</p>
       <div class="stat-list">
@@ -115,6 +125,38 @@
       </div>
       <p class="side-hint" id="sideHint">Stands in for the class until you go live.
          They arrive every 0.3 seconds.</p>
+
+      </div><!-- /viewClass -->
+
+      <!-- -------- the optimal-price view -------- -->
+      <div class="side-view" id="viewOptimal" hidden>
+
+        <p class="section-label">Cost</p>
+        <div class="side-row cost-row">
+          <span class="cost-cur">$</span>
+          <input type="number" id="costInput" class="num" min="0" max="30" step="0.25" value="0"
+                 title="what one sub costs to make">
+          <span class="unit">to make one</span>
+        </div>
+        <p class="side-hint">Profit at a price is <strong>(price − cost) × how many buy</strong>.
+           Leave cost at $0 and the best price is the one that maximises revenue.</p>
+
+        <hr class="rule">
+
+        <p class="section-label">Profit at each price</p>
+        <div class="profit-wrap">
+          <canvas id="profitCanvas"></canvas>
+          <p class="empty" id="profitEmpty"><span>No responses yet.</span></p>
+        </div>
+
+        <div class="stat-list">
+          <div class="stat-row"><span class="stat-label">Best price</span><span class="stat-value" id="oPrice">–</span></div>
+          <div class="stat-row"><span class="stat-label">Buyers</span><span class="stat-value" id="oQty">–</span></div>
+          <div class="stat-row"><span class="stat-label">Profit</span><span class="stat-value" id="oProfit">–</span></div>
+        </div>
+        <p class="stat-foot" id="oFoot"></p>
+
+      </div><!-- /viewOptimal -->
     </aside>
   </div>
 
@@ -131,6 +173,6 @@
   <footer class="foot">15.010 · Economic Analysis for Business Decisions · Lecture 1</footer>
 </div>
 
-<script src="app.js?v=11"></script>
+<script src="app.js?v=12"></script>
 </body>
 </html>

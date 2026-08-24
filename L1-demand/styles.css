@@ -101,6 +101,18 @@ h1{font-size:31px;line-height:1.15;font-weight:600;letter-spacing:-.02em}
 .stat-foot{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.45;min-height:18px}
 .rule{border:none;border-top:1px solid var(--line);margin:22px 0 20px}
 
+/* the tab strip that swaps the whole right panel */
+.modes.full{display:flex;width:100%;margin-bottom:18px}
+.modes.full .mode-btn{flex:1;padding:7px 0}
+.side-view[hidden]{display:none}
+
+/* optimal view: cost box, then the profit curve */
+.cost-row{margin-bottom:2px}
+.cost-cur{font:17px var(--mono);color:var(--muted)}
+.profit-wrap{position:relative;height:190px;margin-bottom:18px;display:flex}
+#profitCanvas{flex:1;width:100%;min-height:0;display:block}
+.profit-wrap .empty{font-size:13px}
+
 .side-controls{display:flex;flex-direction:column;gap:9px}
 .side-row{display:flex;gap:9px;align-items:center}
 .side-row .btn{flex:1}

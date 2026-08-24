@@ -35,7 +35,8 @@ const DEFAULT_SERVER = location.protocol.startsWith('http')
   : 'https://l1-demand.onrender.com';
 
 const DEFAULTS = { classSize: 45, responses: [], mode: 'students',
-                   server: DEFAULT_SERVER, room: '15010' };
+                   server: DEFAULT_SERVER, room: '15010',
+                   view: 'class', cost: 0 };
 let state = structuredClone(DEFAULTS);
 let newestId = null;
 let arrivalTimer = null;   // non-null while a class is arriving
@@ -285,6 +286,159 @@ function drawChart() {
   }
 }
 
+/* ----------------------------------------------------------------- profit */
+
+/* Profit at a price is (price − cost) × the number who still buy there.
+ *
+ * Between two adjacent answers nobody changes their mind, so quantity is flat
+ * and profit rises with price in a straight line. The maximum therefore always
+ * lands exactly ON someone's stated maximum — which is the point worth making
+ * in class, and why this searches the answers themselves rather than a grid of
+ * prices. Ties go to the lower price, so the seller keeps more buyers. */
+const profitAt = (p, c) => (p - c) * quantityAt(p);
+
+function optimum(c) {
+  let best = null;
+  for (const p of [...new Set(state.responses.map(r => r.wtp))].sort((a, b) => a - b)) {
+    if (p < c) continue;                       // selling below cost is never the answer
+    const profit = profitAt(p, c);
+    if (!best || profit > best.profit) best = { price: p, qty: quantityAt(p), profit };
+  }
+  return best;
+}
+
+function drawProfit() {
+  const cv = $('profitCanvas');
+  if (!cv || $('viewOptimal').hidden) return;   // no size to measure while hidden
+
+  const dpr = window.devicePixelRatio || 1;
+  const rect = cv.getBoundingClientRect();
+  const W = rect.width, H = rect.height;
+  if (W < 20 || H < 20) return;
+  cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+  const g = cv.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, W, H);
+
+  const css = getComputedStyle(document.documentElement);
+  const LINE  = css.getPropertyValue('--line').trim()  || '#e5e5e3';
+  const MUTED = css.getPropertyValue('--muted').trim() || '#8a8a8a';
+  const BLUE  = css.getPropertyValue('--blue').trim()  || '#2563eb';
+  const ACCENT= css.getPropertyValue('--accent').trim()|| '#e05c3e';
+
+  const rows = ranked();
+  if (!rows.length) return;
+
+  const c = state.cost;
+  const padL = 44, padR = 12, padT = 12, padB = 30;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  if (plotW <= 10 || plotH <= 10) return;
+
+  // Price runs across the same range as the demand chart's y-axis, so the two
+  // charts share a scale and "$8 over there" is "$8 over here".
+  const top  = rows[0].wtp;
+  const tick = top <= 10 ? 2 : top <= 30 ? 5 : 10;
+  const pMax = Math.max(tick * 2, Math.ceil(top / tick) * tick);
+
+  const best = optimum(c);
+  const yMax = Math.max(best ? best.profit : 0, 1) * 1.12;
+
+  const X = p => padL + (p / pMax) * plotW;
+  const Y = v => padT + plotH - (v / yMax) * plotH;
+
+  // ---- axes: baseline and price ticks
+  g.strokeStyle = '#d8d8d4'; g.lineWidth = 1;
+  g.beginPath(); g.moveTo(padL, Y(0) + .5); g.lineTo(W - padR, Y(0) + .5); g.stroke();
+
+  g.font = '10px ui-monospace, SFMono-Regular, Menlo, monospace';
+  g.fillStyle = MUTED; g.textAlign = 'center'; g.textBaseline = 'top';
+  for (let p = 0; p <= pMax + 0.001; p += tick) g.fillText('$' + p, X(p), padT + plotH + 6);
+  g.textAlign = 'center';
+  g.font = '11px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif';
+  g.fillText('price', padL + plotW / 2, padT + plotH + 19);
+
+  // ---- profit ticks, rounded to something readable at this height
+  const pt = yMax <= 20 ? 5 : yMax <= 60 ? 20 : yMax <= 200 ? 50 : yMax <= 600 ? 100 : 250;
+  g.font = '10px ui-monospace, SFMono-Regular, Menlo, monospace';
+  g.textAlign = 'right'; g.textBaseline = 'middle';
+  for (let v = pt; v <= yMax; v += pt) {
+    const y = Y(v);
+    g.strokeStyle = LINE;
+    g.beginPath(); g.moveTo(padL, y + .5); g.lineTo(W - padR, y + .5); g.stroke();
+    g.fillStyle = MUTED; g.fillText('$' + v, padL - 6, y);
+  }
+
+  // ---- the profit curve. Sampled finely rather than drawn as steps: what the
+  // class should see is a hill with a peak, and the sawtooth of the exact
+  // function is a distraction at this size. Nothing below the axis — under cost
+  // profit dives steeply negative and would flatten everything worth looking at.
+  g.beginPath();
+  let started = false;
+  const steps = Math.max(60, Math.round(plotW));
+  for (let i = 0; i <= steps; i++) {
+    const p = (i / steps) * pMax;
+    const v = profitAt(p, c);
+    if (v < 0) { started = false; continue; }
+    const x = X(p), y = Y(v);
+    if (!started) { g.moveTo(x, y); started = true; } else g.lineTo(x, y);
+  }
+  g.strokeStyle = BLUE; g.lineWidth = 2; g.lineJoin = 'round'; g.stroke();
+
+  if (!best || best.profit <= 0) return;
+
+  // ---- the peak: a drop to the price axis, a dot, and the price on the axis
+  const bx = X(best.price), by = Y(best.profit);
+  g.save();
+  g.setLineDash([4, 4]); g.strokeStyle = ACCENT; g.lineWidth = 1.5; g.globalAlpha = .75;
+  g.beginPath(); g.moveTo(bx, by); g.lineTo(bx, Y(0)); g.stroke();
+  g.restore();
+
+  g.beginPath(); g.arc(bx, by, 4, 0, Math.PI * 2);
+  g.fillStyle = ACCENT; g.fill();
+
+  const lbl = money(best.price);
+  g.font = 'bold 11px ui-monospace, SFMono-Regular, Menlo, monospace';
+  g.textAlign = 'center'; g.textBaseline = 'top';
+  const w = g.measureText(lbl).width;
+  g.fillStyle = '#fff';
+  g.fillRect(Math.min(Math.max(bx - w / 2 - 4, padL), W - padR - w - 8), padT + plotH + 4, w + 8, 15);
+  g.fillStyle = ACCENT;
+  g.fillText(lbl, Math.min(Math.max(bx, padL + w / 2 + 4), W - padR - w / 2 - 4), padT + plotH + 6);
+}
+
+function renderOptimal() {
+  const c = state.cost;
+  const best = state.responses.length ? optimum(c) : null;
+
+  $('profitEmpty').classList.toggle('hidden', state.responses.length > 0);
+  $('oPrice').textContent  = best ? money(best.price) : '–';
+  $('oQty').textContent    = best ? String(best.qty)  : '–';
+  $('oProfit').textContent = best ? money(best.profit) : '–';
+
+  if (!state.responses.length) {
+    $('oFoot').textContent = '';
+  } else if (!best || best.profit <= 0) {
+    $('oFoot').textContent = `Nobody is willing to pay ${money(c)}, so there is no price worth setting.`;
+  } else {
+    const missed = state.responses.length - best.qty;
+    $('oFoot').textContent =
+      `${best.qty} of ${state.responses.length} buy at ${money(best.price)}; ` +
+      `${missed} walk away. Margin ${money(best.price - c)} each.`;
+  }
+  drawProfit();
+}
+
+function setView(view) {
+  const next = view === 'optimal' ? 'optimal' : 'class';
+  state.view = next;
+  $('viewClass').hidden   = next !== 'class';
+  $('viewOptimal').hidden = next !== 'optimal';
+  $('viewClassBtn').classList.toggle('is-on',   next === 'class');
+  $('viewOptimalBtn').classList.toggle('is-on', next === 'optimal');
+  save();
+  if (next === 'optimal') renderOptimal();
+}
+
 /* ------------------------------------------------------------------ hover */
 
 /* Hit-testing is by COLUMN, not by proximity to the dot. Each student owns a
@@ -436,9 +590,15 @@ function render() {
 
   drawChart();
   showPriceBox();
+  if (state.view === 'optimal') renderOptimal();
 }
 
-function syncInputs() { $('classSize').value = state.classSize; setMode(state.mode); }
+function syncInputs() {
+  $('classSize').value = state.classSize;
+  $('costInput').value = state.cost;
+  setMode(state.mode);
+  setView(state.view);
+}
 function commit() { save(); render(); }
 
 /* ---------------------------------------------------------------- arrivals */
@@ -636,5 +796,17 @@ document.addEventListener('DOMContentLoaded', () => {
   $('modeStudents').addEventListener('click', () => setMode('students'));
   $('modePrice').addEventListener('click',    () => setMode('price'));
 
-  window.addEventListener('resize', () => { onLeave(); drawChart(); });
+  $('viewClassBtn').addEventListener('click',   () => setView('class'));
+  $('viewOptimalBtn').addEventListener('click', () => setView('optimal'));
+
+  // 'input' rather than 'change' so the curve and the peak move as you drag the
+  // stepper — the point of the box is watching the best price walk up with cost.
+  $('costInput').addEventListener('input', e => {
+    const v = Number(e.target.value);
+    state.cost = Number.isFinite(v) ? Math.max(0, Math.min(MAX_WTP, v)) : 0;
+    save();
+    renderOptimal();
+  });
+
+  window.addEventListener('resize', () => { onLeave(); drawChart(); drawProfit(); });
 });
