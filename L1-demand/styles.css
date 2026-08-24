@@ -160,6 +160,17 @@ h1{font-size:31px;line-height:1.15;font-weight:600;letter-spacing:-.02em}
 .slider.price:focus::-webkit-slider-thumb{box-shadow:0 0 0 3px #1a1a1a33}
 .slider.price:focus::-moz-range-thumb{box-shadow:0 0 0 3px #1a1a1a33}
 
+/* Controls, set apart from the readout above them. Tinted ground, its own
+   border, and the inputs kept white so they still read as things you touch. */
+.controls-card{margin-top:22px;padding:15px 15px 16px;border:1px solid var(--line);
+  border-radius:11px;background:#f7f7f5}
+.controls-title{font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--ink-soft);font-weight:700;margin-bottom:13px;padding-bottom:10px;
+  border-bottom:1px solid var(--line)}
+.controls-card .rule{margin:17px 0 15px}
+.controls-card .txt,.controls-card .num,.controls-card .btn:not(.btn-primary),
+.controls-card .modes,.controls-card .join{background:#fff}
+
 .side-controls{display:flex;flex-direction:column;gap:9px}
 .side-row{display:flex;gap:9px;align-items:center}
 .side-row .btn{flex:1}

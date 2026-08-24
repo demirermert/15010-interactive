@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Live demand curve — 15.010 Lecture 1</title>
-<link rel="stylesheet" href="styles.css?v=21">
+<link rel="stylesheet" href="styles.css?v=22">
 </head>
 <body>
 <div class="page">
@@ -96,7 +96,11 @@
       </div>
       <p class="stat-foot" id="statFoot"></p>
 
-      <hr class="rule">
+      <!-- The controls sit in their own tinted card. Left flush against the
+           stats they read as more of the same readout, and the one thing an
+           instructor has to find in a hurry should not look like a number. -->
+      <div class="controls-card">
+      <p class="controls-title">Controls</p>
 
       <p class="section-label">Live submissions</p>
       <div class="side-controls">
@@ -143,6 +147,7 @@
       <p class="side-hint" id="sideHint">Stands in for the class until you go live.
          They arrive every 0.3 seconds.</p>
 
+      </div><!-- /controls-card -->
       </div><!-- /viewClass -->
 
       <!-- -------- the optimal-price view -------- -->
@@ -242,6 +247,6 @@
   <footer class="foot">15.010 · Economic Analysis for Business Decisions · Lecture 1</footer>
 </div>
 
-<script src="app.js?v=21"></script>
+<script src="app.js?v=22"></script>
 </body>
 </html>
