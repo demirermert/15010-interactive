@@ -40,19 +40,31 @@
       <div class="panel-head">
         <p class="section-label">Demand curve</p>
         <div class="head-tools">
-          <!-- only worth showing once the class has been split -->
-          <div class="modes" role="group" aria-label="Segments or pooled" id="demandViewToggle" hidden>
-            <button class="mode-btn is-on" id="demandSegs" data-dv="segments">Segments</button>
-            <button class="mode-btn"       id="demandPool" data-dv="pooled">Pooled</button>
+          <!-- appears once a second round exists: before that all three
+               buttons would show the same single curve -->
+          <div class="modes" role="group" aria-label="Which rounds to show" id="demandViewToggle" hidden>
+            <button class="mode-btn is-on" id="curve1"    data-dv="1">Round 1</button>
+            <button class="mode-btn"       id="curve2"    data-dv="2">Round 2</button>
+            <button class="mode-btn"       id="curveBoth" data-dv="both">Both</button>
           </div>
           <div class="modes" role="group" aria-label="What hovering shows">
             <button class="mode-btn is-on" id="modeStudents" data-mode="students">Students</button>
             <button class="mode-btn"       id="modePrice"    data-mode="price">Price</button>
+            <button class="mode-btn"       id="modeSurplus"  data-mode="surplus">Surplus</button>
+          </div>
+
+          <!-- Only in surplus mode: the price everyone pays. Surplus is
+               measured against a price, so one has to be named before the
+               question means anything. -->
+          <div class="price-set" id="surplusBox" hidden>
+            <label for="surplusPrice">Price</label>
+            <span class="ps-dollar">$</span>
+            <input type="number" id="surplusPrice" class="num" min="0" max="30" step="0.25"
+                   placeholder="0.00" aria-label="the price everyone pays">
+            <button id="surplusPlay" class="ps-btn" type="button">Build area</button>
           </div>
         </div>
       </div>
-      <p class="section-note" id="chartNote">Every student's maximum, highest first. Read across at any price to see
-         how many are still willing to buy. Each step is one student.</p>
 
       <div class="canvas-wrap">
         <canvas id="demandCanvas"></canvas>
@@ -66,23 +78,15 @@
         </div>
         <!-- one span, so the sentence stays a single flex item: flex would otherwise
              split it at <strong> and strip the spaces either side of the button name -->
-        <p class="empty" id="emptyNote"><span>No responses yet. Press <strong>Students arrive</strong>
-           to simulate a class.</span></p>
+        <p class="empty" id="emptyNote"><span>No responses yet. Press <strong>Go live</strong>
+           and hand out the link.</span></p>
       </div>
       <div class="legend" id="legend" hidden></div>
       <p class="hover-hint" id="hoverHint">Hover anywhere along the curve to see who each student is.</p>
     </section>
 
     <!-- -------- right: the numbers -------- -->
-    <!-- Two views behind one tab strip. "The class" is what the panel has always
-         been; "Optimal" swaps the whole panel for the profit curve, so the
-         demand chart on the left is never covered up. -->
     <aside class="panel side-panel">
-
-      <div class="modes full" role="tablist" aria-label="Right panel">
-        <button class="mode-btn is-on" id="viewClassBtn"   data-view="class">The class</button>
-        <button class="mode-btn"       id="viewOptimalBtn" data-view="optimal">Profit</button>
-      </div>
 
       <div class="side-view" id="viewClass">
 
@@ -110,116 +114,28 @@
              to get wrong five minutes before class; use Clear all between
              back-to-back sections rather than a different code. -->
         <button id="liveBtn" class="btn wide">Go live</button>
+
+        <!-- Moves the class to the second condition. Live, every phone changes
+             question at once; offline it just decides which round the
+             rehearsal answers land in. Round 1's answers are never touched. -->
+        <div class="side-row">
+          <button id="roundBtn" class="btn">Start round 2</button>
+          <span class="unit" id="roundTag">Round 1</span>
+        </div>
+
+        <!-- Wipes everything and starts the lecture over: both rounds, the
+             price, the area. Two-step, because it cannot be undone. -->
+        <button id="resetBtn" class="btn wide">Start over</button>
         <!-- Opens with Go live, and stays here to reopen: a blocked popup or a
              closed tab should not mean going offline and back on again. -->
         <button id="joinBtn" class="btn wide" hidden>Open join screen</button>
 
-        <!-- Split the class before going live: each segment gets its own room,
-             its own link and its own QR code, so who gets which link is the
-             instructor's choice at the door. -->
-        <div class="side-row seg-row">
-          <span class="seg-label">Segments</span>
-          <div class="modes" role="group" aria-label="Number of segments">
-            <button class="mode-btn is-on" id="seg1" data-segs="1">1</button>
-            <button class="mode-btn"       id="seg2" data-segs="2">2</button>
-            <button class="mode-btn"       id="seg3" data-segs="3">3</button>
-          </div>
-        </div>
-
         <p class="live-status" id="liveStatus">Offline. The chart is showing simulated answers.</p>
         <div id="joinBoxes"></div>
-      </div>
-
-      <hr class="rule">
-
-      <p class="section-label">Simulate a class</p>
-      <div class="side-controls">
-        <button id="arriveBtn" class="btn btn-primary wide">Students arrive</button>
-        <div class="side-row">
-          <button id="oneBtn" class="btn">Add one</button>
-          <button id="undoBtn" class="btn" disabled>Undo</button>
-        </div>
-        <div class="side-row">
-          <button id="clearBtn" class="btn">Clear all</button>
-          <input type="number" id="classSize" class="num" min="1" max="500" step="1" value="45"
-                 title="class size">
-          <span class="unit">students</span>
-        </div>
       </div>
       </div><!-- /controls-card -->
       </div><!-- /viewClass -->
 
-      <!-- -------- the optimal-price view -------- -->
-      <div class="side-view" id="viewOptimal" hidden>
-
-        <div class="modes full" role="group" aria-label="Segments or pooled" id="profitViewToggle" hidden>
-          <button class="mode-btn is-on" id="profitSegs" data-pv="segments">Segments</button>
-          <button class="mode-btn"       id="profitPool" data-pv="pooled">Pooled</button>
-        </div>
-
-        <div class="slide-head">
-          <p class="section-label">Cost to make one</p>
-          <output class="slide-val" id="costVal" for="costSlider">$0.00</output>
-        </div>
-        <input type="range" id="costSlider" class="slider" min="0" max="30" step="0.25" value="0"
-               aria-label="cost to make one">
-        <p class="side-hint">Profit at a price is <strong>(price − cost) × how many buy</strong>.
-           Drag cost up and watch the best price climb with it.</p>
-
-        <hr class="rule">
-
-        <p class="section-label">Profit at each price</p>
-        <div class="profit-wrap">
-          <canvas id="profitCanvas"></canvas>
-          <p class="empty" id="profitEmpty"><span>No responses yet.</span></p>
-        </div>
-
-        <!-- Setting one price only makes sense against one market. Split, the
-             answer is a price PER segment, and a single slider sitting over
-             three curves invites exactly the confusion the split is meant to
-             clear up — so the whole block goes when segments are showing. -->
-        <div id="yourPriceBlock">
-          <!-- The price slider sits directly under the chart and is given the same
-               range and the same side padding, so the handle lines up with the
-               point on the curve it is picking out. -->
-          <div class="price-slide" id="priceSlideWrap">
-            <input type="range" id="priceSlider" class="slider price" min="0" max="30" step="0.25" value="10"
-                   aria-label="the price you set">
-          </div>
-          <div class="slide-head">
-            <p class="section-label">Your price</p>
-            <output class="slide-val" id="priceVal" for="priceSlider">$10.00</output>
-          </div>
-        </div>
-
-        <!-- pooled: one market, one price, one answer -->
-        <div id="pooledBlocks">
-          <div class="stat-list">
-            <div class="stat-row"><span class="stat-label">Buyers</span><span class="stat-value" id="uQty">–</span></div>
-            <div class="stat-row"><span class="stat-label">Profit</span><span class="stat-value" id="uProfit">–</span></div>
-          </div>
-          <p class="stat-foot" id="uFoot"></p>
-
-          <hr class="rule">
-
-          <p class="section-label">Best you could do</p>
-          <div class="stat-list">
-            <div class="stat-row"><span class="stat-label">Best price</span><span class="stat-value" id="oPrice">–</span></div>
-            <div class="stat-row"><span class="stat-label">Buyers</span><span class="stat-value" id="oQty">–</span></div>
-            <div class="stat-row"><span class="stat-label">Profit</span><span class="stat-value" id="oProfit">–</span></div>
-          </div>
-          <p class="stat-foot" id="oFoot"></p>
-        </div>
-
-        <!-- segments: the same single price charged to everyone, segment by
-             segment, against the best price for each segment on its own -->
-        <div id="segBlocks" hidden>
-          <p class="section-label">Best price for each segment</p>
-          <table class="seg-table" id="segBest"></table>
-          <p class="stat-foot" id="segFootB"></p>
-        </div>
-
-      </div><!-- /viewOptimal -->
     </aside>
   </div>
 
@@ -239,6 +155,31 @@
            whichever way the list is sorted. -->
       <ul class="wtp-list" id="wtpList"></ul>
       <p class="numbers-hint" id="numbersHint"></p>
+    </div>
+  </details>
+
+
+  <!-- ====================== rehearsal (instructor) ====================== -->
+  <!-- Folded shut and last on the page on purpose: in a live class the chart
+       should fill with real answers, and a visible "Students arrive" button is
+       one mis-click away from burying them in fake ones. Open it to rehearse,
+       then Clear all before the room fills. -->
+  <details class="numbers" id="simBox">
+    <summary>Simulate a class</summary>
+    <div class="numbers-body">
+      <div class="side-controls">
+        <button id="arriveBtn" class="btn btn-primary wide">Students arrive</button>
+        <div class="side-row">
+          <button id="oneBtn" class="btn">Add one</button>
+          <button id="undoBtn" class="btn" disabled>Undo</button>
+        </div>
+        <div class="side-row">
+          <button id="clearBtn" class="btn">Clear all</button>
+          <input type="number" id="classSize" class="num" min="1" max="500" step="1" value="45"
+                 title="class size">
+          <span class="unit">students</span>
+        </div>
+      </div>
     </div>
   </details>
 

@@ -65,9 +65,9 @@ body.sent .done{display:block}
 <div class="card">
 
   <div class="form">
-    <p class="eyebrow">15.010 · Lecture 1</p>
-    <h1>What is the most you would pay for this sub?</h1>
-    <p class="lede">A hot Italian sub from the North End. One sub, wrapped to take away.</p>
+    <p class="eyebrow" id="eyebrow">15.010 · Lecture 1</p>
+    <h1 id="qTitle">What is the most you would pay for this sub?</h1>
+    <p class="lede" id="qLede">A hot Italian sub from the North End. One sub, wrapped to take away.</p>
 
     <form id="f" autocomplete="off" novalidate>
       <div class="row">
@@ -113,6 +113,21 @@ body.sent .done{display:block}
 <script>
 /* One answer per device. The token is what the server keys on, so answering a
    second time replaces the first rather than adding another point to the curve. */
+/* ---------------------------------------------------------------------------
+   THE TWO QUESTIONS. Round 2 is the same sub with the alternatives taken away,
+   which is the point of the exercise: willingness to pay is not a property of
+   the sandwich, it moves with what else you could do instead.
+   Edit the round 2 wording here and nowhere else.
+--------------------------------------------------------------------------- */
+const ROUND_TEXT = {
+  1: { eyebrow: '15.010 · Lecture 1',
+       title: 'What is the most you would pay for this sub?',
+       lede:  'A hot Italian sub from the North End. One sub, wrapped to take away.' },
+  2: { eyebrow: '15.010 · Lecture 1 · Round 2',
+       title: 'Now what is the most you would pay?',
+       lede:  'The same sub — but this is the only food you can get. Everywhere else nearby is closed.' }
+};
+
 const TOKEN_KEY = 'l1-demand-token', ME_KEY = 'l1-demand-me';
 let token = localStorage.getItem(TOKEN_KEY);
 if (!token) {
@@ -127,7 +142,31 @@ document.getElementById('roomTag').textContent = 'room ' + room;
 
 const $ = id => document.getElementById(id);
 const socket = io({ transports: ['websocket', 'polling'] });
-socket.on('connect', () => socket.emit('join', { room, role: 'student' }));
+
+let round = 1;
+
+/* The instructor moves the class on; the phone follows. Whatever the student
+   already sent stays on the board under the old round -- this only clears the
+   box so the next answer is a fresh one, and puts the new question above it. */
+function setRound(n) {
+  const next = Number(n) === 2 ? 2 : 1;
+  if (next === round) return;
+  round = next;
+  const t = ROUND_TEXT[round];
+  $('eyebrow').textContent = t.eyebrow;
+  $('qTitle').textContent  = t.title;
+  $('qLede').textContent   = t.lede;
+  document.body.classList.remove('sent');
+  $('wtp').value = '';
+  $('msg').textContent = '';
+  $('msg').className = 'msg';
+}
+
+socket.on('round', d => setRound(d && d.round));
+socket.on('responses', d => { if (d && d.round) setRound(d.round); });
+
+socket.on('connect', () =>
+  socket.emit('join', { room, role: 'student' }, ack => { if (ack) setRound(ack.round); }));
 
 // remember who they said they were, so changing an answer is one tap
 try {

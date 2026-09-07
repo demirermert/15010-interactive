@@ -69,6 +69,20 @@ h1{font-size:31px;line-height:1.15;font-weight:600;letter-spacing:-.02em}
   gap:9px 14px;margin-bottom:9px}
 .head-tools{display:flex;flex-wrap:wrap;gap:9px}
 .head-tools .modes[hidden]{display:none}
+/* the price everyone pays, shown only in surplus mode. Sized to sit level with
+   the mode buttons beside it rather than growing the header row. */
+.price-set{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);
+           border-radius:8px;background:#fff;padding:0 10px 0 12px;height:31px}
+.price-set[hidden]{display:none}
+.price-set label{font-size:12.5px;font-weight:600;color:var(--muted)}
+.price-set .ps-dollar{font-size:12.5px;color:var(--muted)}
+.price-set .num{height:27px;width:56px;border:none;font-size:13px;padding:0}
+.price-set .num:focus{outline:none}
+.ps-btn{border:none;border-left:1px solid var(--line);background:none;cursor:pointer;
+        font-size:12.5px;font-weight:600;color:var(--blue);height:29px;padding:0 2px 0 10px;
+        margin-left:2px;white-space:nowrap}
+.ps-btn:hover{color:var(--blue-dark)}
+.ps-btn.running{color:var(--accent)}
 
 /* which curve is which, under the chart */
 .legend{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:12px}

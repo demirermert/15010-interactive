@@ -63,10 +63,18 @@ const MAX_PER_ROOM = 600;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-/* room -> Map(deviceToken -> {id, name, wtp, ts})
-   Keyed by device token so a student who answers twice REPLACES their answer
-   rather than appearing on the curve twice. */
+/* The class answers the SAME question twice under different conditions. Round 1
+   is the plain question; round 2 removes the alternatives. Both curves are drawn
+   together, so both sets of answers have to survive.
+
+   room -> Map("<deviceToken>#<round>" -> {id, name, wtp, ts, round})
+   Keying by token AND round means a second answer in the same round still
+   REPLACES the first -- nobody appears on one curve twice -- while an answer in
+   round 2 sits alongside the student's round 1 answer instead of erasing it. */
+const ROUNDS = 2;
 const rooms = new Map();
+
+const keyFor = (token, round) => `${token}#${round}`;
 
 const normRoom = r => String(r || '')
   .trim().toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 12) || '15010';
@@ -80,6 +88,7 @@ function roomStore(room) {
     }
     const m = new Map();
     m.touched = Date.now();
+    m.round = 1;
     rooms.set(room, m);
   }
   const m = rooms.get(room);
@@ -88,6 +97,10 @@ function roomStore(room) {
 }
 
 const list = room => [...roomStore(room).values()].sort((a, b) => a.ts - b.ts);
+
+/* The SERVER owns the round, never the client. A phone that was asleep through
+   the switch would otherwise post its round 1 answer into round 2. */
+const roundOf = room => roomStore(room).round || 1;
 
 function cleanName(first, initial) {
   const f = String(first || '').trim().replace(/\s+/g, ' ').slice(0, MAX_NAME);
@@ -212,6 +225,22 @@ app.get('/links', async (req, res) => {
   res.set('Cache-Control', 'no-store').json({ shortening: Boolean(BITLY_TOKEN), links });
 });
 
+/* Shorten an arbitrary URL, for the one-off links that are not room links —
+   a dashboard address, another service's page.
+   Behind the dashboard key, and switched off entirely when no key is set: an
+   ungated version would be an open relay on someone else's Bitly quota. That
+   also means the token stays here and nobody needs a copy of it to use it. */
+app.get(PREFIX + '/shorten', async (req, res) => {
+  if (!DASH_KEY)     return res.status(404).end();
+  if (!BITLY_TOKEN)  return res.status(503).json({ error: 'no BITLY_TOKEN set' });
+
+  const url = String(req.query.u || '');
+  if (!/^https?:\/\/\S+$/i.test(url)) return res.status(400).json({ error: 'pass ?u=<http url>' });
+
+  const slug = String(req.query.slug || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40);
+  res.set('Cache-Control', 'no-store').json({ url, slug: slug || null, short: await shorten(url, slug) });
+});
+
 // QR for the projector, rendered server-side so the dashboard needs no library
 app.get('/qr.svg', async (req, res) => {
   const text = String(req.query.text || '').slice(0, 400);
@@ -262,7 +291,9 @@ const studentCount = room =>
     .filter(id => io.sockets.sockets.get(id)?.data.role === 'student').length;
 
 function push(room) {
-  io.to(room).emit('responses', { room, responses: list(room), online: studentCount(room) });
+  io.to(room).emit('responses', {
+    room, responses: list(room), online: studentCount(room), round: roundOf(room)
+  });
 }
 
 io.on('connection', socket => {
@@ -271,7 +302,8 @@ io.on('connection', socket => {
     socket.join(room);
     socket.data.room = room;
     socket.data.role = payload.role === 'student' ? 'student' : 'dashboard';
-    if (typeof ack === 'function') ack({ room, responses: list(room), online: studentCount(room) });
+    if (typeof ack === 'function')
+      ack({ room, responses: list(room), online: studentCount(room), round: roundOf(room) });
     push(room);
   });
 
@@ -283,21 +315,39 @@ io.on('connection', socket => {
     if (wtp === null) return ack?.({ ok: false, error: `enter a number from 0 to ${MAX_WTP}` });
 
     const store = roomStore(room);
-    if (!store.has(token) && store.size >= MAX_PER_ROOM)
+    const round = roundOf(room);
+    const key = keyFor(token, round);
+    if (!store.has(key) && store.size >= MAX_PER_ROOM * ROUNDS)
       return ack?.({ ok: false, error: 'this room is full' });
 
     const name = cleanName(payload.first, payload.initial);
-    const prev = store.get(token);
-    store.set(token, { id: prev?.id || randomUUID(), name, wtp, ts: prev?.ts || Date.now() });
+    const prev = store.get(key);
+    store.set(key, {
+      id: prev?.id || randomUUID(), name, wtp, round, ts: prev?.ts || Date.now()
+    });
 
-    ack?.({ ok: true, name, wtp, changed: Boolean(prev) });
+    ack?.({ ok: true, name, wtp, round, changed: Boolean(prev) });
     push(room);
   });
 
   // instructor actions
   socket.on('clear', (payload = {}) => {
     const room = normRoom(payload.room || socket.data.room);
-    roomStore(room).clear();
+    const store = roomStore(room);
+    store.clear();
+    store.round = 1;                 // a cleared room starts the lecture over
+    push(room);
+  });
+
+  /* Moving the class to the next condition. Every student's phone is told at
+     once, so the question on the page changes under them and their previous
+     answer stops being the one they can edit. Earlier rounds are kept. */
+  socket.on('setRound', (payload = {}) => {
+    const room = normRoom(payload.room || socket.data.room);
+    const next = Math.min(ROUNDS, Math.max(1, Number(payload.round) | 0 || 1));
+    const store = roomStore(room);
+    store.round = next;
+    io.to(room).emit('round', { room, round: next });
     push(room);
   });
 
@@ -307,14 +357,17 @@ io.on('connection', socket => {
     const room = normRoom(payload.room || socket.data.room);
     const store = roomStore(room);
     if (store.size) return;                       // never overwrite live answers
+    store.round = Math.min(ROUNDS, Math.max(1, Number(payload.round) | 0 || 1));
     for (const r of Array.isArray(payload.responses) ? payload.responses : []) {
       const wtp = cleanWtp(r.wtp);
       if (wtp === null) continue;
       const token = String(r.token || r.id || randomUUID()).slice(0, 64);
-      store.set(token, {
+      const round = Math.min(ROUNDS, Math.max(1, Number(r.round) | 0 || 1));
+      store.set(keyFor(token, round), {
         id: r.id || randomUUID(),
         name: String(r.name || 'Anonymous').slice(0, MAX_NAME + 4),
         wtp,
+        round,
         ts: Number(r.ts) || Date.now()
       });
     }
