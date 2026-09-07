@@ -47,6 +47,7 @@ button:disabled{background:#c9cdd3}
 
 .msg{margin-top:16px;font-size:14.5px;min-height:22px}
 .msg.err{color:#c0392b}
+.msg.wait{color:#8a6d1f}
 .ask{font-size:17px;font-weight:600;color:var(--ink);margin:14px 0 0}
 
 /* after submitting */
@@ -234,7 +235,13 @@ $('f').addEventListener('submit', e => {
 
   socket.emit('submit', { room, token, first, initial, wtp }, res => {
     $('send').disabled = false;
-    if (!res || !res.ok) return fail(res && res.error ? res.error : 'Could not send — try again.');
+    if (!res || !res.ok) {
+      /* Not a mistake the student can fix: the instructor has simply not opened
+         the room yet. Same page, answer still in the box, and no confirmation
+         screen -- nothing was recorded, so there is nothing to change later. */
+      if (res && res.waiting) return waiting(res.error);
+      return fail(res && res.error ? res.error : 'Could not send — try again.');
+    }
     /* Confirm FIRST. This write used to come first and could throw, leaving a
        student on "Sending…" forever after an answer the server had accepted. */
     if (res.round && res.round !== round) {
@@ -256,6 +263,13 @@ $('again').addEventListener('click', () => {
 function fail(text) {
   $('msg').textContent = text;
   $('msg').className = 'msg err';
+  $('send').disabled = false;
+}
+
+/* Same shape as fail(), different tone: nothing has gone wrong, they are early. */
+function waiting(text) {
+  $('msg').textContent = text;
+  $('msg').className = 'msg wait';
   $('send').disabled = false;
 }
 

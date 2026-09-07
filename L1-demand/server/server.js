@@ -355,7 +355,14 @@ io.on('connection', socket => {
     socket.join(room);
     socket.data.room = room;
     socket.data.role = payload.role === 'student' ? 'student' : 'dashboard';
-    if (socket.data.role === 'dashboard') socket.join(dashRoom(room));
+    if (socket.data.role === 'dashboard') {
+      socket.join(dashRoom(room));
+      /* The room is open from the moment an instructor first arrives, and stays
+         open. Deliberately NOT "is a dashboard connected right now": the
+         projector laptop dropping its websocket for two seconds mid-lecture
+         would otherwise tell all 77 phones the session had not started. */
+      roomStore(room).opened = true;
+    }
     ack(socket.data.role === 'dashboard'
       ? { room, responses: list(room), online: studentCount(room), round: roundOf(room) }
       : { room, round: roundOf(room) });          // a phone needs nothing else
@@ -370,6 +377,14 @@ io.on('connection', socket => {
     if (wtp === null) return ack({ ok: false, error: `enter a number from 0 to ${MAX_WTP}` });
 
     const store = roomStore(room);
+    /* Nobody is running this room yet. Taking the answer anyway would drop it
+       into memory unseen and, worse, show the student a confirmation for a
+       poll that is not happening -- so say so plainly and leave them on the
+       form with what they typed still in it. */
+    if (!store.opened)
+      return ack({ ok: false, waiting: true,
+                   error: 'The session has not started yet. Your instructor will open it in a moment.' });
+
     const round = roundOf(room);
     const key = keyFor(token, round);
     // Per ROUND, not a shared budget: a full round 1 used to make round 2

@@ -338,16 +338,15 @@ function drawChart() {
     s.rows.forEach((r, i) => {
       const x = X(i + 0.5), y = Y(r.wtp);
       const idx = points.length;
-      points.push({ x, y, name: r.name, wtp: r.wtp, id: r.id, seg: roundOf(r) - 1, col, step: i });
-      // In price mode the dots are off — except the one being pointed at in the
-      // list below, which should still be findable without changing mode first.
-      if (priceMode && idx !== hoverIdx) return;
-      if (dense && idx !== hoverIdx) return;
-      const on = idx === hoverIdx;
-      g.beginPath(); g.arc(x, y, on ? 5.5 : 3, 0, Math.PI * 2);
-      g.fillStyle = on ? col : '#fff';
-      g.fill();
-      g.lineWidth = on ? 2 : 1.5; g.strokeStyle = col; g.stroke();
+      points.push({ x, y, name: r.name, wtp: r.wtp, id: r.id, token: r.token,
+                    seg: roundOf(r) - 1, col, step: i });
+      // In price mode the dots are off, and in a big class they would smear
+      // into a line. Either way the LIT ones are drawn further down instead of
+      // here, so they sit on top of every curve rather than under the next one.
+      if (priceMode || dense) return;
+      g.beginPath(); g.arc(x, y, 3, 0, Math.PI * 2);
+      g.fillStyle = '#fff'; g.fill();
+      g.lineWidth = 1.5; g.strokeStyle = col; g.stroke();
     });
   });
 
@@ -378,6 +377,25 @@ function drawChart() {
 
   // ---- guides to both axes for the student under the cursor, wherever the
   // cursor is — over the curve itself, or over their row in the list
+  const mates = hoverIdx >= 0 ? mateIdxs(hoverIdx) : [];
+
+  /* The same person, one round apart. Their two answers share a token, so with
+     both curves up the other one lights up at the same time and the vertical
+     gap between the dots IS what the second condition did to them -- which is
+     the whole reason for asking twice. Fainter, and drawn first, so it reads as
+     the echo rather than as the thing being pointed at. */
+  mates.forEach(i => {
+    const m = points[i];
+    if (!m) return;
+    g.save();
+    g.setLineDash([3, 4]); g.strokeStyle = m.col; g.globalAlpha = .3; g.lineWidth = 1;
+    g.beginPath();
+    g.moveTo(padL, m.y); g.lineTo(m.x, m.y);
+    g.moveTo(m.x, m.y); g.lineTo(m.x, padT + plotH);
+    g.stroke();
+    g.restore();
+  });
+
   if (hoverIdx >= 0 && points[hoverIdx]) {
     const p = points[hoverIdx];
     const surplusMode = state.mode === 'surplus' && Number.isFinite(state.surplusPrice);
@@ -412,6 +430,19 @@ function drawChart() {
       g.restore();
     }
   }
+
+  /* Both lit dots last of all, so neither ends up under a curve, a surplus bar
+     or the other one's guides. The primary is the solid one. */
+  [hoverIdx, ...mates].forEach((i, k) => {
+    const p = points[i];
+    if (!p) return;
+    g.save();
+    g.globalAlpha = k === 0 ? 1 : .8;
+    g.beginPath(); g.arc(p.x, p.y, k === 0 ? 5.5 : 4.5, 0, Math.PI * 2);
+    g.fillStyle = p.col; g.fill();
+    g.lineWidth = 2; g.strokeStyle = p.col; g.stroke();
+    g.restore();
+  });
 
   /* ---- surplus mode: the price everyone pays, drawn right across the plot.
      Unlike the price line above it is FIXED, so it stays put while the cursor
@@ -515,6 +546,19 @@ function pickPoint(mx, my) {
   return best;
 }
 
+/* The two answers one person gave -- one per round -- share a token. With both
+   curves up they are two points on the chart, and lighting one has to light the
+   other: otherwise the class has to find the same student twice by eye, which
+   is exactly the comparison the second round exists to make. Only in 'both';
+   with one curve there is nothing to pair with. */
+function mateIdxs(idx) {
+  const p = points[idx];
+  if (!p || !p.token || state.curveView !== 'both') return [];
+  const out = [];
+  points.forEach((q, i) => { if (i !== idx && q.token && q.token === p.token) out.push(i); });
+  return out;
+}
+
 /* Read the cursor's height back as a price. */
 function priceAt(my) {
   if (!geom) return null;
@@ -554,7 +598,8 @@ function paintTip(idx) {
   const tip = $('tip');
   if (idx >= 0 && points[idx]) {
     const p = points[idx];
-    tip.innerHTML = `<div class="tip-name"></div><div class="tip-wtp"></div>`;
+    tip.innerHTML = `<div class="tip-name"></div><div class="tip-wtp"></div>` +
+                    `<div class="tip-mate"></div>`;
     tip.querySelector('.tip-name').textContent = p.name || 'Anonymous';
 
     /* In surplus mode the second line answers "what did THIS student get out of
@@ -573,6 +618,15 @@ function paintTip(idx) {
       }
     }
     tip.querySelector('.tip-wtp').textContent = line;
+
+    /* Say what the same student did in the other round rather than making the
+       room read it off the axis. Their own round is named too, because "$6.00
+       in round 2" only means something next to which one you are on. */
+    const mate = points[mateIdxs(idx)[0]];
+    tip.querySelector('.tip-mate').textContent = mate
+      ? `${ROUND_LABEL[p.seg]} ${money(p.wtp)}  ·  ${ROUND_LABEL[mate.seg]} ${money(mate.wtp)}`
+      : '';
+
     tip.style.left = p.x + 'px';
     tip.style.top = (p.y - 12) + 'px';
     tip.hidden = false;
@@ -633,7 +687,7 @@ function showPriceBox() {
 function stopReveal() {
   if (revealTimer) { clearTimeout(revealTimer); revealTimer = null; }
   $('surplusPlay').classList.remove('running');
-  $('surplusPlay').textContent = 'Build area';
+  $('surplusPlay').textContent = 'Build consumer surplus';
 }
 
 function resetReveal() { stopReveal(); revealN = 0; paintTip(-1); }
@@ -659,7 +713,7 @@ function revealHint() {
     return;
   }
   if (revealN <= 0) {
-    $('hoverHint').textContent = 'Hover a student to see their surplus, or press Build area to add them up.';
+    $('hoverHint').textContent = 'Hover a student to see their surplus, or press Build consumer surplus to add them up.';
     return;
   }
   /* One line per curve. Summing across rounds counted the same students under
