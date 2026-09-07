@@ -155,10 +155,10 @@
 
 
   <!-- ======================= how to run this ========================= -->
-  <!-- For the night before, not for the projector: folded shut, and it says
-       what every control does rather than assuming the person driving wrote it.
-       Control names are set as chips that echo the real buttons, so the eye can
-       match a line here to a thing on the toolbar without hunting. -->
+  <!-- A run-sheet, not documentation: the person reading it is about to teach,
+       so every line says what the control does and stops. Control names are set
+       as chips shaped like the real buttons, to be matched to the toolbar at a
+       glance. -->
   <details class="numbers" id="helpBox">
     <summary>How to run this</summary>
     <div class="numbers-body help">
@@ -168,24 +168,20 @@
         <p class="help-addr">
           Students go to <code>15010.ai/l1-a</code><br>
           You are on <code>15010.ai/l1-axx</code><br>
-          <span class="help-note">Use your own section letter in place of the
-          <b>a</b>. Capitals land in the same place.</span>
+          <span class="help-note">Swap in your own section letter. Capitals work.</span>
         </p>
         <ol class="help-steps">
-          <li><b>Press Go live first.</b> Until you do, a student who submits is
-            told the session has not started. Nothing breaks, but nothing is
-            recorded either, so do this before the link goes on screen.</li>
-          <li><b>Put the student address up.</b> Answers appear on the chart as
-            they arrive, and the panel on the right keeps the count.</li>
-          <li><b>Talk about round 1 while it fills.</b> Show the numbers opens
-            the ranked list if you want names and figures.</li>
-          <li><b>Start round 2</b> when you are ready. Every phone changes
-            question at the same moment; round 1 stays on the chart.</li>
-          <li><b>Both</b> puts the two curves up together. Hovering a student now
-            lights the same person on the other curve, which is the comparison
-            the second round exists to make.</li>
-          <li><b>Surplus</b>, type a price, then <b>Build consumer surplus</b> to
-            add the class up one student at a time.</li>
+          <li><b>Go live first.</b> Until you do, students are told the session
+            has not started.</li>
+          <li><b>Put the address up.</b> Answers land on the chart as they
+            arrive.</li>
+          <li><b>Talk while it fills.</b> Show the numbers if you want names and
+            figures.</li>
+          <li><b>Start round 2.</b> Every phone changes at once. Round 1 stays
+            up.</li>
+          <li><b>Both</b>, then hover a student to see the same person under both
+            conditions.</li>
+          <li><b>Surplus</b>, set a price, <b>Build consumer surplus</b>.</li>
         </ol>
       </div>
 
@@ -193,10 +189,9 @@
         <h3 class="help-title">Which curve is drawn</h3>
         <dl class="help-grid">
           <dt><span class="key">Round 1</span><span class="key">Round 2</span><span class="key">Both</span></dt>
-          <dd>Which demand curve is on the chart. The numbers on the right always
-            describe one round only: averaging across two different conditions
-            would mean nothing. With <b>Both</b> up they follow the later
-            round.</dd>
+          <dd>The numbers on the right describe one round only, the later one
+            when <b>Both</b> is up. Averaging across two conditions would mean
+            nothing.</dd>
         </dl>
       </div>
 
@@ -204,35 +199,27 @@
         <h3 class="help-title">What the chart shows</h3>
         <dl class="help-grid">
           <dt><span class="key">Students</span></dt>
-          <dd>One dot per answer. Hover anywhere in a student’s column to pick
-            them out: guides drop to both axes and a label names them. With both
-            curves up, their answer from the other round lights up at the same
-            time.</dd>
+          <dd>One dot per answer. Hover to name a student and read their number
+            off both axes. With both curves up, their other answer lights up
+            too.</dd>
 
           <dt><span class="key">Price</span></dt>
-          <dd>Hovering draws a price line across the chart and reads off how many
-            students would buy at it. <b>Click to lock the line</b> so it stays
-            put while you talk, and click again to release it.</dd>
+          <dd>Hover for a price line and how many would buy at it. Click to lock
+            it while you talk.</dd>
 
           <dt><span class="key">Surplus</span></dt>
-          <dd>Opens the price box. Hovering a student then shows what they
-            personally gain: the gap between what they would have paid and what
-            they actually pay. Below the price they do not buy at all, and get
-            nothing, not a negative amount. That is the mistake worth heading off
-            out loud.</dd>
+          <dd>Hover a student to see what they gain: their maximum, less the
+            price. Below the price they do not buy, so they get nothing. Not a
+            negative.</dd>
 
           <dt><span class="key">Price&nbsp;$</span></dt>
-          <dd>The price everyone pays, in surplus mode. Type it and the line is
-            fixed there. Unlike the line in Price mode it does not follow the
-            cursor.</dd>
+          <dd>The price everyone pays. Fixed once typed, unlike the line that
+            follows the cursor in Price mode.</dd>
 
           <dt><span class="key">Build consumer surplus</span></dt>
           <dd>Adds the buyers up one at a time, highest first. The first three
-            land slowly and named, so the room sees that a bar is one person and
-            what they gained; after that it speeds up, but every student still
-            gets their own bar, because the area is what they add up to. Press
-            again to stop. With both curves up they build together, so the class
-            watches one area outgrow the other.</dd>
+            are slow and named, so the room sees that a bar is one person; then
+            it speeds up. Press again to stop.</dd>
         </dl>
       </div>
 
@@ -240,21 +227,17 @@
         <h3 class="help-title">Live submissions</h3>
         <dl class="help-grid">
           <dt><span class="key key-go">Go live</span><span class="key key-go">Stop</span></dt>
-          <dd>Connects this page to the room. <b>Students cannot submit until it
-            has been pressed once.</b> Stop disconnects the board; it does not
-            close the poll, and answers already given are kept.</dd>
+          <dd>Opens the room. <b>Students cannot submit until you press it.</b>
+            Stop only disconnects the board; answers are kept.</dd>
 
           <dt><span class="key">Start round 2</span></dt>
-          <dd>Moves the whole class to the second condition at once. Every phone
-            swaps to the new question and clears its box; round 1 answers stay on
-            the chart and in the data.</dd>
+          <dd>Switches every phone to the second question at once. Round 1 stays
+            on the chart.</dd>
 
           <dt><span class="key">Start over</span></dt>
-          <dd>Wipes every answer in the room and returns to round 1, on every
-            phone as well as here. Two clicks, not a dialog. Use it between
-            sections, or after a rehearsal. Not to fix one bad answer, since a
-            student can simply resubmit and their new answer replaces the
-            old one.</dd>
+          <dd>Wipes the room back to round 1, phones included. Two clicks to
+            confirm. For between sections, not for fixing one answer: a student
+            can just resubmit.</dd>
         </dl>
       </div>
 
@@ -262,10 +245,8 @@
         <h3 class="help-title">Show the numbers</h3>
         <dl class="help-grid">
           <dt><span class="key">High to low</span><span class="key">Low to high</span></dt>
-          <dd>Every answer, ranked. Hovering a row lights that student on the
-            chart, and hovering the chart lights their row. The rank is always by
-            willingness to pay, so a student keeps the same number whichever way
-            you sort.</dd>
+          <dd>Every answer, ranked. Hover a row to light that student on the
+            chart, or the chart to light their row.</dd>
         </dl>
       </div>
 
@@ -273,11 +254,9 @@
         <h3 class="help-title">Simulate a class</h3>
         <dl class="help-grid">
           <dt><span class="key">Students arrive</span><span class="key">Add one</span><span class="key">Undo</span><span class="key">Clear all</span></dt>
-          <dd>Invented answers, for rehearsing on your own. They are folded away
-            at the bottom of the page because a visible <b>Students arrive</b> is
-            one mis-click from burying a real class in fake data.
-            <b>Press Clear all before the room fills.</b> Going live also drops
-            any simulated answers for the round you are on.</dd>
+          <dd>Invented answers, for rehearsing alone. <b>Clear all before the
+            room fills.</b> Going live drops them anyway for the round you are
+            on.</dd>
         </dl>
       </div>
 
