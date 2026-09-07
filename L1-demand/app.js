@@ -21,7 +21,7 @@
  */
 
 const KEY = 'l1-demand-v4';
-const MAX_WTP    = 30;     // the most a student may submit
+const MAX_WTP    = 100;    // the most a student may submit
 const ARRIVAL_MS = 300;    // one student every 0.3s, so a class of 45 lands in ~14s
 const HIT_BAND   = 55;     // px above/below the step the cursor may be and still count
 
@@ -117,7 +117,10 @@ const ranked = () => rankedOf(visible());
 /* One entry per curve to draw. Pooled is the whole class as a single market;
    segments are the separate ones. Everything downstream — the chart and the
    legend — reads this rather than deciding for itself. */
-const ROUND_VARS  = ['--blue', '--seg-b'];
+/* Violet, not --seg-b: that is the same #e05c3e as --accent, which paints the
+   surplus price line and the price-mode crosshair. Round 2's curve and the price
+   line were indistinguishable in exactly the view where they matter most. */
+const ROUND_VARS  = ['--blue', '--seg-c'];
 const ROUND_LABEL = ['Round 1', 'Round 2'];
 
 function series(view) {
@@ -195,9 +198,10 @@ function addResponse(wtp, name, sim = false, round = state.round) {
 /* Round-robin rather than random, so the curves grow at the same rate and the
    room watches both fill in together instead of one racing ahead. */
 function addSimulated() {
-  // Round 2 takes the alternatives away, so a rehearsal should show the curve
-  // moving OUT -- same shape, shifted up -- not a second random cloud.
-  const wtp = simulatedWtp(0) * (state.round === 2 ? 1.6 : 1);
+  // Round 1 is the constrained one -- no time to go anywhere else -- and round 2
+  // hands the substitutes back, so a rehearsal should show the curve moving
+  // DOWN, not a second random cloud.
+  const wtp = simulatedWtp(0) * (state.round === 2 ? 0.6 : 1);
   return addResponse(Math.min(MAX_WTP, Math.round(wtp * 4) / 4),
                      simulatedName(), true, state.round);
 }
@@ -242,9 +246,16 @@ function drawChart() {
   const nMax = Math.max(longest, expect, 10);
 
   // The y-axis follows the data, rounded up to a tick, so no answer ever sits
-  // off the top of the plot. It follows the WHOLE class, not the curve being
-  // drawn, so switching between segments and pooled never rescales underfoot.
-  const top = all.length ? all[0].wtp : 10;
+  // off the top of the plot. It spans EVERY curve on screen, not just the round
+  // the numbers describe: round 2 takes the substitutes back and comes in lower,
+  // so scaling to it alone would push round 1 off the top of the chart.
+  const highest = Math.max(0, ...cast.map(sr => (sr.rows.length ? sr.rows[0].wtp : 0)));
+  // The price line has to fit as well. Set a price above everyone's answer and
+  // it used to be painted above the canvas: no line, no label, no bars, and no
+  // hint that anything had happened.
+  const priceOnPlot = state.mode === 'surplus' && Number.isFinite(state.surplusPrice)
+    ? state.surplusPrice : 0;
+  const top = Math.max(highest, priceOnPlot) || 10;
   const tick = top <= 10 ? 2 : top <= 30 ? 5 : 10;
   const yMax = Math.max(tick * 2, Math.ceil(top / tick) * tick);
 
@@ -335,7 +346,11 @@ function drawChart() {
         if (r.wtp < state.surplusPrice) return;      // no surplus below the price
         const x = X(i + 0.5);
         g.beginPath(); g.moveTo(x, Y(r.wtp)); g.lineTo(x, yPrice);
-        g.strokeStyle = col; g.globalAlpha = .5; g.lineWidth = Math.max(2, plotW / all.length * 0.7);
+        // Column pitch is plotW/nMax, so the bar must be measured against nMax.
+        // Against all.length (the focus round only) bars ran up to 3x wider than
+        // their own step and merged into a solid block.
+        g.strokeStyle = col; g.globalAlpha = .5;
+        g.lineWidth = Math.max(2, (plotW / nMax) * 0.7);
         g.stroke();
       });
     });
@@ -582,10 +597,12 @@ function showPriceBox() {
   } else {
     // With the class split, one price sells a different amount into each
     // segment — so the box lists them rather than a single misleading total.
+    // Two rounds are the SAME class answering twice, so adding the quantities
+    // counts everyone twice. Report each round instead.
     const q = cast.map(s => qtyIn(s.rows, hoverPrice));
-    $('pbQty').textContent = q.reduce((a, b) => a + b, 0) + ' would buy';
+    $('pbQty').textContent = cast.map((s, i) => `${s.label}: ${q[i]}`).join(' · ');
     $('pbShare').textContent = cast
-      .map((s, i) => `${SEG_NAMES[s.k]} ${q[i]}/${s.rows.length}`).join(' · ');
+      .map((s, i) => `${q[i]} of ${s.rows.length}`).join(' · ');
   }
   $('pbPin').textContent   = pricePinned ? 'locked — click to release' : '';
   box.hidden = false;
@@ -626,9 +643,17 @@ function revealHint() {
     $('hoverHint').textContent = 'Hover a student to see their surplus, or press Build area to add them up.';
     return;
   }
-  const shown = Math.min(revealN, buyersShown());
-  $('hoverHint').textContent =
-    `${shown} of ${buyersShown()} buyers — consumer surplus so far ${money(surplusTotal())}`;
+  /* One line per curve. Summing across rounds counted the same students under
+     both conditions and put that total next to a buyer count that was a max,
+     not a sum -- "10 of 10 buyers" while adding up twenty people's surplus. */
+  const parts = series(state.demandView).map(sr => {
+    const buyers = sr.rows.filter(r => r.wtp >= state.surplusPrice);
+    const shown  = Math.min(revealN, buyers.length);
+    const total  = buyers.slice(0, revealN)
+      .reduce((a, r) => a + (r.wtp - state.surplusPrice), 0);
+    return `${sr.label}: ${shown} of ${buyers.length} buyers, ${money(total)}`;
+  });
+  $('hoverHint').textContent = parts.join('   ·   ') + '  — consumer surplus';
 }
 
 /* The pace is the teaching. The first few land slowly and NAMED, so the room
@@ -673,6 +698,10 @@ function startReveal() {
   $('surplusPlay').textContent = 'Stop';
 
   const frame = () => {
+    // Recomputed every frame: a student answering mid-build used to leave the
+    // area permanently short, with the button already reset and no way to resume.
+    const total = buyersShown();
+    if (total > revealAt.length) { revealAt = revealSchedule(total); }
     const ms = performance.now() - revealT0;
     let n = 0;
     while (n < revealAt.length && revealAt[n] <= ms) n++;
@@ -683,7 +712,7 @@ function startReveal() {
       paintTip(revealN > 0 && revealN <= REVEAL_SLOW ? revealN - 1 : -1);
       revealHint();
     }
-    if (revealN >= total) { stopReveal(); paintTip(-1); return; }
+    if (revealN >= buyersShown()) { stopReveal(); paintTip(-1); return; }
     // setTimeout, not requestAnimationFrame: frames stop entirely in a hidden
     // tab, timers only slow down. 30ms is finer than the fastest gap.
     revealTimer = setTimeout(frame, 30);
@@ -877,11 +906,12 @@ function setSegCount(n) {
 
   if (changed) { hoverIdx = -1; $('tip').hidden = true; }
   save();
-  if (changed) { renderJoin(); render(); }
+  if (changed) render();
 }
 
 function setDemandView(v) {
   const next = ['1', '2', 'both'].includes(v) ? v : '1';
+  if (next !== state.curveView) resetReveal();   // a built area belongs to one view
   state.curveView = state.demandView = next;
   [['curve1', '1'], ['curve2', '2'], ['curveBoth', 'both']]
     .forEach(([id, val]) => $(id).classList.toggle('is-on', next === val));
@@ -905,7 +935,8 @@ function render() {
   const st = summary();
 
   $('emptyNote').classList.toggle('hidden', st.n > 0);
-  $('undoBtn').disabled = st.n === 0 || live;
+  // Enabled by the round Undo actually removes from, not the one on screen.
+  $('undoBtn').disabled = inRound(state.round).length === 0 || live;
 
   $('sResponses').textContent = st.n;
   $('sMax').textContent    = st.n ? money(st.max)    : '–';
@@ -1004,96 +1035,21 @@ function roomFor(k) {
 }
 const roomsNow = () => Array.from({ length: state.segCount }, (_, k) => roomFor(k));
 
-/* The projector screen, in its own tab: big QR codes and the addresses under
-   them, one card per segment. Named so a second Go live reuses the same tab
-   rather than stacking up windows behind the one on the wall. */
-const joinUrl = () =>
-  `${(state.server || DEFAULT_SERVER).replace(/\/$/, '')}/join` +
-  `?room=${encodeURIComponent(normRoom(state.room))}&segs=${state.segCount}`;
-
-function openJoinScreen() {
-  const w = window.open(joinUrl(), 'l1-join');
-  if (w) w.focus();
-  else liveStatus('Allow pop-ups to open the join screen, or press it again.', 'err');
-}
-
-/* A join box per segment, each with its own QR, its own link and the colour of
-   the curve its students will draw. Which link a student is handed IS which
-   segment they land in — that is the whole mechanism. */
-function renderJoin() {
-  const box = $('joinBoxes');
-  box.innerHTML = '';
-  if (!live) return;
-
-  const base = (state.server || DEFAULT_SERVER).replace(/\/$/, '');
-  const css = getComputedStyle(document.documentElement);
-  const split = state.segCount > 1;
-
-  roomsNow().forEach((room, k) => {
-    // Replaced with the shortened form below, once the server has been asked.
-    const url = `${base}/r/${room}`;
-    const wrap = document.createElement('div');
-    wrap.dataset.room = room;
-    wrap.className = 'join' + (split ? ' tagged' : '');
-    if (split) wrap.style.borderLeftColor = css.getPropertyValue(SEG_VARS[k]).trim();
-
-    const text = document.createElement('div'); text.className = 'join-text';
-    if (split) {
-      const seg = document.createElement('span'); seg.className = 'join-seg';
-      seg.textContent = 'Segment ' + SEG_NAMES[k];
-      seg.style.color = css.getPropertyValue(SEG_VARS[k]).trim();
-      text.appendChild(seg);
-    }
-    const lab = document.createElement('span'); lab.className = 'join-label';
-    lab.textContent = 'Students go to';
-    const code = document.createElement('code'); code.className = 'join-url';
-    code.textContent = url.replace(/^https?:\/\//, '');
-    text.append(lab, code);
-
-    wrap.append(text);
-    box.appendChild(wrap);
-  });
-
-  applyShortLinks(base);
-}
-
-/* Swap the full links for their shortened form once the server answers. Drawn
-   long first and replaced in place, so a shortener that is slow or switched off
-   costs nothing — the links on screen work either way. */
-function applyShortLinks(base) {
-  fetch(`${base}/links?room=${encodeURIComponent(normRoom(state.room))}&segs=${state.segCount}`)
-    .then(r => r.ok ? r.json() : null)
-    .then(d => {
-      if (!d || !Array.isArray(d.links)) return;
-      d.links.forEach(l => {
-        if (!l.short) return;
-        const wrap = document.querySelector(`#joinBoxes .join[data-room="${l.room}"]`);
-        if (!wrap) return;                        // room changed while we waited
-        wrap.querySelector('.join-url').textContent = l.short.replace(/^https?:\/\//, '');
-        wrap.querySelector('.qr').src = `${base}/qr.svg?text=${encodeURIComponent(l.short)}`;
-      });
-    })
-    .catch(() => {});
-}
+let connecting = false;
 
 async function goLive() {
+  if (connecting || socket) return;     // a second click during a cold start used
+  connecting = true;                    // to leak a socket that outlived "Stop"
   const base = DEFAULT_SERVER;
   const room = normRoom(state.room);
   state.server = base; state.room = room;
   save();
 
-  /* Opened HERE, before the first await, and not once the socket connects:
-     a browser only honours window.open while the click that caused it is still
-     the current user gesture, and two awaits later it is not. Called from the
-     connect handler this was silently blocked every time, which is what the
-     "Open join screen" button was quietly papering over.
-     Nothing here depends on the connection — the rooms come from state. */
-  openJoinScreen();
-
   liveStatus('Connecting…');
   try {
     await loadSocketIo(base);
   } catch (e) {
+    connecting = false;
     liveStatus('Could not reach the server. Check the address, or stay on simulated answers.', 'err');
     return;
   }
@@ -1106,15 +1062,26 @@ async function goLive() {
       socket.emit('join', { room: r, role: 'dashboard' }, res => {
         if (!res) return;
         // A restart on the free tier looks like an empty room. Offer our copy back.
-        const mine = state.responses.filter(x => !x.sim);
+        /* Only offer a restore for answers from THIS sitting. The old guard was
+           just "the room came back empty" -- which is the state at the start of
+           every back-to-back section, so section A's answers were uploaded into
+           section B's room. */
+        const FRESH = 3 * 60 * 60 * 1000;             // one lecture, generously
+        const mine = state.responses
+          .filter(x => !x.sim && Date.now() - (Number(x.ts) || 0) < FRESH);
         if (!res.responses.length && mine.length)
           socket.emit('restore', { room: r, responses: mine, round: state.round });
         else adoptRemote(k, res.responses);
         if (res.round) setRoundState(res.round);
       });
     });
+    connecting = false;
+    stopArrivals();                       // a running rehearsal would keep adding
+    // Simulated rows would be counted into the live statistics and the status
+    // line -- a projector reading "Live · 22 submitted" that is 90% invented.
+    state.responses = state.responses.filter(r => !r.sim);
+    resetReveal();
     setLive(true);
-    renderJoin();
   });
 
   socket.on('responses', payload => {
@@ -1125,9 +1092,19 @@ async function goLive() {
     liveStatus(liveLine(), 'on');
   });
 
-  socket.on('round', d => { if (d && d.round) setRoundState(d.round); });
+  socket.on('round', d => {
+    if (d && d.room === state.room && d.round) setRoundState(d.round);
+  });
+  // The server resets to round 1 on a clear. Without this the dashboard kept
+  // saying "Round 2 — live" while every phone showed the round 1 question, with
+  // the round button hidden and no way back.
+  socket.on('reset', d => {
+    if (!d || d.room !== state.room) return;
+    setRoundState(1); setDemandView('1');
+  });
 
-  socket.on('connect_error', () => liveStatus('Server unreachable — retrying…', 'err'));
+  socket.on('connect_error', () => { connecting = false;
+    liveStatus('Server unreachable — retrying…', 'err'); });
   socket.on('disconnect', () => { if (live) liveStatus('Disconnected — retrying…', 'err'); });
 }
 
@@ -1143,9 +1120,14 @@ function liveLine() {
    answers replace the live answers wholesale. Simulated rows are kept: a
    rehearsal left on screen should not vanish the moment the room connects. */
 function adoptRemote(_k, responses) {
+  // points[] is rebuilt by the redraw below, so an index kept from before would
+  // point at a different student -- the chart highlighting one name while the
+  // tooltip shows another, with the mouse never moving.
+  hoverIdx = -1; markRow(null); $('tip').hidden = true;
   const sim = state.responses.filter(r => r.sim);
   const mine = (responses || []).map(r => ({
-    id: r.id, name: r.name, wtp: r.wtp, ts: r.ts, sim: false, round: Number(r.round) === 2 ? 2 : 1
+    id: r.id, token: r.token, name: r.name, wtp: r.wtp, ts: r.ts, sim: false,
+    round: Number(r.round) === 2 ? 2 : 1
   }));
   state.responses = sim.concat(mine);
   save();
@@ -1153,9 +1135,9 @@ function adoptRemote(_k, responses) {
 }
 
 function goOffline() {
+  connecting = false;
   if (socket) { socket.close(); socket = null; }
   setLive(false);
-  $('joinBoxes').innerHTML = '';
   liveStatus('Offline. The chart is showing simulated answers.');
 }
 
@@ -1163,9 +1145,10 @@ function setLive(on) {
   live = on;
   $('liveBtn').textContent = on ? 'Stop' : 'Go live';
   $('liveBtn').classList.toggle('live-on', on);
-  $('joinBtn').hidden = !on;
   // Simulated answers would desync from the server the moment one arrived.
-  ['arriveBtn', 'oneBtn', 'undoBtn'].forEach(id => { $(id).disabled = on; });
+  // clearBtn belongs in this list: it emits 'clear' to the server, so a button
+  // inside a drawer labelled "Simulate a class" could wipe 231 real answers.
+  ['arriveBtn', 'oneBtn', 'undoBtn', 'clearBtn'].forEach(id => { $(id).disabled = on; });
   $('classSize').disabled = on;
 }
 
@@ -1178,9 +1161,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (arrivalTimer) { stopArrivals(); return; }        // click again to stop early
     const n = Math.max(1, Math.min(500, Math.round(Number($('classSize').value) || 45)));
     state.classSize = n;
-    // Only THIS round is re-run. Wiping every round would throw away round 1
-    // the moment you rehearsed round 2 -- which is the whole comparison.
-    state.responses = state.responses.filter(r => roundOf(r) !== state.round);
+    // Only THIS round's SIMULATED answers are re-run. Two things must survive:
+    // the other round (that is the comparison) and anything a student actually
+    // typed (this used to delete real answers with one unarmed click).
+    state.responses = state.responses.filter(r => !(r.sim && roundOf(r) === state.round));
+    resetReveal();
     newestId = null; hoverIdx = -1; $('tip').hidden = true;
     commit();
     startArrivals(n);
@@ -1208,9 +1193,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const b = $('clearBtn');
     if (!state.responses.length) return;
     if (b.dataset.armed) {
-      state.responses = []; newestId = null; hoverIdx = -1; $('tip').hidden = true;
+      // Rehearsal answers only. Wiping the real ones is what "Start over" is
+      // for, and it says so on the button.
+      state.responses = state.responses.filter(r => !r.sim);
+      resetReveal();
+      newestId = null; hoverIdx = -1; $('tip').hidden = true;
       delete b.dataset.armed; b.textContent = 'Clear all';
-      if (live && socket) socket.emit('clear', { room: state.room });
       commit();
     } else {
       b.dataset.armed = '1'; b.textContent = 'Click again';
@@ -1232,9 +1220,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // A stale code saved from an earlier session would silently send this class
   // to a room nobody was given a link to, and there is no field left to spot it
   // in — so the room is pinned to the default on every load.
-  state.room = DEFAULTS.room;
+  state.room = DEFAULTS.room; save();   // without save() the old room comes back
   $('liveBtn').addEventListener('click', () => (live ? goOffline() : goLive()));
-  $('joinBtn').addEventListener('click', openJoinScreen);
 
   $('modeStudents').addEventListener('click', () => setMode('students'));
   $('modePrice').addEventListener('click',    () => setMode('price'));

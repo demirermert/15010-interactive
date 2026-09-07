@@ -73,7 +73,11 @@ h1{font-size:31px;line-height:1.15;font-weight:600;letter-spacing:-.02em}
    the mode buttons beside it rather than growing the header row. */
 .price-set{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);
            border-radius:8px;background:#fff;padding:0 10px 0 12px;height:31px}
-.price-set[hidden]{display:none}
+/* Keeps its space when hidden instead of collapsing. The tool row is
+   right-aligned, so a box that appears on Surplus would widen the group and
+   shove Students/Price/Surplus leftwards under the cursor -- you would click
+   Surplus and watch the button you just hit move. */
+.price-set[hidden]{visibility:hidden}
 .price-set label{font-size:12.5px;font-weight:600;color:var(--muted)}
 .price-set .ps-dollar{font-size:12.5px;color:var(--muted)}
 .price-set .num{height:27px;width:56px;border:none;font-size:13px;padding:0}

@@ -47,8 +47,7 @@ button:disabled{background:#c9cdd3}
 
 .msg{margin-top:16px;font-size:14.5px;min-height:22px}
 .msg.err{color:#c0392b}
-.hint{font-size:13px;color:var(--muted);margin-top:14px;line-height:1.5}
-.room{font:12px var(--mono);color:var(--muted);margin-top:26px;text-align:center}
+.ask{font-size:17px;font-weight:600;color:var(--ink);margin:14px 0 0}
 
 /* after submitting */
 .done{display:none;text-align:center;padding:14px 0}
@@ -66,8 +65,9 @@ body.sent .done{display:block}
 
   <div class="form">
     <p class="eyebrow" id="eyebrow">15.010 · Lecture 1</p>
-    <h1 id="qTitle">What is the most you would pay for this sub?</h1>
-    <p class="lede" id="qLede">A hot Italian sub from the North End. One sub, wrapped to take away.</p>
+    <h1 id="qTitle">What is the most you would pay for this sandwich?</h1>
+    <p class="lede" id="qLede">It is 11:45 and you have fifteen minutes to eat before a seminar at noon. There is nowhere else you can get to in time.</p>
+    <p class="ask" id="qAsk">What is your willingness to pay?</p>
 
     <form id="f" autocomplete="off" novalidate>
       <div class="row">
@@ -86,15 +86,12 @@ body.sent .done{display:block}
       <label for="wtp">The most you would pay</label>
       <div class="money">
         <span>$</span>
-        <input id="wtp" type="number" inputmode="decimal" step="0.25" min="0" max="30"
+        <input id="wtp" type="number" inputmode="decimal" step="0.25" min="0" max="100"
                placeholder="0.00" required>
       </div>
 
       <button type="submit" id="send">Submit</button>
       <p class="msg" id="msg"></p>
-      <p class="hint">Answer for yourself, not for the class: the highest price at which you
-         would still buy it rather than go without. Anything from $0.00 to $30.00. You can
-         change your answer until we close the poll.</p>
     </form>
   </div>
 
@@ -106,7 +103,6 @@ body.sent .done{display:block}
     <button class="ghost" id="again">Change my answer</button>
   </div>
 
-  <p class="room" id="roomTag"></p>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -121,24 +117,35 @@ body.sent .done{display:block}
 --------------------------------------------------------------------------- */
 const ROUND_TEXT = {
   1: { eyebrow: '15.010 · Lecture 1',
-       title: 'What is the most you would pay for this sub?',
-       lede:  'A hot Italian sub from the North End. One sub, wrapped to take away.' },
+       title: 'What is the most you would pay for this sandwich?',
+       lede:  'It is 11:45 and you have fifteen minutes to eat before a seminar at noon. ' +
+              'There is nowhere else you can get to in time.' },
   2: { eyebrow: '15.010 · Lecture 1 · Round 2',
        title: 'Now what is the most you would pay?',
-       lede:  'The same sub — but this is the only food you can get. Everywhere else nearby is closed.' }
+       lede:  'Same sandwich, but you have a free hour. Brothers, Chipotle, anywhere else ' +
+              'nearby: all of them are open to you.' }
 };
 
 const TOKEN_KEY = 'l1-demand-token', ME_KEY = 'l1-demand-me';
-let token = localStorage.getItem(TOKEN_KEY);
+/* Storage throws outright in Safari's "block all cookies", in lockdown modes and
+   in some in-app browsers (Slack, Canvas, Outlook) -- which is how plenty of
+   students will open this link. Unguarded, the whole inline script died here:
+   the page still LOOKED perfect, no submit handler was ever attached, and the
+   student tapped Submit into nothing and never appeared in the data. */
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* fine */ } }
+};
+
+let token = store.get(TOKEN_KEY);
 if (!token) {
   token = (crypto.randomUUID ? crypto.randomUUID()
                              : String(Date.now()) + Math.random().toString(36).slice(2));
-  localStorage.setItem(TOKEN_KEY, token);
+  store.set(TOKEN_KEY, token);
 }
 
 const room = (location.pathname.split('/r/')[1] || '15010')
   .toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 12) || '15010';
-document.getElementById('roomTag').textContent = 'room ' + room;
 
 const $ = id => document.getElementById(id);
 const socket = io({ transports: ['websocket', 'polling'] });
@@ -148,29 +155,43 @@ let round = 1;
 /* The instructor moves the class on; the phone follows. Whatever the student
    already sent stays on the board under the old round -- this only clears the
    box so the next answer is a fresh one, and puts the new question above it. */
-function setRound(n) {
-  const next = Number(n) === 2 ? 2 : 1;
-  if (next === round) return;
-  round = next;
+function applyRoundText() {
   const t = ROUND_TEXT[round];
   $('eyebrow').textContent = t.eyebrow;
   $('qTitle').textContent  = t.title;
   $('qLede').textContent   = t.lede;
+}
+
+function setRound(n) {
+  const next = Number(n) === 2 ? 2 : 1;
+  if (next === round) return;
+  round = next;
+  applyRoundText();
   document.body.classList.remove('sent');
   $('wtp').value = '';
   $('msg').textContent = '';
   $('msg').className = 'msg';
 }
 
-socket.on('round', d => setRound(d && d.round));
-socket.on('responses', d => { if (d && d.round) setRound(d.round); });
+socket.on('round', d => { if (d && d.round) setRound(d.round); });
+
+/* The instructor cleared the room. The round may be unchanged, so setRound()
+   would return early -- and every phone that had answered would sit on its
+   green tick while the board was empty. Force the form back. */
+socket.on('reset', d => {
+  round = Number(d && d.round) === 2 ? 2 : 1;
+  applyRoundText();
+  document.body.classList.remove('sent');
+  $('wtp').value = '';
+  $('msg').textContent = ''; $('msg').className = 'msg';
+});
 
 socket.on('connect', () =>
   socket.emit('join', { room, role: 'student' }, ack => { if (ack) setRound(ack.round); }));
 
 // remember who they said they were, so changing an answer is one tap
 try {
-  const me = JSON.parse(localStorage.getItem(ME_KEY) || '{}');
+  const me = JSON.parse(store.get(ME_KEY) || '{}');
   if (me.first) $('first').value = me.first;
   if (me.initial) $('initial').value = me.initial;
 } catch (e) { /* ignore */ }
@@ -182,8 +203,12 @@ $('f').addEventListener('submit', e => {
   const wtp = Number($('wtp').value);
 
   if (!first) return fail('Please put your first name in.');
-  if (!Number.isFinite(wtp) || $('wtp').value === '') return fail('Please enter an amount.');
-  if (wtp < 0 || wtp > 30) return fail('Anything from $0.00 to $30.00.');
+  // A number input empties .value for "12,50", "$12" or "abc" while still SHOWING
+  // the typed text, so "please enter an amount" read as nonsense next to a filled
+  // box. Comma decimals catch international students in particular.
+  if (!Number.isFinite(wtp) || $('wtp').value === '')
+    return fail('Please enter a plain number, using a dot for cents — for example 8.50');
+  if (wtp < 0 || wtp > 100) return fail('Anything from $0.00 to $100.00.');
 
   $('send').disabled = true;
   $('msg').textContent = 'Sending…';
@@ -192,11 +217,16 @@ $('f').addEventListener('submit', e => {
   socket.emit('submit', { room, token, first, initial, wtp }, res => {
     $('send').disabled = false;
     if (!res || !res.ok) return fail(res && res.error ? res.error : 'Could not send — try again.');
-    localStorage.setItem(ME_KEY, JSON.stringify({ first, initial }));
+    /* Confirm FIRST. This write used to come first and could throw, leaving a
+       student on "Sending…" forever after an answer the server had accepted. */
+    if (res.round && res.round !== round) {
+      return fail('The question changed while you were typing — please answer again.');
+    }
     $('doneWho').textContent = res.name;
     $('doneAmt').textContent = '$' + Number(res.wtp).toFixed(2);
     document.body.classList.add('sent');
     $('msg').textContent = '';
+    store.set(ME_KEY, JSON.stringify({ first, initial }));
   });
 });
 

@@ -56,7 +56,7 @@ const BITLY_DOMAIN = String(process.env.BITLY_DOMAIN || '').trim();
    keyword someone else already owns comes back 4xx too. Either way the random
    short link is used instead, so a name that cannot be had costs nothing. */
 const BITLY_SLUG = String(process.env.BITLY_SLUG || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40);
-const MAX_WTP   = 30;          // must match MAX_WTP in the dashboard
+const MAX_WTP   = 100;         // must match MAX_WTP in the dashboard
 const MAX_NAME  = 24;
 const MAX_ROOMS = 50;          // a stray room code should not grow memory forever
 const MAX_PER_ROOM = 600;
@@ -81,10 +81,18 @@ const normRoom = r => String(r || '')
 
 function roomStore(room) {
   if (!rooms.has(room)) {
-    if (rooms.size >= MAX_ROOMS) {                 // drop the least recently used
-      const oldest = [...rooms.entries()]
+    if (rooms.size >= MAX_ROOMS) {
+      /* Drop the least recently used room that is EMPTY. Evicting a room that
+         holds answers loses a live class: the next push recreates it empty, the
+         connected dashboard adopts the empty list and overwrites its own cached
+         backup, and nothing reconnects to trigger a restore. A quiet room --
+         which is what a class looks like while you talk between rounds -- was
+         previously the most likely victim. */
+      const spare = [...rooms.entries()]
+        .filter(([, m]) => m.size === 0)
         .sort((a, b) => (a[1].touched || 0) - (b[1].touched || 0))[0];
-      if (oldest) rooms.delete(oldest[0]);
+      if (spare) rooms.delete(spare[0]);
+      else return rooms.get(room) || new Map();   // all full: serve, don't destroy
     }
     const m = new Map();
     m.touched = Date.now();
@@ -102,17 +110,39 @@ const list = room => [...roomStore(room).values()].sort((a, b) => a.ts - b.ts);
    the switch would otherwise post its round 1 answer into round 2. */
 const roundOf = room => roomStore(room).round || 1;
 
+const countInRound = (store, round) => {
+  let n = 0;
+  for (const v of store.values()) if ((v.round || 1) === round) n++;
+  return n;
+};
+
 function cleanName(first, initial) {
   const f = String(first || '').trim().replace(/\s+/g, ' ').slice(0, MAX_NAME);
-  const i = String(initial || '').trim().slice(0, 1).toUpperCase();
+  // [...str] splits by code point, so an emoji or an accented letter survives
+  // instead of becoming half a surrogate pair on the projector. Uppercase first
+  // so 'ß' does not become 'SS'.
+  const i = ([...String(initial || '').trim().toUpperCase()][0] || '')
+    .replace(/[^\p{L}\p{N}]/u, '');
   if (!f) return 'Anonymous';
   return i ? `${f} ${i}.` : f;
 }
 
 function cleanWtp(v) {
+  // Number('') and Number(null) are 0, which would put a silent $0.00 answer on
+  // the curve. Anything that is not a real number typed by a person is refused.
+  if (v === null || v === undefined || v === '' ||
+      (typeof v === 'string' && v.trim() === '') || typeof v === 'boolean' ||
+      Array.isArray(v)) return null;
+  // Only plain decimal notation. "0x10" is a valid Number (16) but nobody typed
+  // hexadecimal into a price box, so it is a tampered client, not a student.
+  if (typeof v === 'string' && !/^-?\d*\.?\d+$/.test(v.trim())) return null;
   const n = Number(v);
   if (!Number.isFinite(n)) return null;
-  return Math.max(0, Math.min(MAX_WTP, Math.round(n * 4) / 4));   // quarters
+  // Out of range is REFUSED, not quietly clamped: the error text promises
+  // "a number from 0 to 100", and a silent 1e9 -> $100 is a fabricated answer
+  // sitting at the top of the demand curve.
+  if (n < 0 || n > MAX_WTP) return null;
+  return Math.round(n * 4) / 4;                                  // quarters
 }
 
 /* ------------------------------------------------------------------ http */
@@ -290,81 +320,119 @@ const studentCount = room =>
   [...io.sockets.adapter.rooms.get(room) || []]
     .filter(id => io.sockets.sockets.get(id)?.data.role === 'student').length;
 
+/* Dashboards sit in a second room so the answers go ONLY to them. Students used
+   to receive the whole class's names and amounts on every push -- ~10MB per
+   phone across a lecture, and a live roster of everyone's answer readable from
+   the phone, in an exercise whose point is that nobody anchors on anyone else.
+   They need exactly one integer, so that is all they get. */
+const dashRoom = room => room + '\u0000dash';
+
 function push(room) {
-  io.to(room).emit('responses', {
+  io.to(dashRoom(room)).emit('responses', {
     room, responses: list(room), online: studentCount(room), round: roundOf(room)
   });
+  io.to(room).emit('round', { room, round: roundOf(room) });
 }
 
+/* A handler must never take the process down. `(payload = {})` only defaults on
+   undefined, so a single `emit('join', null)` from any phone's console used to
+   throw an uncaught TypeError and kill the server -- taking every room's answers
+   with it, mid-lecture. Everything below goes through here instead. */
+const on = (socket, event, fn, instructorOnly = false) =>
+  socket.on(event, (payload, ack) => {
+    try {
+      if (instructorOnly && socket.data.role !== 'dashboard') return;
+      fn(payload && typeof payload === 'object' ? payload : {},
+         typeof ack === 'function' ? ack : () => {});
+    } catch (err) {
+      console.error(`[${event}]`, err && err.message);
+    }
+  });
+
 io.on('connection', socket => {
-  socket.on('join', (payload = {}, ack) => {
+  on(socket, 'join', (payload, ack) => {
     const room = normRoom(payload.room);
     socket.join(room);
     socket.data.room = room;
     socket.data.role = payload.role === 'student' ? 'student' : 'dashboard';
-    if (typeof ack === 'function')
-      ack({ room, responses: list(room), online: studentCount(room), round: roundOf(room) });
+    if (socket.data.role === 'dashboard') socket.join(dashRoom(room));
+    ack(socket.data.role === 'dashboard'
+      ? { room, responses: list(room), online: studentCount(room), round: roundOf(room) }
+      : { room, round: roundOf(room) });          // a phone needs nothing else
     push(room);
   });
 
-  socket.on('submit', (payload = {}, ack) => {
+  on(socket, 'submit', (payload, ack) => {
     const room = normRoom(payload.room || socket.data.room);
     const token = String(payload.token || '').slice(0, 64);
     const wtp = cleanWtp(payload.wtp);
-    if (!token) return ack?.({ ok: false, error: 'missing token' });
-    if (wtp === null) return ack?.({ ok: false, error: `enter a number from 0 to ${MAX_WTP}` });
+    if (!token) return ack({ ok: false, error: 'missing token' });
+    if (wtp === null) return ack({ ok: false, error: `enter a number from 0 to ${MAX_WTP}` });
 
     const store = roomStore(room);
     const round = roundOf(room);
     const key = keyFor(token, round);
-    if (!store.has(key) && store.size >= MAX_PER_ROOM * ROUNDS)
-      return ack?.({ ok: false, error: 'this room is full' });
+    // Per ROUND, not a shared budget: a full round 1 used to make round 2
+    // impossible for everyone, including the students who had already answered.
+    if (!store.has(key) && countInRound(store, round) >= MAX_PER_ROOM)
+      return ack({ ok: false, error: 'this room is full' });
 
     const name = cleanName(payload.first, payload.initial);
     const prev = store.get(key);
     store.set(key, {
-      id: prev?.id || randomUUID(), name, wtp, round, ts: prev?.ts || Date.now()
+      id: prev?.id || randomUUID(), token, name, wtp, round, ts: prev?.ts || Date.now()
     });
 
-    ack?.({ ok: true, name, wtp, round, changed: Boolean(prev) });
+    ack({ ok: true, name, wtp, round, changed: Boolean(prev) });
     push(room);
   });
 
   // instructor actions
-  socket.on('clear', (payload = {}) => {
+  on(socket, 'clear', payload => {
     const room = normRoom(payload.room || socket.data.room);
     const store = roomStore(room);
     store.clear();
     store.round = 1;                 // a cleared room starts the lecture over
+    // 'reset' is distinct from 'round': the round may be unchanged, but every
+    // phone still has to drop its "your answer is on the board" screen, or the
+    // class sits looking at a confirmation for an answer that no longer exists.
+    io.to(room).emit('reset', { room, round: 1 });
     push(room);
-  });
+  }, true);
 
   /* Moving the class to the next condition. Every student's phone is told at
      once, so the question on the page changes under them and their previous
      answer stops being the one they can edit. Earlier rounds are kept. */
-  socket.on('setRound', (payload = {}) => {
+  on(socket, 'setRound', payload => {
     const room = normRoom(payload.room || socket.data.room);
     const next = Math.min(ROUNDS, Math.max(1, Number(payload.round) | 0 || 1));
     const store = roomStore(room);
     store.round = next;
     io.to(room).emit('round', { room, round: next });
     push(room);
-  });
+  }, true);
 
   /* The dashboard hands its cached copy back if it reconnects and finds the
      room empty — which is what a free-tier restart mid-class looks like. */
-  socket.on('restore', (payload = {}) => {
+  on(socket, 'restore', payload => {
     const room = normRoom(payload.room || socket.data.room);
     const store = roomStore(room);
     if (store.size) return;                       // never overwrite live answers
     store.round = Math.min(ROUNDS, Math.max(1, Number(payload.round) | 0 || 1));
     for (const r of Array.isArray(payload.responses) ? payload.responses : []) {
+      if (!r || typeof r !== 'object') continue;  // one null row used to kill the process
       const wtp = cleanWtp(r.wtp);
       if (wtp === null) continue;
-      const token = String(r.token || r.id || randomUUID()).slice(0, 64);
       const round = Math.min(ROUNDS, Math.max(1, Number(r.round) | 0 || 1));
+      if (countInRound(store, round) >= MAX_PER_ROOM) continue;   // cap applies here too
+      /* Keyed by the DEVICE token, which is why push() now sends it back. Keying
+         a restored row by its id instead meant the student's next answer landed
+         under a different key and they appeared twice on the same curve --
+         exactly in the restart this whole path exists for. */
+      const token = String(r.token || r.id || randomUUID()).slice(0, 64);
       store.set(keyFor(token, round), {
         id: r.id || randomUUID(),
+        token,
         name: String(r.name || 'Anonymous').slice(0, MAX_NAME + 4),
         wtp,
         round,
@@ -372,7 +440,7 @@ io.on('connection', socket => {
       });
     }
     push(room);
-  });
+  }, true);
 
   socket.on('disconnect', () => { if (socket.data.room) push(socket.data.room); });
 });
