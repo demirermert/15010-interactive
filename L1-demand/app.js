@@ -958,7 +958,7 @@ function setRoundState(n) {
   // into the wrong condition. Clear all is the way back, and it says so.
   $('roundBtn').hidden = next === 2;
   $('roundBtn').textContent = 'Start round 2';
-  $('roundTag').textContent = next === 1 ? 'Round 1' : 'Round 2 — live';
+  $('roundTag').textContent = next === 1 ? 'Round 1' : 'Round 2 · live';
   // Once a second curve exists the toggle earns its place; before that it is
   // three buttons that all show the same thing.
   $('demandViewToggle').hidden = roundsWithAnswers().length < 2 && next === 1;
