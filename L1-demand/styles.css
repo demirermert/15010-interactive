@@ -282,21 +282,51 @@ h1{font-size:31px;line-height:1.15;font-weight:600;letter-spacing:-.02em}
 .numbers-hint{font-size:12px;color:var(--muted);margin-top:12px}
 
 /* "How to run this" — a run-sheet for whoever is driving, which may not be the
-   person who built it. Sized to be read on a laptop the night before rather
-   than from the back of a room, so it is deliberately smaller than the chart
-   furniture and capped in width for readability. */
-.help{max-width:70ch}
-.help-lede{font-size:13.5px;color:var(--ink-soft);margin-bottom:18px;line-height:1.55}
-.help-h{font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
-        color:var(--muted);margin:20px 0 8px}
-.help-h:first-of-type{margin-top:0}
-.help-steps{margin:0;padding-left:20px;font-size:13.5px;color:var(--ink-soft);line-height:1.6}
-.help-steps li{margin-bottom:7px}
-.help-dl{margin:0;font-size:13.5px;line-height:1.6}
-.help-dl dt{font-weight:600;color:var(--ink);margin-top:11px}
-.help-dl dt:first-child{margin-top:0}
-.help-dl dd{margin:2px 0 0;color:var(--ink-soft)}
-.help b{font-weight:600;color:var(--ink)}
+   person who built it. Set as cards in the same language as the rest of the
+   page, with the control names as chips that echo the real buttons: the reader
+   should be able to match a line here to a thing on the toolbar at a glance,
+   rather than reading a wall of grey at one size. */
+.help{max-width:none}
+.help-card{border:1px solid var(--line);border-radius:12px;background:#fff;
+           padding:18px 22px;margin-bottom:14px}
+/* the one you actually read on the day, so it is marked */
+.help-card-lead{border-left:3px solid var(--blue)}
+.help-title{font-size:15.5px;font-weight:700;color:var(--ink);margin-bottom:13px}
+
+.help-addr{font-size:13.5px;color:var(--ink-soft);line-height:1.9;margin-bottom:15px}
+.help-addr code{font:13px var(--mono);color:var(--ink);background:var(--line-soft);
+                padding:3px 7px;border-radius:5px}
+.help-note{font-size:12.5px;color:var(--muted);line-height:1.55}
+
+.help-steps{margin:0;padding-left:19px;font-size:14px;color:var(--ink-soft);line-height:1.65}
+.help-steps li{margin-bottom:9px}
+.help-steps li:last-child{margin-bottom:0}
+.help-steps li::marker{color:var(--muted);font-weight:700}
+
+/* term on the left, what it does on the right, hairline between rows */
+/* No column gap: the row rule is drawn by dt and dd each carrying a border-top,
+   and a gap between them would leave a visible break in the middle of it. The
+   space between the two columns is padding on dt instead. */
+.help-grid{display:grid;grid-template-columns:224px 1fr;gap:0;align-items:start}
+.help-grid>dt,.help-grid>dd{padding:12px 0;border-top:1px solid var(--line-soft)}
+.help-grid>dt:first-of-type,.help-grid>dd:first-of-type{padding-top:0;border-top:none}
+.help-grid>dt{display:flex;flex-wrap:wrap;gap:5px;padding-right:24px}
+.help-grid>dd{font-size:13.5px;color:var(--ink-soft);line-height:1.6;margin:0}
+.help b,.help-grid>dd b{font-weight:600;color:var(--ink)}
+
+/* chips: the toolbar's own shape, so the name is recognisable as a control */
+.key{display:inline-block;border:1px solid var(--line);border-radius:7px;
+     padding:4px 10px;font-size:12.5px;font-weight:600;color:var(--ink);
+     background:#fff;white-space:nowrap;line-height:1.35}
+.key-go{background:#f6f6f4}
+
+/* one column once the term and its text can no longer sit side by side */
+@media (max-width:860px){
+  .help-grid{grid-template-columns:1fr}
+  .help-grid>dt{padding-bottom:7px;padding-right:0}
+  .help-grid>dd{padding-top:0;border-top:none}
+  .help-grid>dt:first-of-type{padding-top:0}
+}
 .wtp-seg{font:10px var(--mono);font-weight:700;letter-spacing:.06em;flex:0 0 14px}
 
 /* segment results in the profit panel */
