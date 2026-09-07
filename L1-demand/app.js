@@ -34,6 +34,25 @@ const DEFAULT_SERVER = location.protocol.startsWith('http')
   ? location.origin
   : 'https://l1-demand.onrender.com';
 
+/* Behind the 15010.ai proxy this page is served under a per-section path
+   prefix — 15010.ai/L1-AXX/ rather than the service's own /<key>/dashboard/ —
+   because every section is a separate Render service and the section has to be
+   somewhere in the URL. socket.io would otherwise dial <origin>/socket.io,
+   which names no section and so reaches nothing. Everything before the route we
+   know about is the prefix; served from Render direct there is none. */
+function labPrefix() {
+  const p = location.pathname;
+  const r = p.indexOf('/r/');
+  if (r >= 0) return p.slice(0, r);            // student form
+  if (/\/dashboard\/?$/.test(p)) return '';    // dashboard on the service itself
+  return p.replace(/\/$/, '');                 // dashboard behind the proxy
+}
+const LAB_PREFIX = location.protocol.startsWith('http') ? labPrefix() : '';
+
+/* Only OUR origin is behind the proxy. If the Live panel is pointed at some
+   other address the prefix does not belong on it. */
+const prefixFor = base => (base === location.origin ? LAB_PREFIX : '');
+
 /* The class can be split into up to three segments. Each is a separate room on
    the server — <ROOM>-A, <ROOM>-B, <ROOM>-C — with its own link and QR code, so
    who ends up in which segment is decided by which link they were handed. With
@@ -1011,7 +1030,7 @@ function loadSocketIo(base) {
   if (window.io) return Promise.resolve();
   return new Promise((resolve, reject) => {
     const s = document.createElement('script');
-    s.src = base.replace(/\/$/, '') + '/socket.io/socket.io.js';
+    s.src = base.replace(/\/$/, '') + prefixFor(base) + '/socket.io/socket.io.js';
     s.onload = resolve;
     s.onerror = () => reject(new Error('could not reach the server'));
     document.head.appendChild(s);
@@ -1055,7 +1074,8 @@ async function goLive() {
   }
 
   const rooms = roomsNow();
-  socket = window.io(base, { transports: ['websocket', 'polling'], timeout: 8000 });
+  socket = window.io(base, { path: prefixFor(base) + '/socket.io',
+                             transports: ['websocket', 'polling'], timeout: 8000 });
 
   socket.on('connect', () => {
     rooms.forEach((r, k) => {

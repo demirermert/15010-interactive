@@ -105,7 +105,24 @@ body.sent .done{display:block}
 
 </div>
 
-<script src="/socket.io/socket.io.js"></script>
+<script>
+/* Behind the 15010.ai proxy this form is served under a per-section path prefix
+   — 15010.ai/L1-A/ rather than the service's own /r/15010 — because every
+   section is a separate Render service and the section has to be somewhere in
+   the URL. socket.io defaults to <origin>/socket.io, which on the proxy names
+   no section and answers nothing, so both the client library and the connection
+   have to be told where they really live. Served from Render direct the prefix
+   comes out empty and this is exactly the old behaviour.
+   document.write, deliberately: the script below runs at parse time and needs
+   `io` to already exist. Same-origin, so the parser-blocking rule browsers
+   apply to document.written cross-origin scripts does not bite. */
+function labPrefix() {
+  const p = location.pathname, r = p.indexOf('/r/');
+  return r >= 0 ? p.slice(0, r) : p.replace(/\/$/, '');
+}
+var LAB_PREFIX = labPrefix();
+document.write('<scr' + 'ipt src="' + LAB_PREFIX + '/socket.io/socket.io.js"></scr' + 'ipt>');
+</script>
 <script>
 /* One answer per device. The token is what the server keys on, so answering a
    second time replaces the first rather than adding another point to the curve. */
@@ -148,7 +165,8 @@ const room = (location.pathname.split('/r/')[1] || '15010')
   .toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 12) || '15010';
 
 const $ = id => document.getElementById(id);
-const socket = io({ transports: ['websocket', 'polling'] });
+const socket = io({ path: LAB_PREFIX + '/socket.io',
+                    transports: ['websocket', 'polling'] });
 
 let round = 1;
 
