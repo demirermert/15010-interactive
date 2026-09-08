@@ -66,8 +66,8 @@ body.sent .done{display:block}
 
   <div class="form">
     <p class="eyebrow" id="eyebrow">15.010 · Lecture 1</p>
-    <h1 id="qTitle">What is the most you would pay for this sandwich?</h1>
-    <p class="lede" id="qLede">It is 11:45 and you have fifteen minutes to eat before a seminar at noon. There is nowhere else you can get to in time.</p>
+    <h1 id="qTitle">What is the most you would pay for a sandwich?</h1>
+    <p class="lede" id="qLede">You have a free hour. Brothers, Chipotle and anywhere else nearby are all available to you.</p>
     <p class="ask" id="qAsk">What is your willingness to pay?</p>
 
     <form id="f" autocomplete="off" novalidate>
@@ -128,20 +128,24 @@ document.write('<scr' + 'ipt src="' + LAB_PREFIX + '/socket.io/socket.io.js"></s
 /* One answer per device. The token is what the server keys on, so answering a
    second time replaces the first rather than adding another point to the curve. */
 /* ---------------------------------------------------------------------------
-   THE TWO QUESTIONS. Round 2 is the same sub with the alternatives taken away,
-   which is the point of the exercise: willingness to pay is not a property of
-   the sandwich, it moves with what else you could do instead.
-   Edit the round 2 wording here and nowhere else.
+   THE TWO QUESTIONS, and the order is the point. Round 1 asks with every
+   alternative available; round 2 takes them away. Willingness to pay is not a
+   property of the sandwich, it moves with what else you could do instead, so
+   round 2 should come in HIGHER and the curve should shift up.
+   Edit the wording here and nowhere else, EXCEPT that round 1's lede is also
+   written into the markup above: that is what a phone shows for the moment
+   before the server says which round is running, and the two must match.
 --------------------------------------------------------------------------- */
 const ROUND_TEXT = {
   1: { eyebrow: '15.010 · Lecture 1',
-       title: 'What is the most you would pay for this sandwich?',
-       lede:  'It is 11:45 and you have fifteen minutes to eat before a seminar at noon. ' +
-              'There is nowhere else you can get to in time.' },
+       title: 'What is the most you would pay for a sandwich?',
+       lede:  'You have a free hour. Brothers, Chipotle and anywhere else nearby ' +
+              'are all available to you.' },
   2: { eyebrow: '15.010 · Lecture 1 · Round 2',
-       title: 'Now what is the most you would pay?',
-       lede:  'Same sandwich, but you have a free hour. Brothers, Chipotle, anywhere else ' +
-              'nearby: all of them are open to you.' }
+       title: 'Now what is the most you would pay for the same sandwich?',
+       lede:  'Same sandwich, but it is 11:45 and you have fifteen minutes before a ' +
+              'seminar at noon. Nowhere else is close enough. This is your only ' +
+              'option, and if you do not buy it you go without lunch.' }
 };
 
 const TOKEN_KEY = 'l1-demand-token', ME_KEY = 'l1-demand-me';
