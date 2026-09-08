@@ -69,7 +69,7 @@ body.sent .done{display:block}
     <!-- Pre-script fallback only: applyRoundText() repaints both of these from
          ROUND_TEXT as soon as the script runs. -->
     <h1 id="qTitle">What is the most you would pay for a sandwich from the Sloan cafeteria?</h1>
-    <p class="lede" id="qLede">You have a free hour. Brothers, Chipotle and anywhere else nearby are all available to you.</p>
+    <p class="lede" id="qLede">It is 11:45 and you have time until 13:00. Brothers, Chipotle and anywhere else nearby are all available to you.</p>
     <p class="ask" id="qAsk">What is your willingness to pay?</p>
 
     <form id="f" autocomplete="off" novalidate>
@@ -141,8 +141,8 @@ document.write('<scr' + 'ipt src="' + LAB_PREFIX + '/socket.io/socket.io.js"></s
 const ROUND_TEXT = {
   1: { eyebrow: '15.010 · Lecture 1',
        title: 'What is the most you would pay for a sandwich from the Sloan cafeteria?',
-       lede:  'You have a free hour. Brothers, Chipotle and anywhere else nearby ' +
-              'are all available to you.' },
+       lede:  'It is 11:45 and you have time until 13:00. Brothers, Chipotle and ' +
+              'anywhere else nearby are all available to you.' },
   2: { eyebrow: '15.010 · Lecture 1 · Round 2',
        title: 'Now what is the most you would pay for the same sandwich?',
        lede:  'It is 11:45 and you have fifteen minutes before a seminar at noon. ' +
