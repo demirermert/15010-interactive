@@ -66,7 +66,9 @@ body.sent .done{display:block}
 
   <div class="form">
     <p class="eyebrow" id="eyebrow">15.010 · Lecture 1</p>
-    <h1 id="qTitle">What is the most you would pay for a sandwich?</h1>
+    <!-- Pre-script fallback only: applyRoundText() repaints both of these from
+         ROUND_TEXT as soon as the script runs. -->
+    <h1 id="qTitle">What is the most you would pay for a sandwich from the Sloan cafeteria?</h1>
     <p class="lede" id="qLede">You have a free hour. Brothers, Chipotle and anywhere else nearby are all available to you.</p>
     <p class="ask" id="qAsk">What is your willingness to pay?</p>
 
@@ -132,20 +134,20 @@ document.write('<scr' + 'ipt src="' + LAB_PREFIX + '/socket.io/socket.io.js"></s
    alternative available; round 2 takes them away. Willingness to pay is not a
    property of the sandwich, it moves with what else you could do instead, so
    round 2 should come in HIGHER and the curve should shift up.
-   Edit the wording here and nowhere else, EXCEPT that round 1's lede is also
-   written into the markup above: that is what a phone shows for the moment
-   before the server says which round is running, and the two must match.
+   Edit the wording HERE; this object is authoritative. The copy of round 1 in
+   the markup above only covers the moment before this script runs, and is
+   overwritten on load.
 --------------------------------------------------------------------------- */
 const ROUND_TEXT = {
   1: { eyebrow: '15.010 · Lecture 1',
-       title: 'What is the most you would pay for a sandwich?',
+       title: 'What is the most you would pay for a sandwich from the Sloan cafeteria?',
        lede:  'You have a free hour. Brothers, Chipotle and anywhere else nearby ' +
               'are all available to you.' },
   2: { eyebrow: '15.010 · Lecture 1 · Round 2',
        title: 'Now what is the most you would pay for the same sandwich?',
-       lede:  'Same sandwich, but it is 11:45 and you have fifteen minutes before a ' +
-              'seminar at noon. Nowhere else is close enough. This is your only ' +
-              'option, and if you do not buy it you go without lunch.' }
+       lede:  'It is 11:45 and you have fifteen minutes before a seminar at noon. ' +
+              'Nowhere else is close enough. This is your only option, and if you ' +
+              'do not buy it you go without lunch.' }
 };
 
 const TOKEN_KEY = 'l1-demand-token', ME_KEY = 'l1-demand-me';
@@ -184,6 +186,14 @@ function applyRoundText() {
   $('qTitle').textContent  = t.title;
   $('qLede').textContent   = t.lede;
 }
+
+/* Paint round 1 straight away, so ROUND_TEXT is the only place the question
+   lives. Without this the markup was authoritative until the server announced a
+   DIFFERENT round, and setRound() returns early when the round has not changed
+   -- so on a room sitting at round 1 stale markup was never corrected and would
+   have stayed up for the whole lecture rather than flashing. That happened once
+   already, from a parallel edit that left the wrong scenario in the markup. */
+applyRoundText();
 
 function setRound(n) {
   const next = Number(n) === 2 ? 2 : 1;
