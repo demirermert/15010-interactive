@@ -56,7 +56,7 @@ const BITLY_DOMAIN = String(process.env.BITLY_DOMAIN || '').trim();
    keyword someone else already owns comes back 4xx too. Either way the random
    short link is used instead, so a name that cannot be had costs nothing. */
 const BITLY_SLUG = String(process.env.BITLY_SLUG || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40);
-const MAX_WTP   = 100;         // must match MAX_WTP in the dashboard
+const MAX_WTP   = 60;          // must match MAX_WTP in the dashboard and on the form
 const MAX_NAME  = 24;
 const MAX_ROOMS = 50;          // a stray room code should not grow memory forever
 const MAX_PER_ROOM = 600;

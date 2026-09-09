@@ -21,7 +21,7 @@
  */
 
 const KEY = 'l1-demand-v4';
-const MAX_WTP    = 100;    // the most a student may submit
+const MAX_WTP    = 60;     // the most a student may submit; matches the server
 const ARRIVAL_MS = 300;    // one student every 0.3s, so a class of 45 lands in ~14s
 const HIT_BAND   = 55;     // px above/below the step the cursor may be and still count
 

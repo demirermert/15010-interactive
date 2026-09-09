@@ -89,7 +89,7 @@ body.sent .done{display:block}
       <label for="wtp">The most you would pay</label>
       <div class="money">
         <span>$</span>
-        <input id="wtp" type="number" inputmode="decimal" step="0.25" min="0" max="100"
+        <input id="wtp" type="number" inputmode="decimal" step="0.25" min="0"
                placeholder="0.00" required>
       </div>
 
@@ -172,6 +172,13 @@ const room = (location.pathname.split('/r/')[1] || '15010')
   .toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 12) || '15010';
 
 const $ = id => document.getElementById(id);
+
+/* The ceiling on an answer. server.js is what actually enforces it; this copy
+   exists only to say so before a round trip. The input's max attribute is set
+   from it rather than written into the markup, so the number lives in one place
+   on this page instead of three. Keep it equal to MAX_WTP in server.js. */
+const MAX_WTP = 60;
+$('wtp').max = MAX_WTP;
 const socket = io({ path: LAB_PREFIX + '/socket.io',
                     transports: ['websocket', 'polling'] });
 
@@ -241,7 +248,8 @@ $('f').addEventListener('submit', e => {
   // box. Comma decimals catch international students in particular.
   if (!Number.isFinite(wtp) || $('wtp').value === '')
     return fail('Please enter a plain number, using a dot for cents — for example 8.50');
-  if (wtp < 0 || wtp > 100) return fail('Anything from $0.00 to $100.00.');
+  if (wtp < 0 || wtp > MAX_WTP)
+    return fail(`Anything from $0.00 to $${MAX_WTP.toFixed(2)}.`);
 
   $('send').disabled = true;
   $('msg').textContent = 'Sending…';
