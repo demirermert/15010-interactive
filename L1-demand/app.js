@@ -333,7 +333,7 @@ function drawChart() {
   g.save();
   g.translate(22, padT + plotH / 2); g.rotate(-Math.PI / 2);
   g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.fillText('Price', 0, 0);
+  g.fillText('most they would pay', 0, 0);
   g.restore();
 
   if (!all.length) return;
