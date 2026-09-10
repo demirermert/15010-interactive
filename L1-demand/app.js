@@ -80,7 +80,11 @@ let socket = null;         // non-null once live
 let live = false;
 
 const $ = id => document.getElementById(id);
-const money = x => '$' + x.toFixed(2);
+/* Whole dollars lose their decimals. An axis reading "$40.00 / $30.00 / $20.00"
+   is mostly noise on a projector, and answers land on quarters, so the cents
+   are only worth printing when there are some: $40, but $8.25. */
+const money = x =>
+  '$' + (Math.round(x * 100) % 100 === 0 ? String(Math.round(x)) : x.toFixed(2));
 
 /* ------------------------------------------------------------------ state */
 
@@ -248,11 +252,17 @@ function drawChart() {
   const css = getComputedStyle(document.documentElement);
   const LINE  = css.getPropertyValue('--line').trim()  || '#e5e5e3';
   const MUTED = css.getPropertyValue('--muted').trim() || '#8a8a8a';
+  const AXIS  = '#9c9c96';        // darker than a gridline, lighter than ink
   const ACCENT= css.getPropertyValue('--accent').trim()|| '#e05c3e';
   const colour = s => css.getPropertyValue(s.varName).trim() || '#2563eb';
 
   // padL has to clear both the "$00.00" ticks and the rotated axis title
-  const padL = 88, padR = 18, padT = 26, padB = 46;
+  /* Margins are sized for the TYPE, not chosen once. The widest thing on the
+     left is not a tick label -- those are whole dollars now -- but the
+     price-mode readout, which carries cents and sits on a white patch: at bold
+     15px "$15.25" needs about 54px, and it must still clear the rotated axis
+     title. */
+  const padL = 100, padR = 20, padT = 30, padB = 60;
   const plotW = W - padL - padR, plotH = H - padT - padB;
   points = []; geom = null;
   if (plotW <= 10 || plotH <= 10) return;
@@ -284,31 +294,46 @@ function drawChart() {
   geom = { padL, padT, plotW, plotH, nMax, yMax, n: longest };
 
   // ---- grid + y ticks
-  g.font = '11px ui-monospace, SFMono-Regular, Menlo, monospace';
+  g.font = '15px ui-monospace, SFMono-Regular, Menlo, monospace';
   g.textAlign = 'right'; g.textBaseline = 'middle';
   for (let p = 0; p <= yMax + 0.001; p += tick) {
     const y = Y(p);
-    g.strokeStyle = p === 0 ? '#d8d8d4' : LINE;
+    g.strokeStyle = LINE;
     g.lineWidth = 1;
     g.beginPath(); g.moveTo(padL, y + .5); g.lineTo(W - padR, y + .5); g.stroke();
-    g.fillStyle = MUTED; g.fillText(money(p), padL - 9, y);
+    g.strokeStyle = AXIS; g.beginPath();
+    g.moveTo(padL - 5, y + .5); g.lineTo(padL, y + .5); g.stroke();
+    g.fillStyle = MUTED; g.fillText(money(p), padL - 12, y);
   }
 
   // ---- x ticks
   g.textAlign = 'center'; g.textBaseline = 'top';
   const stepQ = nMax <= 20 ? 5 : nMax <= 60 ? 10 : 20;
   for (let q = stepQ; q <= nMax; q += stepQ) {
-    g.fillStyle = MUTED; g.fillText(String(q), X(q), padT + plotH + 9);
+    g.strokeStyle = AXIS; g.lineWidth = 1;
+    g.beginPath(); g.moveTo(X(q) + .5, padT + plotH); g.lineTo(X(q) + .5, padT + plotH + 5); g.stroke();
+    g.fillStyle = MUTED; g.fillText(String(q), X(q), padT + plotH + 11);
   }
+
+  /* ---- the axes themselves. Drawn after the grid so they sit on top of it,
+     and darker than a gridline: the eye needs to know where the figure starts,
+     particularly with a staircase that can run right along the bottom. */
+  g.strokeStyle = AXIS; g.lineWidth = 1.25; g.lineCap = 'square';
+  g.beginPath();
+  g.moveTo(padL + .5, padT);                                  // up the left
+  g.lineTo(padL + .5, padT + plotH + .5);
+  g.lineTo(W - padR, padT + plotH + .5);                       // along the bottom
+  g.stroke();
+  g.lineCap = 'butt';
 
   // ---- axis titles
   g.fillStyle = MUTED;
-  g.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif';
-  g.fillText('students who would buy', padL + plotW / 2, padT + plotH + 26);
+  g.font = '600 16px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif';
+  g.fillText('students who would buy', padL + plotW / 2, padT + plotH + 36);
   g.save();
-  g.translate(17, padT + plotH / 2); g.rotate(-Math.PI / 2);
+  g.translate(22, padT + plotH / 2); g.rotate(-Math.PI / 2);
   g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.fillText('most they would pay', 0, 0);
+  g.fillText('Price', 0, 0);
   g.restore();
 
   if (!all.length) return;
@@ -421,9 +446,9 @@ function drawChart() {
       g.beginPath(); g.moveTo(p.x, p.y); g.lineTo(p.x, yPrice); g.stroke();
 
       const gain = p.wtp - state.surplusPrice;
-      if (yPrice - p.y > 14) {                    // only when the bar can hold it
+      if (yPrice - p.y > 17) {                    // only when the bar can hold it
         g.fillStyle = p.col;
-        g.font = '600 11.5px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif';
+        g.font = '600 14px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif';
         g.textAlign = 'left'; g.textBaseline = 'middle';
         g.fillText(money(gain), p.x + 7, (p.y + yPrice) / 2);
       }
@@ -454,10 +479,16 @@ function drawChart() {
     g.strokeStyle = ACCENT; g.lineWidth = 1.75; g.setLineDash([6, 4]);
     g.beginPath(); g.moveTo(padL, yp); g.lineTo(padL + plotW, yp); g.stroke();
     g.setLineDash([]);
-    g.fillStyle = ACCENT;
-    g.font = '600 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif';
+    g.font = '600 15px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif';
     g.textAlign = 'left'; g.textBaseline = 'bottom';
-    g.fillText(money(state.surplusPrice), padL + 4, yp - 4);
+    /* On a white patch: the surplus bars start at this very corner, and at 15px
+       the figure was being drawn straight over them. */
+    const plab = money(state.surplusPrice);
+    const plw = g.measureText(plab).width;
+    g.fillStyle = '#fff';
+    g.fillRect(padL + 3, yp - 21, plw + 8, 19);
+    g.fillStyle = ACCENT;
+    g.fillText(plab, padL + 7, yp - 5);
     g.restore();
   }
 
@@ -495,15 +526,15 @@ function drawChart() {
     // off the axes rather than out of a box in the corner. Each label is
     // painted on a white patch so it covers the grey tick underneath instead
     // of colliding with it.
-    g.font = 'bold 12px ui-monospace, SFMono-Regular, Menlo, monospace';
+    g.font = 'bold 15px ui-monospace, SFMono-Regular, Menlo, monospace';
 
     const pLabel = money(hoverPrice);                 // price, on the y-axis
     g.textAlign = 'right'; g.textBaseline = 'middle';
     const pw = g.measureText(pLabel).width;
     g.fillStyle = '#fff';
-    g.fillRect(padL - 11 - pw, y - 9, pw + 8, 18);
+    g.fillRect(padL - 14 - pw, y - 11, pw + 10, 22);
     g.fillStyle = ACCENT;
-    g.fillText(pLabel, padL - 7, y);
+    g.fillText(pLabel, padL - 9, y);
 
     // Only one curve? Put its quantity on the axis too. With several, the
     // numbers would crowd each other along a short stretch of axis, so they go
@@ -513,9 +544,9 @@ function drawChart() {
       g.textAlign = 'center'; g.textBaseline = 'top';
       const qw = g.measureText(qLabel).width;
       g.fillStyle = '#fff';
-      g.fillRect(xq - qw / 2 - 5, padT + plotH + 5, qw + 10, 17);
+      g.fillRect(xq - qw / 2 - 6, padT + plotH + 6, qw + 12, 21);
       g.fillStyle = ACCENT;
-      g.fillText(qLabel, xq, padT + plotH + 8);
+      g.fillText(qLabel, xq, padT + plotH + 10);
     }
   }
 }
@@ -609,12 +640,12 @@ function paintTip(idx) {
     let line = `would pay ${money(p.wtp)}`;
     if (state.mode === 'surplus') {
       if (!Number.isFinite(state.surplusPrice)) {
-        line = `would pay ${money(p.wtp)} — set a price`;
+        line = `would pay ${money(p.wtp)} · set a price`;
       } else if (p.wtp >= state.surplusPrice) {
         line = `${money(p.wtp)} − ${money(state.surplusPrice)} = ` +
                `surplus ${money(p.wtp - state.surplusPrice)}`;
       } else {
-        line = `would pay ${money(p.wtp)} — does not buy, no surplus`;
+        line = `would pay ${money(p.wtp)} · does not buy, no surplus`;
       }
     }
     tip.querySelector('.tip-wtp').textContent = line;
@@ -677,7 +708,7 @@ function showPriceBox() {
     $('pbShare').textContent = cast
       .map((s, i) => `${q[i]} of ${s.rows.length}`).join(' · ');
   }
-  $('pbPin').textContent   = pricePinned ? 'locked — click to release' : '';
+  $('pbPin').textContent   = pricePinned ? 'locked · click to release' : '';
   box.hidden = false;
 }
 
@@ -726,7 +757,7 @@ function revealHint() {
       .reduce((a, r) => a + (r.wtp - state.surplusPrice), 0);
     return `${sr.label}: ${shown} of ${buyers.length} buyers, ${money(total)}`;
   });
-  $('hoverHint').textContent = parts.join('   ·   ') + '  — consumer surplus';
+  $('hoverHint').textContent = parts.join('   ·   ') + '  ·  consumer surplus';
 }
 
 /* The pace is the teaching. The first few land slowly and NAMED, so the room

@@ -49,7 +49,7 @@ h1{font-size:31px;line-height:1.15;font-weight:600;letter-spacing:-.02em}
 /* -------------------------------- panels -------------------------------- */
 .panels{display:grid;grid-template-columns:1fr 384px;gap:24px;align-items:stretch;margin-top:28px}
 .panel{border:1px solid var(--line);border-radius:12px;background:#fff;padding:22px 24px}
-.section-label{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
+.section-label{font-size:12.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
   font-weight:600;margin-bottom:9px}
 .section-note{font-size:13.5px;color:var(--ink-soft);margin-bottom:16px;line-height:1.55}
 
@@ -78,12 +78,12 @@ h1{font-size:31px;line-height:1.15;font-weight:600;letter-spacing:-.02em}
    shove Students/Price/Surplus leftwards under the cursor -- you would click
    Surplus and watch the button you just hit move. */
 .price-set[hidden]{visibility:hidden}
-.price-set label{font-size:12.5px;font-weight:600;color:var(--muted)}
-.price-set .ps-dollar{font-size:12.5px;color:var(--muted)}
-.price-set .num{height:27px;width:56px;border:none;font-size:13px;padding:0}
+.price-set label{font-size:14px;font-weight:600;color:var(--muted)}
+.price-set .ps-dollar{font-size:14px;color:var(--muted)}
+.price-set .num{height:30px;width:66px;border:none;font-size:15px;padding:0}
 .price-set .num:focus{outline:none}
 .ps-btn{border:none;border-left:1px solid var(--line);background:none;cursor:pointer;
-        font-size:12.5px;font-weight:600;color:var(--blue);height:29px;padding:0 2px 0 10px;
+        font-size:14px;font-weight:600;color:var(--blue);height:32px;padding:0 2px 0 10px;
         margin-left:2px;white-space:nowrap}
 .ps-btn:hover{color:var(--blue-dark)}
 .ps-btn.running{color:var(--accent)}
@@ -91,12 +91,12 @@ h1{font-size:31px;line-height:1.15;font-weight:600;letter-spacing:-.02em}
 /* which curve is which, under the chart */
 .legend{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:12px}
 .legend[hidden]{display:none}
-.legend-item{display:flex;align-items:baseline;gap:7px;font-size:12.5px;color:var(--ink-soft)}
+.legend-item{display:flex;align-items:baseline;gap:7px;font-size:14.5px;color:var(--ink-soft)}
 .legend-swatch{width:12px;height:3px;border-radius:2px;flex:none;transform:translateY(-3px)}
-.legend-n{font:12px var(--mono);color:var(--muted)}
+.legend-n{font:13.5px var(--mono);color:var(--muted)}
 .panel-head .section-label{margin-bottom:0}
 .modes{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#fff}
-.mode-btn{border:none;background:none;padding:6px 15px;font-size:12.5px;font-weight:600;
+.mode-btn{border:none;background:none;padding:7px 17px;font-size:14px;font-weight:600;
   color:var(--muted);cursor:pointer;transition:background .12s,color .12s}
 .mode-btn + .mode-btn{border-left:1px solid var(--line)}
 .mode-btn:hover{background:#f6f6f4;color:var(--ink)}
@@ -109,11 +109,11 @@ h1{font-size:31px;line-height:1.15;font-weight:600;letter-spacing:-.02em}
   background:#fff;border:1px solid var(--line);border-radius:9px;padding:10px 13px;
   box-shadow:0 4px 14px rgba(0,0,0,.07)}
 .price-box[hidden]{display:none}
-.pb-label{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.pb-label{font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
 .pb-price{font:26px/1.15 var(--mono);font-weight:500;color:var(--accent);letter-spacing:-.02em}
-.pb-qty{font-size:14px;font-weight:600;color:var(--ink);margin-top:3px}
-.pb-share{font-size:12px;color:var(--muted)}
-.pb-pin{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--blue);
+.pb-qty{font-size:16px;font-weight:600;color:var(--ink);margin-top:3px}
+.pb-share{font-size:13.5px;color:var(--muted)}
+.pb-pin{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--blue);
   font-weight:700;margin-top:4px}
 .pb-pin:empty{display:none}
 
@@ -121,22 +121,22 @@ h1{font-size:31px;line-height:1.15;font-weight:600;letter-spacing:-.02em}
 .tip{position:absolute;pointer-events:none;z-index:5;transform:translate(-50%,-100%);
   background:#fff;border:1px solid var(--line);border-radius:8px;padding:7px 11px;
   box-shadow:0 6px 18px rgba(0,0,0,.10);white-space:nowrap;line-height:1.35}
-.tip .tip-name{font-size:13px;font-weight:600;color:var(--ink)}
-.tip .tip-wtp{font:13px var(--mono);color:var(--blue)}
+.tip .tip-name{font-size:15px;font-weight:600;color:var(--ink)}
+.tip .tip-wtp{font:15px var(--mono);color:var(--blue)}
 /* the same student in the other round, when both curves are up */
-.tip .tip-mate{font:11.5px var(--mono);color:var(--muted);margin-top:2px}
+.tip .tip-mate{font:13px var(--mono);color:var(--muted);margin-top:2px}
 .tip .tip-mate:empty{display:none}
 .tip[hidden]{display:none}
-.hover-hint{font-size:12px;color:var(--muted);margin-top:10px}
+.hover-hint{font-size:14px;color:var(--muted);margin-top:10px}
 
 /* right: the numbers */
 .side-panel{display:flex;flex-direction:column}
 .stat-list{border-top:1px solid var(--line-soft)}
 .stat-row{display:flex;align-items:baseline;justify-content:space-between;gap:12px;
   padding:11px 0;border-bottom:1px solid var(--line-soft)}
-.stat-label{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:600}
-.stat-value{font:22px/1.15 var(--mono);font-weight:500;letter-spacing:-.02em}
-.stat-foot{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.45;min-height:18px}
+.stat-label{font-size:12.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.stat-value{font:25px/1.15 var(--mono);font-weight:500;letter-spacing:-.02em}
+.stat-foot{font-size:13.5px;color:var(--muted);margin-top:10px;line-height:1.45;min-height:18px}
 .rule{border:none;border-top:1px solid var(--line);margin:22px 0 20px}
 
 /* the tab strip that swaps the whole right panel */
@@ -185,7 +185,7 @@ h1{font-size:31px;line-height:1.15;font-weight:600;letter-spacing:-.02em}
    border, and the inputs kept white so they still read as things you touch. */
 .controls-card{margin-top:22px;padding:15px 15px 16px;border:1px solid var(--line);
   border-radius:11px;background:#f7f7f5}
-.controls-title{font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;
+.controls-title{font-size:12px;letter-spacing:.13em;text-transform:uppercase;
   color:var(--ink-soft);font-weight:700;margin-bottom:13px;padding-bottom:10px;
   border-bottom:1px solid var(--line)}
 .controls-card .rule{margin:17px 0 15px}
@@ -200,7 +200,7 @@ h1{font-size:31px;line-height:1.15;font-weight:600;letter-spacing:-.02em}
 .side-controls{display:flex;flex-direction:column;gap:9px}
 .side-row{display:flex;gap:9px;align-items:center}
 .side-row .btn{flex:1}
-.side-hint{font-size:12px;color:var(--muted);margin-top:12px;line-height:1.5}
+.side-hint{font-size:13.5px;color:var(--muted);margin-top:12px;line-height:1.5}
 
 /* live submissions */
 .txt{border:1px solid var(--line);border-radius:7px;height:38px;padding:0 11px;
@@ -208,7 +208,7 @@ h1{font-size:31px;line-height:1.15;font-weight:600;letter-spacing:-.02em}
 .txt:focus{border-color:var(--blue)}
 .txt.code{font:15px var(--mono);text-transform:uppercase;letter-spacing:.06em;text-align:center;flex:0 0 96px}
 .side-row .btn{flex:1}
-.live-status{font-size:12px;color:var(--muted);line-height:1.45;margin-top:2px}
+.live-status{font-size:13.5px;color:var(--muted);line-height:1.45;margin-top:2px}
 .live-status.on{color:#0f9d58;font-weight:600}
 .live-status.err{color:#c0392b}
 .btn.live-on{background:#0f9d58;border-color:#0f9d58;color:#fff}
@@ -249,11 +249,11 @@ h1{font-size:31px;line-height:1.15;font-weight:600;letter-spacing:-.02em}
 .num{border:1px solid var(--line);border-radius:7px;height:38px;width:62px;text-align:center;
   font:15px var(--mono);outline:none;background:#fff;color:var(--ink)}
 .num:focus{border-color:var(--blue)}
-.unit{font-size:12.5px;color:var(--muted);white-space:nowrap}
+.unit{font-size:14px;color:var(--muted);white-space:nowrap}
 
 /* ------------------------------- numbers -------------------------------- */
 .numbers{margin-top:26px;border-top:1px solid var(--line);padding-top:12px}
-.numbers>summary{cursor:pointer;font-size:14px;color:var(--ink-soft);
+.numbers>summary{cursor:pointer;font-size:15px;color:var(--ink-soft);
   list-style:none;padding:7px 0;user-select:none}
 .numbers>summary::-webkit-details-marker{display:none}
 .numbers>summary::before{content:"+";color:var(--muted);margin-right:10px;font:14px var(--mono)}
