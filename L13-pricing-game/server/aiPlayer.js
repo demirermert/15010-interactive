@@ -46,8 +46,9 @@ export async function getAIPriceDecision(config, history = [], opponentHistory =
           content: gameDescription
         }
       ],
-      // newer OpenAI models take max_completion_tokens and only the default temperature
-      ...(/gpt-5|o[1-9]/.test(AI_MODEL) ? { max_completion_tokens: 50 } : { temperature: 1.0, max_tokens: 50 })
+      // newer OpenAI models take max_completion_tokens and only the default temperature; their reasoning tokens count
+      // against that budget, so it is generous and the effort kept low (50 tokens gave an empty answer, 2026-11-02)
+      ...(/gpt-[5-9]|o[1-9]/.test(AI_MODEL) ? { max_completion_tokens: 1500, reasoning_effort: 'low' } : { temperature: 1.0, max_tokens: 50 })
     });
 
     const responseText = completion.choices[0].message.content.trim();
