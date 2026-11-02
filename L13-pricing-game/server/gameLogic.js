@@ -570,6 +570,27 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
       io.to(pair.playerB).emit('roundStarted', { round: session.currentRound, roundTime, fullTime: roundTime, side: 'B' });
     });
     instructorSockets(session).forEach(id => io.to(id).emit('roundStarted', { round: session.currentRound, roundTime, fullTime: roundTime }));
+
+    // The ChatGPT seat decides at the start of the round (its choice depends only on past rounds), so the end of the
+    // round never waits for OpenAI (2026-11-02: it used to add 1-3 s to every round for the whole class)
+    session.aiPending = new Map();
+    const roundNow = session.currentRound;
+    session.pairs.forEach(pair => {
+      [[pair.playerA, pair.playerB], [pair.playerB, pair.playerA]].forEach(([me, rival]) => {
+        const p = session.players.get(me);
+        if (!p || !p.isAI) return;
+        const q = session.players.get(rival);
+        const promise = getAIPriceDecision(session.config, p.history || [], q?.history || [])
+          .then(price => {
+            if (session.currentRound === roundNow && roundIsOpen(session)) {
+              recordSubmission(session, me, price, false);
+              emitSubmissionProgress(session);
+            }
+          })
+          .catch(err => console.error(`[Session ${session.code}] AI decision failed:`, err.message));
+        session.aiPending.set(me, promise);
+      });
+    });
     
     // If showOpponentName is enabled, send each student their opponent's name
     if (session.config.showOpponentName) {
@@ -645,6 +666,11 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
       return Math.min(max, Math.floor(min + Math.random() * (max - min + 1)));
     };
       
+    // An AI decision still in flight gets a short grace period, then a random price like anyone else
+    if (session.aiPending && session.aiPending.size) {
+      await Promise.race([Promise.allSettled([...session.aiPending.values()]), new Promise(r => setTimeout(r, 1500))]);
+    }
+
     // Process all pairs sequentially to get AI decisions
     for (const pair of session.pairs) {
       seenPairs.add(pair.id);
@@ -655,15 +681,9 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
       if (!submissionA) {
         const playerA = session.players.get(pair.playerA);
         if (playerA && playerA.isAI) {
-          // AI player - use ChatGPT to get price
-          const playerB = session.players.get(pair.playerB);
-          const aiPrice = await getAIPriceDecision(
-            session.config,
-            playerA.history || [],
-            playerB.history || []
-          );
-          console.log(`[Session ${session.code}] AI player (ChatGPT) submitting price: ${aiPrice.toFixed(2)}`);
-          recordSubmission(session, pair.playerA, aiPrice, false);
+          const randomPrice = getRandomPrice();
+          console.log(`[Session ${session.code}] AI seat had no answer in time; random price ${randomPrice}`);
+          recordSubmission(session, pair.playerA, randomPrice, true);
         } else {
           const randomPrice = getRandomPrice();
           console.log(`[Session ${session.code}] Forcing random price ${randomPrice.toFixed(2)} for player ${pair.playerA}`);
@@ -674,15 +694,9 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
       if (!submissionB) {
         const playerB = session.players.get(pair.playerB);
         if (playerB && playerB.isAI) {
-          // AI player - use ChatGPT to get price
-          const playerA = session.players.get(pair.playerA);
-          const aiPrice = await getAIPriceDecision(
-            session.config,
-            playerB.history || [],
-            playerA.history || []
-          );
-          console.log(`[Session ${session.code}] AI player (ChatGPT) submitting price: ${aiPrice.toFixed(2)}`);
-          recordSubmission(session, pair.playerB, aiPrice, false);
+          const randomPrice = getRandomPrice();
+          console.log(`[Session ${session.code}] AI seat had no answer in time; random price ${randomPrice}`);
+          recordSubmission(session, pair.playerB, randomPrice, true);
         } else {
           const randomPrice = getRandomPrice();
           console.log(`[Session ${session.code}] Forcing random price ${randomPrice.toFixed(2)} for player ${pair.playerB}`);

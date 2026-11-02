@@ -58,7 +58,7 @@ export async function getAIPriceDecision(config, history = [], opponentHistory =
       price = Math.max(config.priceBounds.min, Math.min(config.priceBounds.max, price));
       price = Math.round(price * 100) / 100; // Round to 2 decimal places
       
-      console.log(`[AI Player] ChatGPT suggested price: ${price}`);
+      console.log(`[AI Player] ChatGPT chose ${price}`);
       return price;
     } else {
       console.warn('[AI Player] Could not parse price from ChatGPT response, using random price');
