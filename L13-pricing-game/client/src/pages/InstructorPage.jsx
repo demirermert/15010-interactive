@@ -13,14 +13,15 @@ function buildApiUrl(path) {
   return `${normalizedBase}${path}`;
 }
 
-// Defaults match the 2025 deck's linear-city example (Mert's Class 16 slides 17-18: worth $200, $1 per unit walked,
-// sellers at 0 and 100; "you do not know how many rounds"). Set 2026-11-02.
+// Defaults are the games as played in 2025 (slides, speaker notes and the Nov 20, 2025 Section A transcript; set 2026-11-02):
+// 100 consumers on a street from 0 to 100, each worth $200, $1 per unit walked, zero cost; 10 rounds, 60 s in round 1,
+// then 50, 40 and 30 s; a 10 s break; prices 0 to 250. The three quick-setup buttons move the sellers (0/100, 35/65, 50/50).
 const DEFAULT_CONFIG = {
   rounds: 10,
   roundTime: 30,
   breakTime: 10,
-  differentTimePerRound: false,
-  roundTimes: [],
+  differentTimePerRound: true,
+  roundTimes: [60, 50, 40, 30, 30, 30, 30, 30, 30, 30],
   marketSize: 100,
   modelType: 'hotelling', // 'logit' or 'hotelling'
   // Logit model parameters
@@ -35,7 +36,7 @@ const DEFAULT_CONFIG = {
   priceMax: 250,
   defaultPrice: 10,
   enableChat: false,
-  hideRoundCount: true,
+  hideRoundCount: false,
   showOpponentName: false,
   showModelParameters: false
 };
