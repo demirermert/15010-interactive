@@ -97,6 +97,12 @@ The instructor can download a CSV file of the current session by clicking the "D
 - Demand and profit calculations
 - Market share percentages
 
+## How the game computes prices
+
+`how-the-game-computes-prices.html` (open it in a browser) explains the street model, the three games, the special cases,
+the Nash and collusion prices per setting, the round mechanics and the logit option, with a calculator that runs the same
+formula as the server.
+
 ## Deployment (2026)
 
 One Render web service, `pricing-game` in the course-games workspace (Starter plan, always on), runs the whole game:
