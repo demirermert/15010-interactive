@@ -57,60 +57,34 @@ export default function StudentPage() {
     });
   };
 
+  // the join page in the 2026 lab look (2026-11-02)
   const renderStudentJoin = () => (
-    <div className="card student-join-card">
-      {/* Logos Container - Responsive */}
-      <div className="logos-container">
-        <img 
-          src="/course-logo.png" 
-          alt="Course Logo"
-          className="logo-left"
-        />
-        <img 
-          src="/sloan-logo.png" 
-          alt="MIT Sloan School of Management"
-          className="logo-right"
-        />
-      </div>
-
-      {/* Header */}
-      <div className="student-header">
-        <h1>Welcome to 15.010</h1>
-        <p>Economic Analysis of Business Decisions</p>
-      </div>
-
-      <form onSubmit={handleJoinSession} className="student-form">
-        <div className="input-row">
-          <label htmlFor="student-name">Name</label>
-          <input
-            id="student-name"
-            type="text"
-            value={name}
-            onChange={event => setName(event.target.value)}
-          />
+    <div className="lab">
+      <header className="lab-head">
+        <div className="hin">
+          <img src="/course-logo.png" alt="15.010" />
+          <div>
+            <h1>Pricing Game</h1>
+            <div className="sub">15.010 Class 13 &middot; price competition, round after round</div>
+          </div>
+          <img src="/sloan-logo.png" alt="MIT Sloan" style={{ marginLeft: 'auto' }} />
         </div>
-        <div className="input-row">
-          <label htmlFor="session-code">Session code</label>
-          <input
-            id="session-code"
-            type="text"
-            value={sessionCodeInput}
-            onChange={event => setSessionCodeInput(event.target.value.toUpperCase())}
-            required
-          />
-        </div>
-        <button type="submit" className="primary">
-          Join session
-        </button>
-      </form>
-      {errorMessage && <p style={{ color: '#dc2626', marginTop: '1rem' }}>{errorMessage}</p>}
+      </header>
+      <div className="join">
+        <form className="card" onSubmit={handleJoinSession}>
+          <div className="case">Join the game</div>
+          <label htmlFor="student-name">Your name</label>
+          <input id="student-name" type="text" autoComplete="name" value={name} onChange={event => setName(event.target.value)} />
+          <label htmlFor="session-code">Session code (on the screen)</label>
+          <input id="session-code" className="code" type="text" autoComplete="off" autoCapitalize="characters" maxLength={4}
+            value={sessionCodeInput} onChange={event => setSessionCodeInput(event.target.value.toUpperCase())} required />
+          <button type="submit" className="go">Join</button>
+          {errorMessage && <div className="fb no">{errorMessage}</div>}
+        </form>
+      </div>
     </div>
   );
 
-  return (
-    <div className="app-shell">
-      {renderStudentJoin()}
-    </div>
-  );
+  return renderStudentJoin();
 }
 

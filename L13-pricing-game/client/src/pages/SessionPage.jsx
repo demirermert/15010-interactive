@@ -52,6 +52,7 @@ export default function SessionPage() {
   const [nextRoundCountdown, setNextRoundCountdown] = useState(null);
   const [chatMessages, setChatMessages] = useState([]);
   const [opponentName, setOpponentName] = useState(null);
+  const [submissionProgress, setSubmissionProgress] = useState(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [isPageReady, setIsPageReady] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -416,6 +417,7 @@ export default function SessionPage() {
     socket.on('errorMessage', handleError);
     socket.on('chatMessage', handleChatMessage);
     socket.on('opponentInfo', handleOpponentInfo);
+    socket.on('submissionProgress', setSubmissionProgress);
 
     return () => {
       socket.off('joinedSession', handleJoinedSession);
@@ -429,6 +431,7 @@ export default function SessionPage() {
       socket.off('errorMessage', handleError);
       socket.off('chatMessage', handleChatMessage);
       socket.off('opponentInfo', handleOpponentInfo);
+      socket.off('submissionProgress', setSubmissionProgress);
     };
   }, []);
 
@@ -531,7 +534,8 @@ export default function SessionPage() {
       // Try navigation state first, then check localStorage
       const instructorStorageKey = `instructor_${sessionCode}`;
       const storedInstructorName = localStorage.getItem(instructorStorageKey);
-      const instructorName = state?.instructorName || storedInstructorName;
+      // one instructor in 2026, so a direct /manage/ link opens the dashboard without asking a name
+      const instructorName = state?.instructorName || storedInstructorName || 'Instructor';
       
       if (instructorName) {
         setUserName(instructorName);
@@ -809,7 +813,7 @@ export default function SessionPage() {
     }
 
     return (
-      <div className="app-shell" style={{ position: 'relative' }}>
+      <div style={{ position: 'relative' }}>
         {/* Loading overlay during initial load and transitions */}
         {(isTransitioning || (isInitialLoad && !isPageReady)) ? (
           <div style={{
@@ -892,6 +896,7 @@ export default function SessionPage() {
               timer={timer}
               roundActive={roundActive}
               nextRoundCountdown={nextRoundCountdown}
+              submissionProgress={submissionProgress}
             />
           </>
         )}
@@ -906,7 +911,7 @@ export default function SessionPage() {
   const validSession = session && session.code === sessionCode ? session : null;
   
   return (
-    <div className="app-shell">
+    <div>
       <StudentView
         sessionCode={sessionCode}
         sessionStatus={validSession?.status}
@@ -927,6 +932,7 @@ export default function SessionPage() {
         onSendChatMessage={handleSendChatMessage}
         currentSocketId={socket.id}
         opponentName={opponentName}
+        playerName={userName}
       />
     </div>
   );

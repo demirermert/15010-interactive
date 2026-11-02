@@ -103,6 +103,7 @@ export function createGameManager(io) {
     
     const payload = {
       code: session.code,
+      sessionName: session.sessionName,
       status: session.status,
       currentRound: session.currentRound,
       config: session.config,
@@ -346,7 +347,9 @@ export function createGameManager(io) {
           
           // Calculate remaining time
           const elapsed = session.roundStartTime ? (Date.now() - session.roundStartTime) / 1000 : 0;
-          const remainingTime = Math.max(0, session.config.roundTime - elapsed);
+          const rt = session.config.roundTime;
+          const fullTime = Array.isArray(rt) ? rt[session.currentRound - 1] || rt[0] : rt;
+          const remainingTime = Math.max(0, fullTime - elapsed);
           
           // Round is active - tell them about it with actual remaining time
           socket.emit('roundStarted', {
@@ -519,6 +522,7 @@ export function createGameManager(io) {
     }
     
     broadcastSession(session);
+    emitSubmissionProgress(session);
     
     // Broadcast timer updates every second
     let lastBroadcastTime = Date.now();
@@ -642,10 +646,25 @@ export function createGameManager(io) {
         throw new Error(`Price must be between ${min} and ${max}`);
       }
       recordSubmission(session, socket.id, numericPrice, false);
+      emitSubmissionProgress(session);
       concludeRoundIfReady(session);
     } catch (err) {
       socket.emit('errorMessage', err.message);
     }
+  }
+
+  // How many prices are in this round, for the instructor's screen (2026-11-02)
+  function emitSubmissionProgress(session) {
+    let submitted = 0;
+    let total = 0;
+    session.pairs.forEach(pair => {
+      const submission = session.submissions.get(pair.id) || {};
+      [pair.playerA, pair.playerB].forEach(id => {
+        total += 1;
+        if (submission[id]) submitted += 1;
+      });
+    });
+    io.to(session.code).emit('submissionProgress', { round: session.currentRound, submitted, total });
   }
 
   function recordSubmission(session, socketId, price, forced) {

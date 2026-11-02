@@ -11,9 +11,11 @@ function buildApiUrl(path) {
   return `${normalizedBase}${path}`;
 }
 
+// Defaults match the 2025 deck's linear-city example (Mert's Class 16 slides 17-18: worth $200, $1 per unit walked,
+// sellers at 0 and 100; "you do not know how many rounds"). Set 2026-11-02.
 const DEFAULT_CONFIG = {
-  rounds: 2,
-  roundTime: 10,
+  rounds: 10,
+  roundTime: 30,
   breakTime: 10,
   differentTimePerRound: false,
   roundTimes: [],
@@ -23,15 +25,15 @@ const DEFAULT_CONFIG = {
   alpha: 1,
   sigma: 5,
   // Hotelling model parameters
-  travelCost: 2,
-  consumerValue: 100,
+  travelCost: 1,
+  consumerValue: 200,
   x1: 0,
   x2: 100,
   priceMin: 0,
-  priceMax: 100,
+  priceMax: 250,
   defaultPrice: 10,
   enableChat: false,
-  hideRoundCount: false,
+  hideRoundCount: true,
   showOpponentName: false,
   showModelParameters: false
 };
@@ -232,12 +234,12 @@ export default function InstructorPage() {
   };
 
   return (
-    <div className="app-shell">
+    <div className="app-shell portal">
       <div className="card">
         <header style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <h1>Instructor Dashboard</h1>
-            <p style={{ color: '#6b7280' }}>Manage your game sessions</p>
+            <p className="eyebrow">15.010 · Class 13 · Pricing game · instructor</p>
+            <h1>Game sessions</h1>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <Link to="/history" style={{ textDecoration: 'none' }}>
@@ -262,7 +264,25 @@ export default function InstructorPage() {
           </div>
 
           {showCreateForm && (
-            <form onSubmit={handleCreateSession} style={{ display: 'grid', gap: '1rem', marginTop: '1rem' }}>
+            <form onSubmit={handleCreateSession} className="setup-form">
+              {/* the three markets of the 2025 deck: same customers, the sellers moved closer each time (2026-11-02) */}
+              <div className="presets">
+                <div className="bgk">Quick setup</div>
+                {[
+                  ['Round 1', 'full differentiation', 0, 100],
+                  ['Round 2', 'less differentiation', 35, 65],
+                  ['Round 3', 'no differentiation', 50, 50]
+                ].map(([name, what, a, b]) => (
+                  <button key={name} type="button"
+                    className={instructorConfig.modelType === 'hotelling' && Number(instructorConfig.x1) === a && Number(instructorConfig.x2) === b ? 'on' : ''}
+                    onClick={() => {
+                      setInstructorConfig(cfg => ({ ...cfg, modelType: 'hotelling', x1: a, x2: b }));
+                      setSessionName(prev => (prev && !/^Round \d/.test(prev) ? prev : name));
+                    }}>
+                    <b>{name}</b><span>{what} · sellers at {a} and {b}</span>
+                  </button>
+                ))}
+              </div>
               <div className="input-row">
                 <label htmlFor="session-name">Session Name</label>
                 <input
