@@ -112,8 +112,12 @@ Environment variables (set in the Render dashboard):
 - `INSTRUCTOR_KEY` (required in production): the instructor opens the site once as `/instructor?key=<the key>`; the key is
   kept in that browser and every instructor page and REST call carries it. Without it a browser sees only the student page.
   Students never need it. The 15010.ai dashboard address redirects to the keyed address.
-- `OPENAI_API_KEY` (optional): the ChatGPT player that is paired with the odd student out. Without it that student plays
-  against random prices.
+- `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `AI_MODEL` (optional): the ChatGPT seat that is paired with the odd student out.
+  Since 2026-11-02 it runs through MIT's Parley gateway: base URL `https://parley.api.mit.edu/v1`, model `gpt-5.4`
+  (about 1 s per answer; plays the Nash price), key = a Parley key from platform.parley.mit.edu (My keys). Parley model
+  names have no provider prefix and there is no gpt-4o. Without a key that student plays against random prices. The
+  seat decides at the start of each round, so the end of a round never waits for the model. Render reads the
+  environment when a deploy starts: change a variable, then deploy.
 
 ## Change log
 

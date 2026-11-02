@@ -61,7 +61,11 @@ services:
         value: "*"
       - key: INSTRUCTOR_KEY   # the secret in the instructor's address; set in the dashboard, never in git
         sync: false
-      - key: OPENAI_API_KEY   # optional: the ChatGPT player for an odd number of students
+      - key: OPENAI_API_KEY   # optional: the ChatGPT seat for an odd number of students (a Parley key)
+        sync: false
+      - key: OPENAI_BASE_URL  # https://parley.api.mit.edu/v1 (MIT's gateway; billing to an MIT cost object)
+        sync: false
+      - key: AI_MODEL         # gpt-5.4
         sync: false
 
   - type: web
