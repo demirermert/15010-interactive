@@ -2,11 +2,15 @@ import OpenAI from 'openai';
 
 // Initialize OpenAI client (API key will be set from environment variable)
 let openai = null;
+// The gateway and model come from the environment (2026-11-02): with OPENAI_BASE_URL=https://parley.api.mit.edu/v1 the
+// calls go through MIT's Parley gateway (billed to an MIT cost object) and AI_MODEL names the model there, e.g. openai/gpt-4o.
+const BASE_URL = process.env.OPENAI_BASE_URL || undefined;
+export const AI_MODEL = process.env.AI_MODEL || 'gpt-4o';
 
-export function initializeOpenAI(apiKey) {
+export function initializeOpenAI(apiKey, baseURL = BASE_URL) {
   if (apiKey) {
-    openai = new OpenAI({ apiKey, timeout: 5000, maxRetries: 0 }); // 5 s at most after the clock, then a random price (2026-11-02 audit)
-    console.log('OpenAI API initialized for AI player');
+    openai = new OpenAI({ apiKey, baseURL, timeout: 8000, maxRetries: 0 }); // asked at the start of the round, so 8 s is fine
+    console.log(`OpenAI API initialized for AI player (${baseURL || 'api.openai.com'}, model ${AI_MODEL})`);
   } else {
     console.warn('No OpenAI API key provided - AI player will use random prices');
   }
@@ -31,7 +35,7 @@ export async function getAIPriceDecision(config, history = [], opponentHistory =
     
     // Call ChatGPT
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: AI_MODEL,
       messages: [
         {
           role: "system",
@@ -42,8 +46,8 @@ export async function getAIPriceDecision(config, history = [], opponentHistory =
           content: gameDescription
         }
       ],
-      temperature: 1.0,
-      max_tokens: 50
+      // newer OpenAI models take max_completion_tokens and only the default temperature
+      ...(/gpt-5|o[1-9]/.test(AI_MODEL) ? { max_completion_tokens: 50 } : { temperature: 1.0, max_tokens: 50 })
     });
 
     const responseText = completion.choices[0].message.content.trim();
