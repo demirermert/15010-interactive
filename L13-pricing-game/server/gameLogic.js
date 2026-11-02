@@ -837,11 +837,17 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
       
       const priceA = submission[pair.playerA].price;
       const priceB = submission[pair.playerB].price;
-      const { demandA, demandB, shareA, shareB } = computeDemand({
+      let { demandA, demandB, shareA, shareB } = computeDemand({
         priceA,
         priceB,
         config: session.config
       });
+      // Last line of defence (2026-11-02 audit): a NaN here used to reach the phones as null and crash the page.
+      if (![demandA, demandB, shareA, shareB].every(Number.isFinite)) {
+        console.error(`[Session ${session.code}] non-finite demand for prices ${priceA}/${priceB}`, session.config);
+        demandA = Number.isFinite(demandA) ? demandA : 0; demandB = Number.isFinite(demandB) ? demandB : 0;
+        shareA = Number.isFinite(shareA) ? shareA : 0; shareB = Number.isFinite(shareB) ? shareB : 0;
+      }
       const profitA = priceA * demandA;
       const profitB = priceB * demandB;
       const playerResultA = {

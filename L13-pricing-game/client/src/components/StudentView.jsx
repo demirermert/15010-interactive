@@ -168,7 +168,7 @@ export function StudentView({
         <div className="case">Round {currentRound}{!hide && rounds ? ` of ${rounds}` : ''}</div>
         <div className="qt">{done ? 'Your price is in' : 'Set your price'}</div>
         <div className="clock"><span className={`s${low ? ' low' : ''}`}>{Math.max(0, timer)}s</span><span className="l">left in this round</span></div>
-        <div className={`bar${low ? ' low' : ''}`}><i style={{ width: `${Math.max(0, Math.min(100, (timer / fullTime) * 100))}%` }} /></div>
+        <div className={`bar${low ? ' low' : ''}`}><i style={{ width: `${Math.max(0, Math.min(100, (timer / (fullTime || 1)) * 100))}%` }} /></div>
         <form onSubmit={handleSubmit}>
           <div className="pin">
             <span>$</span>

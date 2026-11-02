@@ -49,7 +49,7 @@ export function referencePrices(config) {
   if (!(hi > lo)) return null;
   const step = Math.max(0.5, (hi - lo) / 600); // at most ~600 grid points, whatever the price range
   const grid = [];
-  for (let p = lo; p <= hi + 1e-9; p += step) grid.push(Math.round(p * 100) / 100);
+  for (let p = lo; p <= hi + 1e-9; p += step) grid.push(Math.min(hi, Math.max(lo, Math.round(p * 100) / 100)));
   const best = rival => {
     let bp = lo, bv = -1;
     grid.forEach(p => { const v = p * demand(p, rival, config)[0]; if (v > bv + 1e-9) { bv = v; bp = p; } });

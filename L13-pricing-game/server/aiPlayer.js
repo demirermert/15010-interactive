@@ -85,8 +85,9 @@ function buildGamePrompt(config, history, opponentHistory) {
     const x1 = config.x1;
     
     let monopolyPrice;
-    const leftReach = (V/2) / t;
-    const rightReach = (V/2) / t;
+    // t = 0 would divide by zero (2026-11-02 audit): with no travel cost a lone seller reaches the whole street
+    const leftReach = t > 0 ? (V/2) / t : Infinity;
+    const rightReach = t > 0 ? (V/2) / t : Infinity;
     
     if (leftReach >= x1 && rightReach >= (100 - x1)) {
       // Hits both boundaries
@@ -134,7 +135,7 @@ Maximize your total profit across all rounds.
 `;
   } else {
     // Logit model prompt (default)
-    const monopolyPrice = 10 / config.alpha;
+    const monopolyPrice = config.alpha > 0 ? 10 / config.alpha : config.priceBounds.max; // alpha = 0: no price sensitivity, so the top of the range
     
     prompt = `You are playing a competitive pricing game. Here are the rules:
 

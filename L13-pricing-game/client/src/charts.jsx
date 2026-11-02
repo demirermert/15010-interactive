@@ -56,6 +56,7 @@ export function RoundsChart({ rounds, series, lines = [], height = 260, yLabel =
 // Bars of how many prices fall in each bin. values: numbers; marks: [{ label, color, x }]
 export function PriceBars({ values, lo = 0, hi = 100, bins = 10, marks = [], height = 220 }) {
   const W = 640, H = height, L = 40, R = 16, T = 34, B = 34;
+  if (!(hi > lo) || !(bins > 0)) return null; // an empty price range has no bins (division by zero otherwise)
   const width = (hi - lo) / bins;
   const counts = Array(bins).fill(0);
   values.forEach(v => {
