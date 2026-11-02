@@ -70,6 +70,8 @@ export function InstructorDashboard({
   const navigate = useNavigate();
   const [armed, setArmed] = useState(false);
   const [search, setSearch] = useState('');
+  const [pairSearch, setPairSearch] = useState('');
+  const [selectedPair, setSelectedPair] = useState(null);
   const config = session?.config;
   const status = session?.status;
   const code = session?.code || '';
@@ -98,12 +100,16 @@ export function InstructorDashboard({
   const pairTotals = useMemo(() => {
     const m = new Map();
     byRound.forEach(r => r.results.forEach(p => {
-      const cur = m.get(p.pairId) || { label: `${p.playerA?.name} & ${p.playerB?.name}`, aName: p.playerA?.name, bName: p.playerB?.name, a: 0, b: 0 };
+      const cur = m.get(p.pairId) || { key: p.pairId, label: `${p.playerA?.name} & ${p.playerB?.name}`, aName: p.playerA?.name, bName: p.playerB?.name, a: 0, b: 0, pricesA: [], pricesB: [], profitsA: [], profitsB: [] };
       cur.a += p.playerA?.profit || 0; cur.b += p.playerB?.profit || 0;
+      cur.pricesA[r.round - 1] = p.playerA?.price; cur.pricesB[r.round - 1] = p.playerB?.price;
+      cur.profitsA[r.round - 1] = p.playerA?.profit; cur.profitsB[r.round - 1] = p.playerB?.profit;
       m.set(p.pairId, cur);
     }));
     return [...m.values()].sort((x, y) => (y.a + y.b) - (x.a + x.b));
   }, [byRound]);
+  const shownPairs = pairTotals.filter(r => !pairSearch || r.label.toLowerCase().includes(pairSearch.toLowerCase()));
+  const detail = pairTotals.find(r => r.key === selectedPair) || pairTotals[0] || null;
 
   const filteredBoard = (leaderboard || []).filter(r => r.name.toLowerCase().includes(search.toLowerCase()));
 
@@ -214,10 +220,13 @@ export function InstructorDashboard({
           </section>
 
           <section className="panel">
-            <div className="section-label">Total profit by pair</div>
-            <div className="qtext">Both sellers' profit added up over the rounds played so far, best market first.</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
+              <div className="section-label">Total profit by pair</div>
+              <input className="search" placeholder="Find a name" value={pairSearch} onChange={e => setPairSearch(e.target.value)} />
+            </div>
+            <div className="qtext">Both sellers' profit added up over the rounds played so far, best market first. Click a market to see its prices.</div>
             {pairTotals.length === 0 ? <div className="empty-note">Appears after the first round.</div> : (
-              <div className="scroll" style={{ maxHeight: 520, maxWidth: 700 }}><PairBars rows={pairTotals} /></div>
+              <div className="scroll" style={{ maxHeight: 520, maxWidth: 700 }}><PairBars rows={shownPairs} selected={detail?.key} onSelect={setSelectedPair} /></div>
             )}
           </section>
 
@@ -242,6 +251,20 @@ export function InstructorDashboard({
             )}
           </section>
 
+          {detail && (
+            <section className="panel wide">
+              <div className="section-label">One market: {detail.label}</div>
+              <div className="qtext">The two sellers' prices round by round; totals {money(detail.a)} and {money(detail.b)}.</div>
+              <div style={{ maxWidth: 820 }}>
+                <RoundsChart rounds={nRounds} height={220} series={[
+                  { label: detail.aName, color: '#1F2E5C', values: Array.from({ length: nRounds }, (_, i) => detail.pricesA[i] ?? null) },
+                  { label: detail.bName, color: '#A31F34', values: Array.from({ length: nRounds }, (_, i) => detail.pricesB[i] ?? null), width: 2 }
+                ]} />
+                <div className="legend"><span><i style={{ background: '#1F2E5C' }} />{detail.aName}</span><span><i style={{ background: '#A31F34' }} />{detail.bName}</span></div>
+              </div>
+            </section>
+          )}
+
           <section className="panel wide">
             <div className="section-label">Pairs · round {latestRound?.round || '–'}</div>
             <div className="qtext">Each market in the last round played.</div>
@@ -251,7 +274,7 @@ export function InstructorDashboard({
                   <thead><tr><th>Seller A</th><th className="r">Price</th><th className="r">Profit</th><th>Seller B</th><th className="r">Price</th><th className="r">Profit</th></tr></thead>
                   <tbody>
                     {pairs.map(p => (
-                      <tr key={p.pairId}>
+                      <tr key={p.pairId} onClick={() => setSelectedPair(p.pairId)} style={{ cursor: 'pointer', background: detail?.key === p.pairId ? '#f3f5fa' : undefined }}>
                         <td>{p.playerA?.name}</td><td className="r">{money(p.playerA?.price, 0)}</td><td className="r">{money(p.playerA?.profit)}</td>
                         <td>{p.playerB?.name}</td><td className="r">{money(p.playerB?.price, 0)}</td><td className="r">{money(p.playerB?.profit)}</td>
                       </tr>
@@ -266,7 +289,7 @@ export function InstructorDashboard({
             <div className="section-label">Individual profits by pair</div>
             <div className="qtext">Each seller's own total within the market, best market first.</div>
             {pairTotals.length === 0 ? <div className="empty-note">Appears after the first round.</div> : (
-              <div className="scroll" style={{ maxHeight: 520, maxWidth: 700 }}><PairBars rows={pairTotals} split /></div>
+              <div className="scroll" style={{ maxHeight: 520, maxWidth: 700 }}><PairBars rows={shownPairs} split selected={detail?.key} onSelect={setSelectedPair} /></div>
             )}
           </section>
 

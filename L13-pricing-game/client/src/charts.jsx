@@ -96,7 +96,7 @@ export function PriceBars({ values, lo = 0, hi = 100, bins = 10, marks = [], hei
 }
 
 // Horizontal bars, one row per pair, best first. rows: [{ label, a, b, aName, bName }]; split: two bars (A and B) per row
-export function PairBars({ rows, split = false, rowHeight = 26 }) {
+export function PairBars({ rows, split = false, rowHeight = 26, selected = null, onSelect = null }) {
   const W = 640, L = 170, R = 70, T = 6;
   const H = T + rows.length * (split ? rowHeight * 2 - 6 : rowHeight) + 6;
   const vMax = Math.max(1, ...rows.map(r => (split ? Math.max(r.a, r.b) : r.a + r.b)));
@@ -106,9 +106,13 @@ export function PairBars({ rows, split = false, rowHeight = 26 }) {
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }} role="img">
       {rows.map((r, i) => {
         const y0 = T + i * (split ? rowHeight * 2 - 6 : rowHeight);
+        const rowH = split ? rowHeight * 2 - 6 : rowHeight;
+        const pick = onSelect ? { onClick: () => onSelect(r.key), style: { cursor: 'pointer' } } : {};
+        const hilite = selected === r.key ? <rect x={0} y={y0} width={W} height={rowH} rx="6" fill="#1F2E5C" opacity="0.08" /> : null;
         if (!split) {
           return (
-            <g key={r.label}>
+            <g key={r.label} {...pick}>
+              {hilite}
               <text x={L - 8} y={y0 + rowHeight / 2 + 4} textAnchor="end" fontSize="12" fill="#1c1c1e">{r.label}</text>
               <rect x={L} y={y0 + 4} width={w(r.a + r.b)} height={rowHeight - 8} rx="3" fill="#1F2E5C" opacity="0.85" />
               <text x={L + w(r.a + r.b) + 6} y={y0 + rowHeight / 2 + 4} fontSize="12" fontWeight="600" fill="#1F2E5C">{fmt(r.a + r.b)}</text>
@@ -117,7 +121,8 @@ export function PairBars({ rows, split = false, rowHeight = 26 }) {
         }
         const h = rowHeight - 10;
         return (
-          <g key={r.label}>
+          <g key={r.label} {...pick}>
+            {hilite}
             <text x={L - 8} y={y0 + 4 + h - 2} textAnchor="end" fontSize="12" fill="#1F2E5C">{r.aName}</text>
             <rect x={L} y={y0 + 4} width={w(r.a)} height={h} rx="3" fill="#1F2E5C" opacity="0.85" />
             <text x={L + w(r.a) + 6} y={y0 + 4 + h - 2} fontSize="11.5" fill="#1F2E5C">{fmt(r.a)}</text>
