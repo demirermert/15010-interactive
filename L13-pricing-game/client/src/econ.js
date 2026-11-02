@@ -55,8 +55,10 @@ export function referencePrices(config) {
     grid.forEach(p => { const v = p * demand(p, rival, config)[0]; if (v > bv + 1e-9) { bv = v; bp = p; } });
     return bp;
   };
-  let p = (lo + hi) / 2;
-  for (let i = 0; i < 200; i += 1) {
+  // Same spot or no walking cost is pure price competition: the Nash price is the lowest allowed, not a grid artefact
+  const bertrand = config.modelType === 'hotelling' && (config.x1 === config.x2 || !(config.travelCost > 0));
+  let p = bertrand ? lo : (lo + hi) / 2;
+  for (let i = 0; i < (bertrand ? 0 : 200); i += 1) {
     const n = best(p);
     if (Math.abs(n - p) < step / 2) { p = n; break; }
     p = n;

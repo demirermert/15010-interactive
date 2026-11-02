@@ -9,11 +9,11 @@ function niceMax(v) {
   return 10 * step;
 }
 
-// Lines over rounds. series: [{ label, color, values: [number|null per round], dashed, width }]
-// lines: horizontal reference lines [{ label, color, y }]
+// Lines over rounds. series: [{ label, color, values: [number|null per round], dashed, width, band: [lo[], hi[]] }]
+// lines: horizontal reference lines [{ label, color, y }] (none on the Class 13 dashboard: Mert wants the 2025 charts as they were)
 export function RoundsChart({ rounds, series, lines = [], height = 260, yLabel = 'Price ($)' }) {
   const W = 640, H = height, L = 52, R = 16, T = 14, B = 34;
-  const all = series.flatMap(s => s.values.filter(v => Number.isFinite(v))).concat(lines.map(l => l.y));
+  const all = series.flatMap(s => s.values.concat(s.band ? s.band[0].concat(s.band[1]) : []).filter(v => Number.isFinite(v))).concat(lines.map(l => l.y));
   const yMax = niceMax(Math.max(1, ...all) * 1.08);
   const n = Math.max(rounds, 2);
   const x = i => L + (W - L - R) * (n === 1 ? 0.5 : i / (n - 1));
@@ -41,8 +41,12 @@ export function RoundsChart({ rounds, series, lines = [], height = 260, yLabel =
       {series.map(s => {
         const pts = s.values.map((v, i) => (Number.isFinite(v) ? [x(i), y(v)] : null)).filter(Boolean);
         if (!pts.length) return null;
+        const band = s.band ? s.values.map((v, i) => (Number.isFinite(s.band[0][i]) && Number.isFinite(s.band[1][i]) ? i : null)).filter(i => i !== null) : [];
         return (
           <g key={s.label}>
+            {band.length > 1 && (
+              <polygon fill={s.color} opacity="0.12" points={band.map(i => `${x(i)},${y(s.band[1][i])}`).concat(band.slice().reverse().map(i => `${x(i)},${y(s.band[0][i])}`)).join(' ')} />
+            )}
             <polyline points={pts.map(p => p.join(',')).join(' ')} fill="none" stroke={s.color}
               strokeWidth={s.width || 3} strokeDasharray={s.dashed ? '6 5' : undefined} strokeLinejoin="round" />
             {pts.map((p, i) => <circle key={i} cx={p[0]} cy={p[1]} r={s.width ? s.width + 1.5 : 4.5} fill={s.color} />)}
@@ -87,6 +91,42 @@ export function PriceBars({ values, lo = 0, hi = 100, bins = 10, marks = [], hei
           <text x={xv(m.x)} y={T - 8} textAnchor="middle" fontSize="12" fontWeight="600" fill={m.color}>{m.label}</text>
         </g>
       ))}
+    </svg>
+  );
+}
+
+// Horizontal bars, one row per pair, best first. rows: [{ label, a, b, aName, bName }]; split: two bars (A and B) per row
+export function PairBars({ rows, split = false, rowHeight = 26 }) {
+  const W = 640, L = 170, R = 70, T = 6;
+  const H = T + rows.length * (split ? rowHeight * 2 - 6 : rowHeight) + 6;
+  const vMax = Math.max(1, ...rows.map(r => (split ? Math.max(r.a, r.b) : r.a + r.b)));
+  const w = v => Math.max(0, (W - L - R) * (v / vMax));
+  const fmt = v => '$' + Math.round(v).toLocaleString('en-US');
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }} role="img">
+      {rows.map((r, i) => {
+        const y0 = T + i * (split ? rowHeight * 2 - 6 : rowHeight);
+        if (!split) {
+          return (
+            <g key={r.label}>
+              <text x={L - 8} y={y0 + rowHeight / 2 + 4} textAnchor="end" fontSize="12" fill="#1c1c1e">{r.label}</text>
+              <rect x={L} y={y0 + 4} width={w(r.a + r.b)} height={rowHeight - 8} rx="3" fill="#1F2E5C" opacity="0.85" />
+              <text x={L + w(r.a + r.b) + 6} y={y0 + rowHeight / 2 + 4} fontSize="12" fontWeight="600" fill="#1F2E5C">{fmt(r.a + r.b)}</text>
+            </g>
+          );
+        }
+        const h = rowHeight - 10;
+        return (
+          <g key={r.label}>
+            <text x={L - 8} y={y0 + 4 + h - 2} textAnchor="end" fontSize="12" fill="#1F2E5C">{r.aName}</text>
+            <rect x={L} y={y0 + 4} width={w(r.a)} height={h} rx="3" fill="#1F2E5C" opacity="0.85" />
+            <text x={L + w(r.a) + 6} y={y0 + 4 + h - 2} fontSize="11.5" fill="#1F2E5C">{fmt(r.a)}</text>
+            <text x={L - 8} y={y0 + 6 + h * 2 - 2} textAnchor="end" fontSize="12" fill="#A31F34">{r.bName}</text>
+            <rect x={L} y={y0 + 6 + h} width={w(r.b)} height={h} rx="3" fill="#A31F34" opacity="0.85" />
+            <text x={L + w(r.b) + 6} y={y0 + 6 + h * 2 - 2} fontSize="11.5" fill="#A31F34">{fmt(r.b)}</text>
+          </g>
+        );
+      })}
     </svg>
   );
 }

@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { RoundsChart, PriceBars } from '../charts.jsx';
-import { money, referencePrices } from '../econ.js';
+import { RoundsChart, PairBars } from '../charts.jsx';
+import { money } from '../econ.js';
 import { withKey } from '../auth.js';
 
 // The instructor's projector page in the 2026 lab look (2026-11-02; the 2025 page is in git history),
@@ -29,7 +29,7 @@ function asPairs(results) {
     if (j >= 0) used.add(j);
     const side = x => x && { name: x.playerName, playerId: x.playerId, price: x.price, profit: x.profit };
     out.push({
-      pairId: `p${i}`,
+      pairId: [r.playerName, r.opponentName].sort().join(' | '),
       playerA: side(r),
       playerB: j >= 0 ? side(results[j]) : { name: r.opponentName, price: r.opponentPrice, profit: null }
     });
@@ -78,7 +78,6 @@ export function InstructorDashboard({
   const rounds = config?.rounds || 0;
   const current = session?.currentRound || 0;
   const joinHost = typeof window !== 'undefined' ? window.location.host : '';
-  const ref = useMemo(() => referencePrices(config), [config]);
 
   const byRound = useMemo(() => {
     const m = new Map();
@@ -86,23 +85,25 @@ export function InstructorDashboard({
     return [...m.values()].sort((a, b) => a.round - b.round);
   }, [allRounds]);
 
+  // The 2025 charts: the average price each round with one standard deviation around it, and profits by pair
   const pricesOf = r => (r?.results || []).flatMap(x => [x.playerA?.price, x.playerB?.price]).filter(Number.isFinite);
   const avg = a => (a.length ? a.reduce((s, v) => s + v, 0) / a.length : null);
-  const med = a => {
-    if (!a.length) return null;
-    const s = [...a].sort((x, y) => x - y), k = Math.floor(s.length / 2);
-    return s.length % 2 ? s[k] : (s[k - 1] + s[k]) / 2;
-  };
+  const sd = a => { if (!a.length) return null; const m = avg(a); return Math.sqrt(a.reduce((s, v) => s + (v - m) ** 2, 0) / a.length); };
   const nRounds = Math.max(rounds, byRound.length, 1);
-  const avgSeries = Array.from({ length: nRounds }, (_, i) => avg(pricesOf(byRound.find(r => r.round === i + 1))));
-  const medSeries = Array.from({ length: nRounds }, (_, i) => med(pricesOf(byRound.find(r => r.round === i + 1))));
+  const roundPrices = Array.from({ length: nRounds }, (_, i) => pricesOf(byRound.find(r => r.round === i + 1)));
+  const avgSeries = roundPrices.map(avg);
+  const sdSeries = roundPrices.map(sd);
   const lastRound = latestRound ? { ...latestRound, results: asPairs(latestRound.results) } : null;
-  const lastPrices = pricesOf(lastRound);
 
-  const lines = ref ? [
-    { label: `Collusion ${money(ref.collusion)}`, color: '#1E7B34', y: ref.collusion },
-    { label: `Nash ${money(ref.nash)}`, color: '#A31F34', y: ref.nash }
-  ] : [];
+  const pairTotals = useMemo(() => {
+    const m = new Map();
+    byRound.forEach(r => r.results.forEach(p => {
+      const cur = m.get(p.pairId) || { label: `${p.playerA?.name} & ${p.playerB?.name}`, aName: p.playerA?.name, bName: p.playerB?.name, a: 0, b: 0 };
+      cur.a += p.playerA?.profit || 0; cur.b += p.playerB?.profit || 0;
+      m.set(p.pairId, cur);
+    }));
+    return [...m.values()].sort((x, y) => (y.a + y.b) - (x.a + x.b));
+  }, [byRound]);
 
   const filteredBoard = (leaderboard || []).filter(r => r.name.toLowerCase().includes(search.toLowerCase()));
 
@@ -197,31 +198,26 @@ export function InstructorDashboard({
           <section className="panel wide">{state}</section>
 
           <section className="panel wide">
-            <div className="section-label">Prices by round</div>
-            <div className="qtext">The average and median price the room set in each round. Dashed lines: the one-shot Nash price
-              (each firm's best reply to the other) and the collusion price, which maximizes the two firms' joint profit.</div>
+            <div className="section-label">Average price across rounds</div>
+            <div className="qtext">The average price the room set in each round; the band is one standard deviation either side.</div>
             {byRound.length === 0 ? <div className="empty-note">The first round's prices appear here when it ends.</div> : (
               <>
-                <RoundsChart rounds={nRounds} height={280} lines={lines} series={[
-                  { label: 'Average', color: '#1F2E5C', values: avgSeries },
-                  { label: 'Median', color: '#7d8fb8', values: medSeries, width: 2 }
+                <RoundsChart rounds={nRounds} height={280} series={[
+                  { label: 'Average', color: '#1F2E5C', values: avgSeries, band: [avgSeries.map((v, i) => (v == null ? null : Math.max(0, v - sdSeries[i]))), avgSeries.map((v, i) => (v == null ? null : v + sdSeries[i]))] }
                 ]} />
                 <div className="legend">
                   <span><i style={{ background: '#1F2E5C' }} />Average price</span>
-                  <span><i style={{ background: '#7d8fb8' }} />Median price</span>
-                  {ref && <span><i className="dash1" />Collusion price {money(ref.collusion)} (each earns {money(ref.collusionProfit)})</span>}
-                  {ref && <span><i className="dash2" />Nash price {money(ref.nash)} (each earns {money(ref.nashProfit)})</span>}
+                  <span><i style={{ background: '#1F2E5C', opacity: .25, height: 10 }} />One standard deviation</span>
                 </div>
               </>
             )}
           </section>
 
           <section className="panel">
-            <div className="section-label">Round {latestRound?.round || '–'} · the prices</div>
-            <div className="qtext">How many students chose each price in the last round played.</div>
-            {lastPrices.length === 0 ? <div className="empty-note">No round has ended yet.</div> : (
-              <PriceBars values={lastPrices} lo={config?.priceBounds?.min ?? 0} hi={config?.priceBounds?.max ?? 100}
-                bins={10} marks={ref ? [{ label: 'Nash', color: '#A31F34', x: ref.nash }, { label: 'Collusion', color: '#1E7B34', x: ref.collusion }] : []} />
+            <div className="section-label">Total profit by pair</div>
+            <div className="qtext">Both sellers' profit added up over the rounds played so far, best market first.</div>
+            {pairTotals.length === 0 ? <div className="empty-note">Appears after the first round.</div> : (
+              <div className="scroll" style={{ maxHeight: 520, maxWidth: 700 }}><PairBars rows={pairTotals} /></div>
             )}
           </section>
 
@@ -266,7 +262,15 @@ export function InstructorDashboard({
             )}
           </section>
 
-          <section className="panel wide">
+          <section className="panel">
+            <div className="section-label">Individual profits by pair</div>
+            <div className="qtext">Each seller's own total within the market, best market first.</div>
+            {pairTotals.length === 0 ? <div className="empty-note">Appears after the first round.</div> : (
+              <div className="scroll" style={{ maxHeight: 520, maxWidth: 700 }}><PairBars rows={pairTotals} split /></div>
+            )}
+          </section>
+
+          <section className="panel">
             <div className="section-label">Students ({players.length}{players.length ? `, ${online} online` : ''})</div>
             {players.length === 0 ? <div className="empty-note">No one has joined yet.</div> : (
               <div className="scroll" style={{ maxHeight: 260 }}>
