@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { socket } from '../socket.js';
 import { StudentView } from '../components/StudentView.jsx';
 import { InstructorDashboard } from '../components/InstructorDashboard.jsx';
+import { getKey, keyHeaders } from '../auth.js';
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL || import.meta.env.VITE_SOCKET_URL || '').trim();
 
@@ -42,7 +43,8 @@ export default function SessionPage() {
   const [history, setHistory] = useState([]);
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [leaderboardData, setLeaderboardData] = useState(new Map());
+  const [leaderboard, setLeaderboard] = useState([]); // computed by the server (2026-11-02 audit: adding it up here doubled it on every rejoin)
+  const [acceptedPrice, setAcceptedPrice] = useState(null);
   const [latestRoundSummary, setLatestRoundSummary] = useState(null);
   const [allRoundSummaries, setAllRoundSummaries] = useState([]);
   const [userRole, setUserRole] = useState(null);
@@ -60,6 +62,9 @@ export default function SessionPage() {
     sessionUpdate: false,
     gameState: false
   });
+  // The socket handlers are registered once, so they read the current values through this ref (2026-11-02 audit)
+  const latest = useRef({});
+  latest.current = { joinInfo, sessionCode, studentCodeFromUrl, hasAttemptedJoin, userName, isManagePage };
 
   // Clear all state when session code changes (navigating to a new session)
   useEffect(() => {
@@ -117,6 +122,7 @@ export default function SessionPage() {
       console.log('[SessionPage] Joined session successfully:', payload.sessionCode);
       setJoinInfo(payload);
       setUserRole(payload.role);
+      if (Array.isArray(payload.leaderboard)) setLeaderboard(payload.leaderboard);
       
       // Only clear history/results if this is a NEW join (status is lobby)
       // For rejoins during active games, keep the existing state
@@ -124,7 +130,7 @@ export default function SessionPage() {
         setRoundInfo(null);
         setHistory([]);
         setLatestResult(null);
-        setLeaderboardData(new Map());
+        setLeaderboard([]);
         setLatestRoundSummary(null);
         setAllRoundSummaries([]);
       }
@@ -138,7 +144,7 @@ export default function SessionPage() {
         try {
           const url = buildApiUrl(`/session/${sessionCode}`);
           console.log('[SessionPage] Fetching from:', url);
-          const response = await fetch(url);
+          const response = await fetch(url, { headers: keyHeaders() });
           console.log('[SessionPage] Response status:', response.status);
           if (response.ok) {
             const sessionData = await response.json();
@@ -159,16 +165,17 @@ export default function SessionPage() {
               const leaderboardMap = new Map();
               sessionData.rounds.forEach(round => {
                 round.results.forEach(result => {
-                  const existing = leaderboardMap.get(result.playerName) || { 
+                  const k = result.playerId ?? result.playerName;
+                  const existing = leaderboardMap.get(k) || { 
                     name: result.playerName,
                     totalProfit: 0 
                   };
                   existing.totalProfit += result.profit;
-                  leaderboardMap.set(result.playerName, existing);
+                  leaderboardMap.set(k, existing);
                 });
               });
               console.log('[SessionPage] Reconstructed leaderboard:', leaderboardMap.size, 'players');
-              setLeaderboardData(leaderboardMap);
+              setLeaderboard([...leaderboardMap.values()].sort((x, y) => y.totalProfit - x.totalProfit));
             }
           }
         } catch (err) {
@@ -233,12 +240,14 @@ export default function SessionPage() {
       setRoundActive(true);
       // If payload includes hasSubmitted (when rejoining), use it; otherwise default to false
       setHasSubmitted(payload.hasSubmitted || false);
-      setTimer(payload.roundTime);
+      setAcceptedPrice(Number.isFinite(payload.submittedPrice) ? payload.submittedPrice : null);
+      const roundTime = Number.isFinite(Number(payload.roundTime)) ? Number(payload.roundTime) : 0;
+      setTimer(roundTime);
       setNextRoundCountdown(null); // Clear countdown when new round starts
       
       // Store the round start time for client-side fallback timer
       sessionStorage.setItem('roundStartTime', Date.now().toString());
-      sessionStorage.setItem('roundDuration', payload.roundTime.toString());
+      sessionStorage.setItem('roundDuration', String(roundTime));
       
       // Mark gameState as received (we have timer info)
       setReceivedEvents(prev => ({ ...prev, gameState: true }));
@@ -275,42 +284,25 @@ export default function SessionPage() {
     };
     
     const handleRoundSummary = payload => {
-      setLatestRoundSummary(payload);
-      setAllRoundSummaries(prev => {
-        // Check if this round already exists to prevent duplicates
-        const existingIndex = prev.findIndex(r => r.round === payload.round);
-        if (existingIndex >= 0) {
-          // Round already exists, replace it
-          const updated = [...prev];
-          updated[existingIndex] = payload;
-          return updated;
-        }
-        // New round, append it
-        return [...prev, payload];
-      });
-      setLeaderboardData(prev => {
-        const next = new Map(prev);
-        payload.results.forEach(result => {
-          [result.playerA, result.playerB].forEach(entry => {
-            // Use player name as key instead of socketId to handle reconnections
-            const playerKey = entry.name || entry.socketId;
-            const current = next.get(playerKey) || {
-              socketId: entry.socketId,
-              name: entry.name || entry.socketId,
-              totalProfit: 0
-            };
-            current.name = entry.name || current.name;
-            current.totalProfit += entry.profit;
-            next.set(playerKey, current);
-          });
+      if (Array.isArray(payload.results)) {
+        setLatestRoundSummary(payload);
+        setAllRoundSummaries(prev => {
+          const existingIndex = prev.findIndex(r => r.round === payload.round);
+          if (existingIndex >= 0) {
+            const updated = [...prev];
+            updated[existingIndex] = payload;
+            return updated;
+          }
+          return [...prev, payload];
         });
-        return next;
-      });
+      }
+      if (Array.isArray(payload.leaderboard)) setLeaderboard(payload.leaderboard);
     };
     
     const handleSessionComplete = payload => {
       setRoundActive(false);
-      setLatestRoundSummary(payload.rounds[payload.rounds.length - 1] || null);
+      if (Array.isArray(payload.rounds) && payload.rounds.length) setLatestRoundSummary(payload.rounds[payload.rounds.length - 1]);
+      if (Array.isArray(payload.leaderboard)) setLeaderboard(payload.leaderboard);
       
       // Solution #1: Clear localStorage when session ends
       if (studentCodeFromUrl && sessionCode) {
@@ -325,9 +317,10 @@ export default function SessionPage() {
       
       // If session not found in memory, try fetching from database (completed sessions)
       // But only if we're not currently joining for the first time (which might be a timing issue)
-      if ((message.includes('Session not found') || message.includes('has ended')) && hasAttemptedJoin) {
+      const { isManagePage: onManage, hasAttemptedJoin: attempted, userName: nameNow } = latest.current;
+      if (onManage && (message.includes('Session not found') || message.includes('has ended')) && attempted) {
         try {
-          const response = await fetch(buildApiUrl(`/session/${sessionCode}`));
+          const response = await fetch(buildApiUrl(`/session/${sessionCode}`), { headers: keyHeaders() });
           if (response.ok) {
             const sessionData = await response.json();
             
@@ -358,15 +351,16 @@ export default function SessionPage() {
                 const leaderboardMap = new Map();
                 sessionData.rounds.forEach(round => {
                   round.results.forEach(result => {
-                    const existing = leaderboardMap.get(result.playerName) || { 
+                    const k = result.playerId ?? result.playerName;
+                    const existing = leaderboardMap.get(k) || { 
                       name: result.playerName,
                       totalProfit: 0 
                     };
                     existing.totalProfit += result.profit;
-                    leaderboardMap.set(result.playerName, existing);
+                    leaderboardMap.set(k, existing);
                   });
                 });
-                setLeaderboardData(leaderboardMap);
+                setLeaderboard([...leaderboardMap.values()].sort((x, y) => y.totalProfit - x.totalProfit));
               }
               
               setJoinInfo({ role: 'instructor', code: sessionData.code });
@@ -379,11 +373,12 @@ export default function SessionPage() {
               console.log('[SessionPage] Session exists but not complete, retrying join...');
               // Wait a moment and retry
               setTimeout(() => {
-                if (isManagePage && userName) {
+                if (onManage && nameNow) {
                   socket.emit('joinSession', {
                     sessionCode,
-                    playerName: userName,
-                    role: 'instructor'
+                    playerName: nameNow,
+                    role: 'instructor',
+                    key: getKey()
                   });
                 }
               }, 500);
@@ -396,6 +391,13 @@ export default function SessionPage() {
       }
       setErrorMessage(message);
       setIsJoining(false);
+      setHasSubmitted(false); // a refused price must not look accepted (2026-11-02 audit)
+    };
+
+    const handlePriceAccepted = payload => {
+      setHasSubmitted(true);
+      setAcceptedPrice(payload.price);
+      setErrorMessage('');
     };
 
     const handleChatMessage = (payload) => {
@@ -418,6 +420,7 @@ export default function SessionPage() {
     socket.on('chatMessage', handleChatMessage);
     socket.on('opponentInfo', handleOpponentInfo);
     socket.on('submissionProgress', setSubmissionProgress);
+    socket.on('priceAccepted', handlePriceAccepted);
 
     return () => {
       socket.off('joinedSession', handleJoinedSession);
@@ -432,6 +435,7 @@ export default function SessionPage() {
       socket.off('chatMessage', handleChatMessage);
       socket.off('opponentInfo', handleOpponentInfo);
       socket.off('submissionProgress', setSubmissionProgress);
+      socket.off('priceAccepted', handlePriceAccepted);
     };
   }, []);
 
@@ -471,6 +475,23 @@ export default function SessionPage() {
     return () => clearInterval(fallbackTimer);
   }, [roundActive, hasSubmitted]);
 
+  // Socket.io gives a reconnecting socket a new id, and the server knows nothing about it until we join again.
+  // Without this a student whose wifi blipped in the lobby was paired as an offline ghost (2026-11-02 audit).
+  useEffect(() => {
+    const onConnect = () => {
+      const { joinInfo, sessionCode, studentCodeFromUrl } = latest.current;
+      if (!joinInfo || !sessionCode) return;
+      if (joinInfo.role === 'student' && (studentCodeFromUrl || joinInfo.studentCode)) {
+        socket.emit('joinSession', { sessionCode, playerName: joinInfo.playerName, studentCode: studentCodeFromUrl || joinInfo.studentCode, role: 'student' });
+      } else if (joinInfo.role === 'instructor') {
+        socket.emit('joinSession', { sessionCode, playerName: joinInfo.playerName, role: 'instructor', key: getKey() });
+      }
+    };
+    // 'connect' fires on every connection, automatic or not; the first one finds no joinInfo and does nothing
+    socket.on('connect', onConnect);
+    return () => socket.off('connect', onConnect);
+  }, []);
+
   // Handle page visibility changes (mobile app switching)
   useEffect(() => {
     let wasHidden = false;
@@ -507,7 +528,8 @@ export default function SessionPage() {
               socket.emit('joinSession', {
                 sessionCode,
                 playerName: joinInfo.playerName,
-                role: 'instructor'
+                role: 'instructor',
+                key: getKey()
               });
             }
           }, 500); // Give socket 500ms to reconnect
@@ -544,7 +566,8 @@ export default function SessionPage() {
         socket.emit('joinSession', {
           sessionCode,
           playerName: instructorName,
-          role: 'instructor'
+          role: 'instructor',
+          key: getKey()
         });
       }
     } else if (studentCodeFromUrl) {
@@ -611,11 +634,6 @@ export default function SessionPage() {
     }
   }, [sessionCode, studentCodeFromUrl, hasAttemptedJoin, joinInfo, isManagePage, navigationState]);
 
-  const leaderboard = useMemo(() => {
-    return Array.from(leaderboardData.values())
-      .sort((a, b) => b.totalProfit - a.totalProfit);
-  }, [leaderboardData]);
-
   const handleStartSession = () => {
     if (!sessionCode) return;
     setErrorMessage('');
@@ -671,7 +689,8 @@ export default function SessionPage() {
     socket.emit('joinSession', {
       sessionCode,
       playerName: userName,
-      role: 'instructor'
+      role: 'instructor',
+      key: getKey()
     });
   };
 
@@ -933,6 +952,13 @@ export default function SessionPage() {
         currentSocketId={socket.id}
         opponentName={opponentName}
         playerName={userName}
+        playerId={joinInfo?.playerId || joinInfo?.studentCode || null}
+        side={roundInfo?.side || joinInfo?.side || null}
+        roundTime={roundInfo?.fullTime ?? roundInfo?.roundTime ?? null}
+        spectator={!!joinInfo?.spectator}
+        acceptedPrice={acceptedPrice}
+        errorMessage={errorMessage}
+        onDismissError={() => setErrorMessage('')}
       />
     </div>
   );

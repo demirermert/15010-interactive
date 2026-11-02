@@ -6,6 +6,7 @@ const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || (import.meta.env.DEV ? 'ht
 export const socket = io(SOCKET_URL, {
   autoConnect: true
 });
+if (typeof window !== 'undefined') window.__socket = socket; // for testing reconnection from the console
 
 // Send heartbeat every 5 seconds to let server know we're still active
 let heartbeatInterval = null;

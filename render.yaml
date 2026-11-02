@@ -28,12 +28,12 @@ services:
     name: commons-game-server
     env: node
     plan: free
-    rootDir: L12-commons-game/server
+    rootDir: L16-commons-game/server
     buildCommand: npm install
     startCommand: npm start
     buildFilter:
       paths:
-        - L12-commons-game/server/**
+        - L16-commons-game/server/**
     envVars:
       - key: NODE_VERSION
         value: 20
@@ -41,21 +41,28 @@ services:
         value: "*"
 
   - type: web
-    name: pricing-game-server
+    name: pricing-game
+    # The live service (created 2026-11-02 in the course-games workspace, Starter) was made by API with these settings;
+    # this entry documents them. One service runs the whole game: the build compiles the React client into
+    # client/dist and the server serves it, so there is no Vercel front end any more.
     env: node
-    plan: free
-    rootDir: L16-pricing-game/server
-    buildCommand: npm install
-    startCommand: npm start
+    plan: starter
+    rootDir: L13-pricing-game
+    buildCommand: cd client && npm install && npm run build && cd ../server && npm install
+    startCommand: cd server && npm start
+    healthCheckPath: /health
     buildFilter:
       paths:
-        - L16-pricing-game/server/**
+        - L13-pricing-game/**
     envVars:
       - key: NODE_VERSION
         value: 20
       - key: ALLOWED_ORIGINS
         value: "*"
-      # Set OPENAI_API_KEY in the Render dashboard (secret) to enable the ChatGPT AI player.
+      - key: INSTRUCTOR_KEY   # the secret in the instructor's address; set in the dashboard, never in git
+        sync: false
+      - key: OPENAI_API_KEY   # optional: the ChatGPT player for an odd number of students
+        sync: false
 
   - type: web
     name: ultimatum-game-server

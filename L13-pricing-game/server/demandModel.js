@@ -3,14 +3,17 @@ export function computeLogitDemand({
   priceB,
   config
 }) {
-  const { marketSize, alpha, sigma } = config;
+  const { marketSize, alpha } = config;
+  const sigma = Math.max(config.sigma, 1e-6); // sigma = 0 would divide by zero (2026-11-02 audit)
   // Add delta (constant utility term) - fixed at 10
   const delta = 10;
   const utilityA = delta - alpha * priceA;
   const utilityB = delta - alpha * priceB;
-  const expA = Math.exp(utilityA / sigma);
-  const expB = Math.exp(utilityB / sigma);
-  const expOutside = 1; // Outside option has utility normalized to 0, so exp(0) = 1
+  // Subtract the largest exponent before exp() so a tiny sigma cannot overflow to Infinity/NaN; the shares are unchanged.
+  const top = Math.max(utilityA / sigma, utilityB / sigma, 0);
+  const expA = Math.exp(utilityA / sigma - top);
+  const expB = Math.exp(utilityB / sigma - top);
+  const expOutside = Math.exp(0 - top); // Outside option has utility normalized to 0
   const denom = expA + expB + expOutside;
   const shareA = denom === 0 ? 0 : expA / denom;
   const shareB = denom === 0 ? 0 : expB / denom;
@@ -30,9 +33,17 @@ export function computeHotellingDemand({
   config
 }) {
   const { travelCost, x1, x2, consumerValue } = config;
+
+  // The formulas below assume firm A is the left one (x1 <= x2). If the instructor typed them the other way round,
+  // compute with the roles swapped and swap the answer back (2026-11-02 audit: x1 > x2 gave both firms zero demand).
+  if (x1 > x2) {
+    const r = computeHotellingDemand({ priceA: priceB, priceB: priceA, config: { ...config, x1: x2, x2: x1 } });
+    return { demandA: r.demandB, demandB: r.demandA, shareA: r.shareB, shareB: r.shareA };
+  }
   
-  // Special case: firms at the same location
-  if (x1 === x2) {
+  // Special case: firms at the same location, or no travel cost at all (then location does not matter):
+  // the cheaper firm takes everyone who is willing to buy; equal prices split the market.
+  if (x1 === x2 || !(travelCost > 0)) {
     let demandA, demandB;
     
     if (priceA === priceB) {

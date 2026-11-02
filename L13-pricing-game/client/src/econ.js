@@ -3,15 +3,18 @@
 
 function logitDemand(pA, pB, c) {
   const delta = 10;
-  const eA = Math.exp((delta - c.alpha * pA) / c.sigma);
-  const eB = Math.exp((delta - c.alpha * pB) / c.sigma);
-  const den = eA + eB + 1;
+  const sigma = Math.max(c.sigma, 1e-6);
+  const uA = (delta - c.alpha * pA) / sigma, uB = (delta - c.alpha * pB) / sigma;
+  const top = Math.max(uA, uB, 0); // same stabilisation as the server
+  const eA = Math.exp(uA - top), eB = Math.exp(uB - top), e0 = Math.exp(-top);
+  const den = eA + eB + e0;
   return [c.marketSize * eA / den, c.marketSize * eB / den];
 }
 
 function hotellingDemand(pA, pB, c) {
   const { travelCost: t, x1, x2, consumerValue: V } = c;
-  if (x1 === x2) {
+  if (x1 > x2) { const r = hotellingDemand(pB, pA, { ...c, x1: x2, x2: x1 }); return [r[1], r[0]]; }
+  if (x1 === x2 || !(t > 0)) {
     if (pA === pB) return V >= pA ? [50, 50] : [0, 0];
     if (pA < pB) return V >= pA ? [100, 0] : [0, 0];
     return V >= pB ? [0, 100] : [0, 0];
@@ -43,8 +46,10 @@ export function demand(pA, pB, config) {
 export function referencePrices(config) {
   if (!config) return null;
   const lo = config.priceBounds?.min ?? 0, hi = config.priceBounds?.max ?? 100;
+  if (!(hi > lo)) return null;
+  const step = Math.max(0.5, (hi - lo) / 600); // at most ~600 grid points, whatever the price range
   const grid = [];
-  for (let p = lo; p <= hi + 1e-9; p += 0.5) grid.push(p);
+  for (let p = lo; p <= hi + 1e-9; p += step) grid.push(Math.round(p * 100) / 100);
   const best = rival => {
     let bp = lo, bv = -1;
     grid.forEach(p => { const v = p * demand(p, rival, config)[0]; if (v > bv + 1e-9) { bv = v; bp = p; } });
@@ -53,7 +58,7 @@ export function referencePrices(config) {
   let p = (lo + hi) / 2;
   for (let i = 0; i < 200; i += 1) {
     const n = best(p);
-    if (Math.abs(n - p) < 0.25) { p = n; break; }
+    if (Math.abs(n - p) < step / 2) { p = n; break; }
     p = n;
   }
   let coll = lo, cv = -1;

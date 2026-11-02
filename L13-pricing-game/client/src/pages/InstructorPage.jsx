@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 
+import { keyHeaders, withKey } from '../auth.js';
+
 const API_BASE_URL = (import.meta.env.VITE_API_URL || import.meta.env.VITE_SOCKET_URL || '').trim();
 
 function buildApiUrl(path) {
@@ -51,6 +53,7 @@ export default function InstructorPage() {
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [deleteAllConfirm, setDeleteAllConfirm] = useState(false);
+  const [locked, setLocked] = useState(false);
 
   const instructorName = 'Instructor'; // Default single instructor name
 
@@ -61,7 +64,11 @@ export default function InstructorPage() {
   const fetchInstructorSessions = async () => {
     try {
       setLoading(true);
-      const response = await fetch(buildApiUrl('/sessions'));
+      const response = await fetch(buildApiUrl('/sessions'), { headers: keyHeaders() });
+      if (response.status === 403) {
+        setLocked(true); // no instructor key in this browser (2026-11-02): say so instead of showing an empty portal
+        return;
+      }
       if (!response.ok) {
         throw new Error('Failed to fetch sessions');
       }
@@ -109,7 +116,7 @@ export default function InstructorPage() {
       };
       const response = await fetch(buildApiUrl('/session'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...keyHeaders() },
         body: JSON.stringify(payload)
       });
       if (!response.ok) {
@@ -129,7 +136,7 @@ export default function InstructorPage() {
   const handleDownload = (code, event) => {
     event.stopPropagation(); // Prevent row click
     const url = buildApiUrl(`/session/${code}/export`);
-    window.open(url, '_blank');
+    window.open(withKey(url), '_blank');
   };
 
   const fetchSessionDetails = async (code) => {
@@ -143,7 +150,7 @@ export default function InstructorPage() {
     try {
       setLoadingDetails(true);
       setSelectedSession(code);
-      const response = await fetch(buildApiUrl(`/session/${code}`));
+      const response = await fetch(buildApiUrl(`/session/${code}`), { headers: keyHeaders() });
       if (!response.ok) {
         throw new Error('Failed to fetch session details');
       }
@@ -167,7 +174,8 @@ export default function InstructorPage() {
     
     try {
       const response = await fetch(buildApiUrl(`/session/${deleteConfirm.code}`), {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: keyHeaders()
       });
       
       if (!response.ok) {
@@ -193,7 +201,7 @@ export default function InstructorPage() {
     try {
       // Delete all sessions for this instructor
       const deletePromises = instructorSessions.map(session =>
-        fetch(buildApiUrl(`/session/${session.code}`), { method: 'DELETE' })
+        fetch(buildApiUrl(`/session/${session.code}`), { method: 'DELETE', headers: keyHeaders() })
       );
       
       await Promise.all(deletePromises);
@@ -232,6 +240,21 @@ export default function InstructorPage() {
         return '#6b7280';
     }
   };
+
+  if (locked) {
+    return (
+      <div className="lab">
+        <div className="join">
+          <div className="card">
+            <div className="case">Instructor page</div>
+            <div className="qt">This page runs the game and needs the instructor's address.</div>
+            <div className="hint">Students join at <b>{window.location.host}</b> with the code on the screen.</div>
+            <button className="go" type="button" onClick={() => navigate('/')}>Go to the student page</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="app-shell portal">

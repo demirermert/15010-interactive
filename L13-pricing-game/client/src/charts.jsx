@@ -90,10 +90,10 @@ export function PriceBars({ values, lo = 0, hi = 100, bins = 10, marks = [], hei
   );
 }
 
-// The street of the linear-city model: where the two sellers stand. x1, x2 in 0..100.
+// The street of the linear-city model: where I stand (x1) and where my rival stands (x2), each in 0..100.
 export function Street({ x1 = 0, x2 = 100 }) {
   const W = 640, H = 96, L = 30, R = 30;
-  const x = v => L + (W - L - R) * (v / 100);
+  const x = v => L + (W - L - R) * (Math.max(0, Math.min(100, v)) / 100);
   const same = x1 === x2;
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }} role="img">

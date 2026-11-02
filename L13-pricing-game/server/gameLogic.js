@@ -1,17 +1,7 @@
 import { computeDemand } from './demandModel.js';
 import * as db from './database.js';
 import { getAIPriceDecision, isOpenAIInitialized } from './aiPlayer.js';
-
-const DEFAULT_CONFIG = {
-  rounds: 10,
-  roundTime: 30,
-  resultRevealTime: 10,
-  marketSize: 1000,
-  alpha: 1,
-  sigma: 5,
-  priceBounds: { min: 0, max: 100 },
-  defaultPrice: 10  // Price used when student doesn't submit
-};
+import { validateConfig, studentConfig, cleanName } from './config.js';
 
 const SESSION_CODE_LENGTH = 4;
 const STATUS = {
@@ -30,19 +20,7 @@ function randomCode() {
   return result;
 }
 
-function deepMerge(target, source) {
-  const output = { ...target };
-  Object.keys(source || {}).forEach(key => {
-    if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
-      output[key] = deepMerge(target[key] || {}, source[key]);
-    } else if (source[key] !== undefined) {
-      output[key] = source[key];
-    }
-  });
-  return output;
-}
-
-export function createGameManager(io) {
+export function createGameManager(io, { instructorKey = '' } = {}) {
   const sessions = new Map();
 
   function createSession(instructorName, sessionName, configOverrides) {
@@ -53,9 +31,9 @@ export function createGameManager(io) {
     let code;
     do {
       code = randomCode();
-    } while (sessions.has(code));
+    } while (sessions.has(code) || db.getSessionIdByCode(code)); // not live, and not left in the database by an earlier run
 
-    const config = deepMerge(DEFAULT_CONFIG, configOverrides);
+    const config = validateConfig(configOverrides); // throws with a message the form shows (2026-11-02 audit)
     const session = {
       code,
       sessionName: sessionName || `${instructorName}'s Game`,
@@ -70,7 +48,9 @@ export function createGameManager(io) {
       submissions: new Map(),
       timers: {
         round: null,
-        reveal: null
+        reveal: null,
+        timerBroadcast: null,
+        countdown: null
       },
       dbId: null,
       playerDbIds: new Map(),
@@ -134,7 +114,43 @@ export function createGameManager(io) {
         playerB: sanitizePlayerRef(session.players.get(pair.playerB))
       }))
     };
-    io.to(session.code).emit('sessionUpdate', payload);
+    const instructorIds = instructorSockets(session);
+    // Students get only what their page shows: no list of names, no pairs (2026-11-02 audit: that told a student who their rival was)
+    const studentPayload = {
+      code: session.code,
+      sessionName: session.sessionName,
+      status: session.status,
+      currentRound: session.currentRound,
+      config: studentConfig(session.config),
+      playerCount: payload.players.filter(p => p.role === 'student').length
+    };
+    io.to(session.code).except(instructorIds).emit('sessionUpdate', studentPayload);
+    instructorIds.forEach(id => io.to(id).emit('sessionUpdate', payload));
+  }
+
+  function instructorSockets(session) {
+    return Array.from(session.players.values()).filter(p => p.role === 'instructor' && p.connected).map(p => p.socketId);
+  }
+
+  // Which end of the street a student is on: seller A stands at x1, seller B at x2
+  function sideOf(session, socketId) {
+    const pair = session.pairs.find(p => p.playerA === socketId || p.playerB === socketId);
+    return pair ? (pair.playerA === socketId ? 'A' : 'B') : null;
+  }
+
+  // Total profit per student over the rounds played so far, best first; computed here once, so no client can double it
+  function leaderboardOf(session) {
+    const totals = new Map();
+    session.roundResults.forEach(r => r.results.forEach(pr => [pr.playerA, pr.playerB].forEach(e => {
+      const cur = totals.get(e.playerId) || { playerId: e.playerId, name: e.name, totalProfit: 0 };
+      cur.totalProfit += e.profit;
+      totals.set(e.playerId, cur);
+    })));
+    return [...totals.values()].sort((a, b) => b.totalProfit - a.totalProfit);
+  }
+
+  function roundIsOpen(session) {
+    return session.status === STATUS.RUNNING && !!session.timers.round && !session.roundFinalizing;
   }
 
   function sanitizePlayerRef(player) {
@@ -152,8 +168,9 @@ export function createGameManager(io) {
   }
 
   function ensureInstructor(socket, session) {
-    if (session.instructorSocket !== socket.id) {
-      throw new Error('Only instructor can perform this action');
+    const player = session.players.get(socket.id);
+    if (!player || player.role !== 'instructor') {
+      throw new Error('Only the instructor can do this');
     }
   }
 
@@ -192,6 +209,12 @@ export function createGameManager(io) {
               pair.playerB = socket.id;
             }
           }
+          // A price submitted before the reconnect stays submitted (2026-11-02 audit: it used to be replaced by a random one)
+          const submission = session.submissions.get(existingPlayer.pairId);
+          if (submission && submission[oldSocketId] && oldSocketId !== socket.id) {
+            submission[socket.id] = submission[oldSocketId];
+            delete submission[oldSocketId];
+          }
         }
         
         socket.join(session.code);
@@ -203,7 +226,26 @@ export function createGameManager(io) {
       }
     }
     
+    // The instructor coming back after a drop takes over the dropped entry; a second device that is live at the same
+    // time (laptop and iPad) gets its own entry, so both can run the game (2026-11-02 audit)
+    if (role === 'instructor') {
+      const existing = Array.from(session.players.values()).find(p => p.role === 'instructor' && !p.connected);
+      if (existing && existing.socketId !== socket.id) {
+        session.players.delete(existing.socketId);
+        existing.socketId = socket.id;
+        existing.connected = true;
+        existing.lastHeartbeat = Date.now();
+        session.players.set(socket.id, existing);
+        session.instructorSocket = socket.id;
+        socket.join(session.code);
+        socket.data.sessionCode = session.code;
+        socket.data.role = 'instructor';
+        return null;
+      }
+    }
+
     // For new players, name is required
+    playerName = cleanName(playerName);
     if (!playerName) {
       throw new Error('Name is required');
     }
@@ -240,8 +282,8 @@ export function createGameManager(io) {
       session.instructorSocket = socket.id;
     }
 
-    // Save player to database
-    if (session.dbId) {
+    // Save player to database (students only: the instructor is not a player in the results)
+    if (session.dbId && player.role === 'student') {
       try {
         const dbId = db.savePlayer(session.dbId, {
           socketId: socket.id,
@@ -259,10 +301,15 @@ export function createGameManager(io) {
     return newStudentCode; // Return the generated code for new students
   }
 
-  function handleJoin(socket, { sessionCode, playerName, role, studentCode }) {
+  function handleJoin(socket, payload) {
     try {
-      const code = sessionCode?.trim().toUpperCase();
+      const { sessionCode, role, studentCode, key } = payload || {};
+      const playerName = cleanName(payload?.playerName);
+      const code = String(sessionCode || '').trim().toUpperCase();
       const session = ensureSession(code);
+      if (role === 'instructor' && instructorKey && key !== instructorKey) {
+        throw new Error('This page is for the instructor. Students join at the main address.');
+      }
       
       // Check if trying to join as a new student when session is not in lobby
       if (role === 'student' && !studentCode) {
@@ -301,11 +348,16 @@ export function createGameManager(io) {
         code,
         role: socket.data.role,
         status: session.status,
-        config: session.config,
+        config: socket.data.role === 'instructor' ? session.config : studentConfig(session.config),
         currentRound: session.currentRound,
         studentCode: finalStudentCode || null,
+        playerId: finalStudentCode || null,
         playerLink: finalStudentCode ? `/session/${code}/${finalStudentCode}` : null,
-        playerName: actualPlayerName
+        playerName: actualPlayerName,
+        side: sideOf(session, socket.id),
+        leaderboard: leaderboardOf(session),
+        // a student who was offline when the game started has no pair and sits this game out
+        spectator: socket.data.role === 'student' && session.status !== STATUS.LOBBY && session.status !== STATUS.SETUP && !actualPlayer?.pairId
       };
       
       // If rejoining mid-round or mid-game, send current state and history
@@ -314,10 +366,12 @@ export function createGameManager(io) {
         
         // If instructor is rejoining, send all round summaries for dashboard
         if (role === 'instructor' && session.roundResults && session.roundResults.length > 0) {
+          const leaderboard = leaderboardOf(session);
           session.roundResults.forEach(roundResult => {
             socket.emit('roundSummary', {
               round: roundResult.round,
-              results: roundResult.results
+              results: roundResult.results,
+              leaderboard
             });
           });
         }
@@ -341,7 +395,7 @@ export function createGameManager(io) {
         }
         
         // If a round is currently active (timer is running), send round state
-        if (session.timers.round) {
+        if (roundIsOpen(session) && (role === 'instructor' || player?.pairId)) {
           const hasSubmitted = player && player.pairId && 
             session.submissions.get(player.pairId)?.[socket.id];
           
@@ -355,14 +409,18 @@ export function createGameManager(io) {
           socket.emit('roundStarted', {
             round: session.currentRound,
             roundTime: Math.ceil(remainingTime), // Send remaining time, not full time
-            hasSubmitted: !!hasSubmitted
+            fullTime,
+            hasSubmitted: !!hasSubmitted,
+            submittedPrice: hasSubmitted ? hasSubmitted.price : null,
+            side: sideOf(session, socket.id)
           });
         }
       }
       
       socket.emit('joinedSession', joinResponse);
       broadcastSession(session);
-      console.log(`${playerName} joined session ${code}${finalStudentCode ? ` (${finalStudentCode})` : ''}`);
+      if (session.status === STATUS.RUNNING) emitSubmissionProgress(session);
+      console.log(`${actualPlayerName} joined session ${code}${finalStudentCode ? ` (${finalStudentCode})` : ''}`);
     } catch (err) {
       socket.emit('errorMessage', err.message);
     }
@@ -402,9 +460,11 @@ export function createGameManager(io) {
       if (session.status !== STATUS.LOBBY) {
         throw new Error('Session already started');
       }
-      const students = Array.from(session.players.values()).filter(p => p.role === 'student');
+      // Only students whose phone is connected now are paired; one who left the lobby would otherwise
+      // leave a partner playing against random prices all game (2026-11-02 audit)
+      const students = Array.from(session.players.values()).filter(p => p.role === 'student' && p.connected);
       if (students.length < 1) {
-        throw new Error('Need at least one student to start');
+        throw new Error('Need at least one connected student to start');
       }
       pairStudents(session, students);
       session.status = STATUS.RUNNING;
@@ -489,6 +549,7 @@ export function createGameManager(io) {
 
   function startNextRound(session) {
     clearTimers(session);
+    if (session.status !== STATUS.RUNNING) return; // the game was ended meanwhile
     if (session.currentRound >= session.config.rounds) {
       finalizeSession(session);
       return;
@@ -503,11 +564,12 @@ export function createGameManager(io) {
       ? session.config.roundTime[session.currentRound - 1] || session.config.roundTime[0]
       : session.config.roundTime;
     
-    // Send round started to all players
-    io.to(session.code).emit('roundStarted', {
-      round: session.currentRound,
-      roundTime: roundTime
+    // Send round started to every seat (with which end of the street it is) and to the instructor
+    session.pairs.forEach(pair => {
+      io.to(pair.playerA).emit('roundStarted', { round: session.currentRound, roundTime, fullTime: roundTime, side: 'A' });
+      io.to(pair.playerB).emit('roundStarted', { round: session.currentRound, roundTime, fullTime: roundTime, side: 'B' });
     });
+    instructorSockets(session).forEach(id => io.to(id).emit('roundStarted', { round: session.currentRound, roundTime, fullTime: roundTime }));
     
     // If showOpponentName is enabled, send each student their opponent's name
     if (session.config.showOpponentName) {
@@ -554,6 +616,7 @@ export function createGameManager(io) {
     }, 1000);
     
     session.timers.round = setTimeout(() => {
+      session.timers.round = null; // the round is over: a rejoin or a late price must not see it as open (2026-11-02 audit)
       if (session.timers.timerBroadcast) {
         clearInterval(session.timers.timerBroadcast);
         session.timers.timerBroadcast = null;
@@ -563,15 +626,23 @@ export function createGameManager(io) {
   }
 
   async function forceSubmitMissing(session) {
+    try {
+      await forceSubmitMissingInner(session);
+    } catch (err) {
+      // never let a round's end take the process down (2026-11-02 audit)
+      console.error(`[Session ${session.code}] Error finishing round ${session.currentRound}:`, err);
+      try { finalizeRound(session); } catch (err2) { console.error('finalizeRound failed too:', err2); }
+    }
+  }
+
+  async function forceSubmitMissingInner(session) {
     console.log(`[Session ${session.code}] Round ${session.currentRound} timer expired - finalizing round`);
     const seenPairs = new Set();
     
-    // Function to generate random price for non-submissions
-    // Use the game's price bounds (0 to max, which is typically 2x monopoly price)
+    // A whole-dollar random price inside the game's price bounds for anyone who did not submit
     const getRandomPrice = () => {
-      const min = session.config.priceBounds?.min || 0;
-      const max = session.config.priceBounds?.max || 100;
-      return Math.floor(min + Math.random() * (max - min + 1)); // Return integer
+      const { min, max } = session.config.priceBounds;
+      return Math.min(max, Math.floor(min + Math.random() * (max - min + 1)));
     };
       
     // Process all pairs sequentially to get AI decisions
@@ -624,18 +695,22 @@ export function createGameManager(io) {
     finalizeRound(session);
   }
 
-  function handlePriceSubmission(socket, { sessionCode, price }) {
+  function handlePriceSubmission(socket, payload) {
     try {
+      const { sessionCode, price } = payload || {};
       const session = ensureSession(sessionCode);
       if (session.status !== STATUS.RUNNING) {
-        throw new Error('Session not running');
+        throw new Error('The game is not running.');
+      }
+      if (!roundIsOpen(session)) {
+        throw new Error('This round is over. Your price goes in when the next round starts.');
       }
       const player = session.players.get(socket.id);
       if (!player || player.role !== 'student') {
-        throw new Error('Only active students can submit prices');
+        throw new Error('Only students in the game can submit a price. Reload the page.');
       }
       if (!player.pairId) {
-        throw new Error('Player is not paired');
+        throw new Error('You were not paired when the game started, so you are sitting this one out.');
       }
       const numericPrice = Number(price);
       const { min, max } = session.config.priceBounds;
@@ -646,6 +721,7 @@ export function createGameManager(io) {
         throw new Error(`Price must be between ${min} and ${max}`);
       }
       recordSubmission(session, socket.id, numericPrice, false);
+      socket.emit('priceAccepted', { round: session.currentRound, price: numericPrice });
       emitSubmissionProgress(session);
       concludeRoundIfReady(session);
     } catch (err) {
@@ -701,6 +777,7 @@ export function createGameManager(io) {
   }
 
   function finalizeRound(session) {
+    if (session.status !== STATUS.RUNNING) return; // ended while the round was being finished
     // Prevent double finalization
     if (session.roundFinalizing) {
       console.log(`[Session ${session.code}] Attempted double finalization of round ${session.currentRound} - prevented`);
@@ -799,10 +876,12 @@ export function createGameManager(io) {
         pairId: pair.id,
         playerA: {
           socketId: pair.playerA,
+          playerId: playerA.studentCode || pair.playerA, // stable across reconnects, unlike the socket id
           ...playerResultA
         },
         playerB: {
           socketId: pair.playerB,
+          playerId: playerB.studentCode || pair.playerB,
           ...playerResultB
         }
       });
@@ -833,10 +912,10 @@ export function createGameManager(io) {
       io.to(pair.playerB).emit('roundResults', formatPlayerPayload(playerB, playerResultB));
     });
     session.roundResults.push({ round: roundNumber, results: resultsForRound });
-    io.to(session.code).emit('roundSummary', {
-      round: roundNumber,
-      results: resultsForRound
-    });
+    const leaderboard = leaderboardOf(session);
+    const instructorIds = instructorSockets(session);
+    instructorIds.forEach(id => io.to(id).emit('roundSummary', { round: roundNumber, results: resultsForRound, leaderboard }));
+    io.to(session.code).except(instructorIds).emit('roundSummary', { round: roundNumber, leaderboard });
     broadcastSession(session);
     
     // Check if this was the last round
@@ -854,17 +933,19 @@ export function createGameManager(io) {
     let countdown = breakTime;
     io.to(session.code).emit('nextRoundCountdown', { countdown });
     
-    const countdownInterval = setInterval(() => {
+    session.timers.countdown = setInterval(() => {
       countdown -= 1;
       if (countdown > 0) {
         io.to(session.code).emit('nextRoundCountdown', { countdown });
       } else {
-        clearInterval(countdownInterval);
+        clearInterval(session.timers.countdown);
+        session.timers.countdown = null;
       }
     }, 1000);
     
     session.timers.reveal = setTimeout(() => {
-      clearInterval(countdownInterval);
+      if (session.timers.countdown) clearInterval(session.timers.countdown);
+      session.timers.countdown = null;
       startNextRound(session);
     }, breakTime * 1000);
   }
@@ -900,9 +981,10 @@ export function createGameManager(io) {
       }
     }
     
-    io.to(session.code).emit('sessionComplete', {
-      rounds: session.roundResults
-    });
+    const leaderboard = leaderboardOf(session);
+    const instructorIds = instructorSockets(session);
+    instructorIds.forEach(id => io.to(id).emit('sessionComplete', { rounds: session.roundResults, leaderboard }));
+    io.to(session.code).except(instructorIds).emit('sessionComplete', { leaderboard });
     broadcastSession(session);
   }
 
@@ -916,9 +998,13 @@ export function createGameManager(io) {
     if (session.timers.timerBroadcast) {
       clearInterval(session.timers.timerBroadcast);
     }
+    if (session.timers.countdown) {
+      clearInterval(session.timers.countdown);
+    }
     session.timers.round = null;
     session.timers.reveal = null;
     session.timers.timerBroadcast = null;
+    session.timers.countdown = null;
   }
 
   function handleEndSession(socket, sessionCode) {
@@ -964,8 +1050,11 @@ export function createGameManager(io) {
     });
   }
 
-  function handleChatMessage(socket, { sessionCode, message }) {
+  function handleChatMessage(socket, payload) {
     try {
+      const { sessionCode } = payload || {};
+      const message = typeof payload?.message === 'string' ? payload.message.slice(0, 500) : '';
+      if (!message.trim()) throw new Error('Empty message');
       const session = ensureSession(sessionCode);
       const player = session.players.get(socket.id);
       

@@ -177,6 +177,7 @@ export function getSessionData(code) {
       round: round.round_number,
       timestamp: round.created_at,
       results: results.map(r => ({
+        playerId: r.player_id,
         playerName: r.player_name,
         opponentName: r.opponent_name,
         price: r.price,

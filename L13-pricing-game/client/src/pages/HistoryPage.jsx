@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
+import { keyHeaders, withKey } from '../auth.js';
+
 const API_BASE_URL = (import.meta.env.VITE_API_URL || import.meta.env.VITE_SOCKET_URL || '').trim();
 
 function buildApiUrl(path) {
@@ -26,7 +28,7 @@ export default function HistoryPage() {
   const fetchSessions = async () => {
     try {
       setLoading(true);
-      const response = await fetch(buildApiUrl('/sessions'));
+      const response = await fetch(buildApiUrl('/sessions'), { headers: keyHeaders() });
       if (!response.ok) {
         throw new Error('Failed to fetch sessions');
       }
@@ -43,7 +45,7 @@ export default function HistoryPage() {
   const fetchSessionDetails = async (code) => {
     try {
       setLoadingDetails(true);
-      const response = await fetch(buildApiUrl(`/session/${code}`));
+      const response = await fetch(buildApiUrl(`/session/${code}`), { headers: keyHeaders() });
       if (!response.ok) {
         throw new Error('Failed to fetch session details');
       }
@@ -59,7 +61,7 @@ export default function HistoryPage() {
 
   const handleDownload = (code) => {
     const url = buildApiUrl(`/session/${code}/export`);
-    window.open(url, '_blank');
+    window.open(withKey(url), '_blank');
   };
 
   const formatDate = (dateString) => {

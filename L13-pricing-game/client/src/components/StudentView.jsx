@@ -47,7 +47,14 @@ export function StudentView({
   onSendChatMessage,
   currentSocketId,
   opponentName,
-  playerName
+  playerName,
+  playerId,
+  side,
+  roundTime,
+  spectator,
+  acceptedPrice,
+  errorMessage,
+  onDismissError
 }) {
   const [price, setPrice] = useState('');
   const [error, setError] = useState('');
@@ -84,13 +91,17 @@ export function StudentView({
 
   const rounds = config?.rounds || 0;
   const hide = config?.hideRoundCount;
-  const fullTime = roundTimeFor(config, currentRound);
+  const fullTime = roundTime || roundTimeFor(config, currentRound);
   const low = timer <= 5;
   const total = (history || []).reduce((s, h) => s + (h.profit || 0), 0);
   const rivalTotal = (history || []).reduce((s, h) => s + (h.opponentProfit || 0), 0);
   const me = playerName || history?.[0]?.name;
-  const rank = leaderboard?.length ? leaderboard.findIndex(r => r.name === me) + 1 : 0;
+  const rank = leaderboard?.length ? leaderboard.findIndex(r => (playerId ? r.playerId === playerId : r.name === me)) + 1 : 0;
   const rivalLabel = config?.showOpponentName && opponentName ? opponentName : 'Rival';
+  // Seller A stands at x1 and seller B at x2; the server says which seat I have
+  const iAmB = side === 'B';
+  const myX = config?.modelType === 'hotelling' ? (iAmB ? config.x2 : config.x1) : 0;
+  const rivalX = config?.modelType === 'hotelling' ? (iAmB ? config.x1 : config.x2) : 100;
   const between = sessionStatus === 'running' && !roundActive && latestResult;
 
   const steps = !hide && rounds > 0 && rounds <= 20 ? (
@@ -141,6 +152,15 @@ export function StudentView({
         {rank > 0 && <div className="fb info">You placed <b>{rank}</b> of {leaderboard.length}.</div>}
       </div>
     );
+  } else if (spectator) {
+    left = (
+      <div className="card">
+        <div className="case">Sitting this one out</div>
+        <div className="qt">Your phone was offline when the game started, so you have no rival this game.</div>
+        <div className="hint">Stay on this page: you can watch, and you will be in the next game.</div>
+        {errorMessage && <div className="fb no" onClick={onDismissError}>{errorMessage}</div>}
+      </div>
+    );
   } else if (roundActive) {
     const done = hasSubmitted;
     left = (
@@ -152,7 +172,7 @@ export function StudentView({
         <form onSubmit={handleSubmit}>
           <div className="pin">
             <span>$</span>
-            <input ref={inputRef} type="number" inputMode="decimal" step="any" value={done && sent != null && price === '' ? sent : price}
+            <input ref={inputRef} type="number" inputMode="decimal" step="any" value={done && price === '' && (sent ?? acceptedPrice) != null ? (sent ?? acceptedPrice) : price}
               onChange={e => setPrice(e.target.value)} disabled={done} placeholder="0" aria-label="Your price" />
           </div>
           <div className="hint">Between {money(priceBounds.min)} and {money(priceBounds.max)}.
@@ -160,7 +180,8 @@ export function StudentView({
           {!done && <button className="go" type="submit">Submit price</button>}
         </form>
         {error && <div className="fb no">{error}</div>}
-        {done && <div className="fb ok">Submitted{sent != null ? <> at <b>{money(sent, Number.isInteger(sent) ? 0 : 2)}</b></> : null}. Results appear when the clock runs out.</div>}
+        {errorMessage && <div className="fb no" onClick={onDismissError}>{errorMessage}</div>}
+        {done && !errorMessage && <div className="fb ok">Submitted{(sent ?? acceptedPrice) != null ? <> at <b>{money(sent ?? acceptedPrice, Number.isInteger(sent ?? acceptedPrice) ? 0 : 2)}</b></> : null}. Results appear when the clock runs out.</div>}
       </div>
     );
   } else if (between) {
@@ -206,7 +227,7 @@ export function StudentView({
       {config?.modelType === 'hotelling' && (
         <div className="card">
           <div className="gname">Your market</div>
-          <Street x1={Math.min(config.x1, config.x2)} x2={Math.max(config.x1, config.x2)} />
+          <Street x1={myX} x2={rivalX} />
           <div className="hint">Customers live along the street and buy from the seller that leaves them the most: what the
             drink is worth to them, minus its price, minus the walk. If both are too costly, they buy nothing.</div>
         </div>

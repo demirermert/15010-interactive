@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { RoundsChart, PriceBars } from '../charts.jsx';
 import { money, referencePrices } from '../econ.js';
+import { withKey } from '../auth.js';
 
 // The instructor's projector page in the 2026 lab look (2026-11-02; the 2025 page is in git history),
 // laid out like the Class 6-11 dashboards: the room's state on top, then the prices, the leaderboard and the pairs.
@@ -26,7 +27,7 @@ function asPairs(results) {
     used.add(i);
     const j = results.findIndex((o, k) => !used.has(k) && o.playerName === r.opponentName && o.opponentName === r.playerName);
     if (j >= 0) used.add(j);
-    const side = x => x && { name: x.playerName, price: x.price, profit: x.profit };
+    const side = x => x && { name: x.playerName, playerId: x.playerId, price: x.price, profit: x.profit };
     out.push({
       pairId: `p${i}`,
       playerA: side(r),
@@ -105,7 +106,7 @@ export function InstructorDashboard({
 
   const filteredBoard = (leaderboard || []).filter(r => r.name.toLowerCase().includes(search.toLowerCase()));
 
-  const download = () => { if (code) window.open(buildApiUrl(`/session/${code}/export`), '_blank'); };
+  const download = () => { if (code) window.open(withKey(buildApiUrl(`/session/${code}/export`)), '_blank'); };
 
   // the state panel: what the room should be doing right now
   let state;
@@ -237,7 +238,7 @@ export function InstructorDashboard({
                   <tbody>
                     {filteredBoard.map(r => {
                       const k = (leaderboard || []).indexOf(r) + 1;
-                      return <tr key={r.name} className={k <= 3 ? 'top' : ''}><td>{k}</td><td>{r.name}</td><td className="r">{money(r.totalProfit)}</td></tr>;
+                      return <tr key={r.playerId || r.name} className={k <= 3 ? 'top' : ''}><td>{k}</td><td>{r.name}</td><td className="r">{money(r.totalProfit)}</td></tr>;
                     })}
                   </tbody>
                 </table>

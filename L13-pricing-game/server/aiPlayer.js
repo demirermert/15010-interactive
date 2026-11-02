@@ -5,7 +5,7 @@ let openai = null;
 
 export function initializeOpenAI(apiKey) {
   if (apiKey) {
-    openai = new OpenAI({ apiKey });
+    openai = new OpenAI({ apiKey, timeout: 5000, maxRetries: 0 }); // 5 s at most after the clock, then a random price (2026-11-02 audit)
     console.log('OpenAI API initialized for AI player');
   } else {
     console.warn('No OpenAI API key provided - AI player will use random prices');

@@ -97,22 +97,29 @@ The instructor can download a CSV file of the current session by clicking the "D
 - Demand and profit calculations
 - Market share percentages
 
-## Deploying to the Cloud
+## Deployment (2026)
 
-### Backend on Render
+One Render web service, `pricing-game` in the course-games workspace (Starter plan, always on), runs the whole game:
+the build compiles the React client (`client/dist`) and `server/server.js` serves it next to the API and Socket.io.
+Settings are documented in the repo's `render.yaml` (`rootDir: L13-pricing-game`, build
+`cd client && npm install && npm run build && cd ../server && npm install`, start `cd server && npm start`).
+The service does not auto-deploy: trigger a deploy after pushing. Never deploy during a class: the running game lives in
+memory and the SQLite history sits on the service's own disk, so a deploy or restart ends the game and clears the history.
+Download the CSV from the dashboard at the end of every session.
 
-1. Commit this repository to GitHub (or similar) and connect it to Render.
-2. Render auto-detects the root `render.yaml` and creates a web service from it.
-3. In the Render dashboard, override the `ALLOWED_ORIGINS` env var with your final frontend URL (the default value is `*` for quick testing).
-4. Deploy; Render will run `cd server && npm install` then `cd server && npm start`, exposing the Socket.io server via HTTPS.
+Environment variables (set in the Render dashboard):
 
-### Frontend on Vercel
+- `INSTRUCTOR_KEY` (required in production): the instructor opens the site once as `/instructor?key=<the key>`; the key is
+  kept in that browser and every instructor page and REST call carries it. Without it a browser sees only the student page.
+  Students never need it. The 15010.ai dashboard address redirects to the keyed address.
+- `OPENAI_API_KEY` (optional): the ChatGPT player that is paired with the odd student out. Without it that student plays
+  against random prices.
 
-1. Duplicate `client/.env.production.example` as `client/.env.production` and set both `VITE_SOCKET_URL` and `VITE_API_URL` to the Render backend URL.
-2. Push the repo to GitHub; import the project into Vercel and point it at the `client` directory.
-3. In Vercel → Project Settings → Environment Variables, add `VITE_SOCKET_URL` and `VITE_API_URL` with the same backend URL (use the Production environment).
-4. Vercel will run `npm install` and `npm run build`, then serve the static build over HTTPS.
+## Change log
 
-### Local Testing Against Production Backend
-
-If you want to test locally with the cloud backend, create `client/.env.local` containing `VITE_SOCKET_URL=https://your-backend-domain` and rerun `npm run dev` in the client.
+- 2026-11-02 audit: the server survives malformed socket messages; every game setting is validated (`server/config.js`);
+  the demand model handles swapped seller positions, zero travel cost and tiny sigma; a price survives a reconnect; the
+  client rejoins on every reconnect; students who are offline at the start are not paired; the leaderboard is computed by
+  the server; students receive only their own pair's results; the instructor pages need `INSTRUCTOR_KEY`; CSV cells are
+  escaped; a round can only be submitted to while it is open and every price is acknowledged.
+- 2026-11-02: the 2026 lab look for the student and instructor pages; one Render service serves client and server.
