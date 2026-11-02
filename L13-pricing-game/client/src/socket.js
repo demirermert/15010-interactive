@@ -1,6 +1,7 @@
 import { io } from 'socket.io-client';
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:4000';
+// No URL in a production build means the same server that serves the page (the one-service deployment).
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || (import.meta.env.DEV ? 'http://localhost:4000' : undefined);
 
 export const socket = io(SOCKET_URL, {
   autoConnect: true

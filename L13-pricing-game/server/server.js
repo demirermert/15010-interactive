@@ -1,4 +1,7 @@
 import http from 'http';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import express from 'express';
 import cors from 'cors';
 import { Server as SocketIOServer } from 'socket.io';
@@ -33,6 +36,23 @@ app.options('*', cors(corsConfig));
 app.use(express.json());
 
 const manager = createGameManager(io);
+
+// One service for the whole game (2026-11-02): when the client has been built, serve it from here too.
+// The client calls the API under /api (as through the Vite proxy in development); page addresses get index.html.
+const CLIENT_DIST = path.join(path.dirname(fileURLToPath(import.meta.url)), '../client/dist');
+if (fs.existsSync(CLIENT_DIST)) {
+  app.use(express.static(CLIENT_DIST, { index: false }));
+  app.use((req, res, next) => {
+    if (req.url.startsWith('/api/')) {
+      req.url = req.url.slice(4);
+      return next();
+    }
+    if (req.method === 'GET' && req.path !== '/health') {
+      return res.sendFile(path.join(CLIENT_DIST, 'index.html'));
+    }
+    return next();
+  });
+}
 
 app.get('/', (_req, res) => {
   res.send('Price competition API is running. Use /health for status checks.');
