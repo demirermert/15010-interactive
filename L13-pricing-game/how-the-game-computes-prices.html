@@ -94,25 +94,21 @@ ul{margin:6px 0 6px 20px;padding:0}li{margin:3px 0}
 
 <section>
   <h2>2. The three games</h2>
-  <p>All three keep V = $200 and the sellers at the two ends of the street, and lower the walking cost each game (the quick-setup
-  buttons on the instructor page; decided 2026-11-07). Less walking cost means customers care less about which seller is nearer,
-  which is less differentiation.</p>
+  <p>All three keep V = $200 and t = $1 and change where the sellers stand (the quick-setup buttons on the instructor page).</p>
   <table>
-    <thead><tr><th>Game</th><th>Walking cost t</th><th>What the slide says</th><th>What the formula gives at equal prices p</th></tr></thead>
+    <thead><tr><th>Game</th><th>Sellers</th><th>What the slide says</th><th>What the formula gives at equal prices p</th></tr></thead>
     <tbody>
-      <tr><td>Round 1</td><td>$1 per block</td><td>full differentiation</td><td>x* = 50; each serves min(50, 200 − p) customers</td></tr>
-      <tr><td>Round 2</td><td>$0.30 per block</td><td>less differentiation</td><td>x* = 50; each serves min(50, (200 − p) / 0.3) customers; a $1 price cut now moves x* by 1.67 blocks instead of 0.5</td></tr>
-      <tr><td>Round 3</td><td>$0</td><td>no differentiation</td><td>pure price competition: the cheaper seller takes every customer with p ≤ 200; equal prices split 50/50</td></tr>
+      <tr><td>Round 1</td><td>0 and 100</td><td>full differentiation</td><td>x* = 50; each serves min(50, 200 − p) customers</td></tr>
+      <tr><td>Round 2</td><td>35 and 65</td><td>less differentiation</td><td>x* = 50; each serves min(50, 200 − p) customers (clipped at the ends of the street once p &gt; 165)</td></tr>
+      <tr><td>Round 3</td><td>50 and 50</td><td>no differentiation</td><td>same spot: the cheaper seller takes every customer with p ≤ 200; equal prices split 50/50</td></tr>
     </tbody>
   </table>
-  <div class="note"><b>Why the walking cost and not the sellers' positions (the 2025 games were 0/100, 35/65, 50/50).</b> The
-  indifferent-customer formula uses only the midpoint between the sellers, and that midpoint is 50 for both 0/100 and 35/65, so with
-  this code Round 2 produced exactly the same demand and profits as Round 1 for every pair of prices up to about $160 (the case in
-  2025 too). A correct straight-line model is no help: a seller who undercuts the rival by more than the $30 walk between them takes
-  the whole street, so with the sellers at 35/65 (anything closer than 25/75) there is no stable price at all; prices cycle. The
-  Nash price with straight-line walking cost is t × 100 at every position out to 25/75, so positions never lower it. Lowering t
-  does, one for one, and the model stays the one the code already has. (The textbook alternative, a walking cost that grows with
-  the square of the distance, would let the sellers move closer with stable prices $100, $30, $0 at 0/100, 35/65, 50/50; not used.)</div>
+  <div class="note"><b>Round 2 as the code computes it.</b> The indifferent-customer formula uses only the midpoint between the sellers, and
+  that midpoint is 50 for both 0/100 and 35/65. Up to prices of $165 (where the stretch behind a seller at 35 starts to be clipped
+  by the end of the street) Round 2 therefore produces exactly the same demand and profits as Round 1 for every pair of prices.
+  This was already the case in 2025. A faithful "sellers closer together" model would let a seller who undercuts the rival by more
+  than t × 30 = $30 take the whole street, which has no stable price (prices climb, then collapse); the alternative that keeps a clean
+  answer is to leave the sellers at the ends and lower the walking cost instead (see section 3). Decision pending.</div>
 
   <h3>Special cases the code handles</h3>
   <ul>
@@ -138,12 +134,12 @@ ul{margin:6px 0 6px 20px;padding:0}li{margin:3px 0}
   <table>
     <thead><tr><th>Setting</th><th class="r">Nash price</th><th class="r">profit each</th><th class="r">Collusion price</th><th class="r">profit each</th></tr></thead>
     <tbody>
-      <tr><td>Round 1: t = $1</td><td class="r">$100</td><td class="r">$5,000</td><td class="r">$150</td><td class="r">$7,500</td></tr>
-      <tr><td>Round 2: t = $0.30</td><td class="r">$30</td><td class="r">$1,500</td><td class="r">$185</td><td class="r">$9,250</td></tr>
-      <tr><td>Round 3: t = $0 (pure price competition)</td><td class="r">$0</td><td class="r">$0</td><td class="r">$200</td><td class="r">$10,000</td></tr>
-      <tr><td>t = $0.50 (not used)</td><td class="r">$50</td><td class="r">$2,500</td><td class="r">$175</td><td class="r">$8,750</td></tr>
-      <tr><td>Sellers 35 and 65, t = $1 (the 2025 Round 2, as this code computes it)</td><td class="r">$100</td><td class="r">$5,000</td><td class="r">$165</td><td class="r">$8,250</td></tr>
-      <tr><td>Sellers 50 and 50, t = $1 (the 2025 Round 3)</td><td class="r">$0</td><td class="r">$0</td><td class="r">$200</td><td class="r">$10,000</td></tr>
+      <tr><td>Sellers 0 and 100, t = $1 (Round 1)</td><td class="r">$100</td><td class="r">$5,000</td><td class="r">$150</td><td class="r">$7,500</td></tr>
+      <tr><td>Sellers 35 and 65, t = $1 (Round 2, as coded)</td><td class="r">$100</td><td class="r">$5,000</td><td class="r">$165</td><td class="r">$8,250</td></tr>
+      <tr><td>Sellers 50 and 50 (Round 3)</td><td class="r">$0</td><td class="r">$0</td><td class="r">$200</td><td class="r">$10,000</td></tr>
+      <tr><td>Sellers 0 and 100, t = $0.50</td><td class="r">$50</td><td class="r">$2,500</td><td class="r">$175</td><td class="r">$8,750</td></tr>
+      <tr><td>Sellers 0 and 100, t = $0.30</td><td class="r">$30</td><td class="r">$1,500</td><td class="r">$185</td><td class="r">$9,250</td></tr>
+      <tr><td>Sellers 0 and 100, t = $0 (pure price competition)</td><td class="r">$0</td><td class="r">$0</td><td class="r">$200</td><td class="r">$10,000</td></tr>
     </tbody>
   </table>
   <p class="small">General formulas with the sellers at the ends and the market covered: Nash price = t × 100, collusion price = V − t × 50.
@@ -180,10 +176,10 @@ ul{margin:6px 0 6px 20px;padding:0}li{margin:3px 0}
   <h2>6. Calculator</h2>
   <p class="small">The same formulas as the server. Pick a game or type any settings, then two prices.</p>
   <div class="presets">
-    <button type="button" data-p="0,100,1">Round 1: walking cost $1</button>
-    <button type="button" data-p="0,100,0.3">Round 2: walking cost $0.30</button>
-    <button type="button" data-p="0,100,0">Round 3: walking free</button>
-    <button type="button" data-p="35,65,1">2025 Round 2: sellers 35 and 65</button>
+    <button type="button" data-p="0,100,1">Round 1: sellers 0 and 100</button>
+    <button type="button" data-p="35,65,1">Round 2: 35 and 65</button>
+    <button type="button" data-p="50,50,1">Round 3: 50 and 50</button>
+    <button type="button" data-p="0,100,0.3">Ends, walking cost $0.30</button>
   </div>
   <div class="calc">
     <label>V (value) <input id="V" type="number" value="200" step="any"></label>

@@ -193,8 +193,9 @@ prices $100, $30, $0 (profit each $5,000, $1,500, $0); collusive prices $150, $1
 $10,000). Why not the 2025 positions (0/100, 35/65, 50/50): with this demand formula 35/65 is identical to 0/100 for every
 pair of prices below about $160 (only the midpoint enters), and a correct straight-line model has no stable price for sellers
 closer than 25/75 (undercutting by the walk between them takes the whole street; prices cycle). The quick-setup buttons on the
-instructor form set the walking cost; the student page prints it under the street ("Walking costs $0.30 per block" / "Walking is
-free"); `how-the-game-computes-prices.html` section 2 has the reasoning. Tested locally at all three walking costs with
+instructor form set the walking cost. Students are NOT shown the walking cost or any model number (Mert, 2026-11-07, as in
+2025): the slide and the instructor say "you are more / less differentiated". `how-the-game-computes-prices.html` was left as
+written on 2026-11-02 (it still describes the 2025 positions and says "decision pending"). Tested locally at all three walking costs with
 `test/sim_class.mjs --t 1|0.3|0` (36/36 server checks each; the ChatGPT check needs a service) and in Chrome.
 
 Open with Mert (nothing decided yet):
