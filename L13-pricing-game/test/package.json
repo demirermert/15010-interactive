@@ -1,0 +1,7 @@
+{
+  "name": "l13-pricing-game-tests",
+  "private": true,
+  "type": "module",
+  "description": "Simulated-class tests for the pricing game (teaching23-games, 2026-11-07). node sim_class.mjs --help",
+  "dependencies": { "socket.io-client": "^4.8.1" }
+}

@@ -157,7 +157,15 @@ Done so far (commits 2298d7c to 388e0de, all 2026-11-02):
   profits by pair), no Nash or collusion lines and no histogram (Mert, 2026-11-02: "just introduce the visualisation,
   not adding lines"); find a pair; click a market to see its price paths. `how-the-game-computes-prices.html` explains
   the model with a calculator that runs the server's formula.
-- The audit and fuzz scripts (`audit.mjs`, `fuzz.mjs`, about 90k cases, `set_parley.sh`) lived in a session scratchpad
+- Tests (2026-11-07): `test/sim_class.mjs` plays a whole game on a live service over the real socket as the instructor plus
+  N student phones and prints 38 PASS/FAIL checks (key gating, lobby rules, the AI seat, price validation, reconnects of
+  phones and the instructor's laptop, every demand/profit against `server/demandModel.js`, no leaks between pairs, round
+  timing, sessionComplete, CSV, DELETE). `cd test && npm install` once, then
+  `node sim_class.mjs --host lab-d.onrender.com --key <instructor key> --students 7 --rounds 10 --round-time 5 --break 3`.
+  It deletes its session at the end (`--keep` to leave it). Runs on 2026-11-07: 38/38 on lab-d (7 students, ChatGPT seat
+  answered 100 every round in about 2 s) and 38/38 on lab-e with 81 students (rounds still ended within 0.3 s of time).
+  Never run during a class.
+- The 2026-11-02 audit and fuzz scripts (`audit.mjs`, `fuzz.mjs`, about 90k cases) lived in a session scratchpad
   that is gone. The Jul 2026 bots in this folder (`pricing-game-automation.js`, `test-automation.js`, `load-test/`,
   `AUTOMATION-README.md`, `QUICK-TEST-GUIDE.md`) predate the rewrite: check them against the socket events in
   `server/server.js` before trusting them, or write new ones, and keep them in this folder.
