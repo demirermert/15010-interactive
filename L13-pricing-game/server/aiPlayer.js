@@ -108,6 +108,19 @@ function buildGamePrompt(config, history, opponentHistory) {
       monopolyPrice = (V + t * (100 - x1)) / 2;
     }
     
+    // Reference prices for THIS walking cost (2026-11-07): the model used to anchor on the $100 monopoly price and play
+    // $100 whatever t was, so with t = 0.30 (Nash $30) or t = 0 (Nash $0) it was far off. The one-shot Nash price of the
+    // demand the server computes is t x 100 with the market covered (every $1 below the rival wins 1/(2t) customers), or
+    // $0 when walking is free (pure price competition); the collusive price is the highest common price at which the
+    // farthest customer still buys.
+    const { min: pMin, max: pMax } = config.priceBounds;
+    const clamp = p => Math.max(pMin, Math.min(pMax, p));
+    const x2 = config.x2;
+    const farthest = Math.max(x1, 100 - x2, Math.abs(x2 - x1) / 2);
+    const nashPrice = clamp(t > 0 && x1 !== x2 ? t * 100 : 0);
+    const collusivePrice = clamp(V - t * farthest);
+    const perDollar = t > 0 && x1 !== x2 ? (1 / (2 * t)).toFixed(2) : null;
+
     // Hotelling model prompt
     prompt = `You are playing a competitive pricing game using the Hotelling location model. Here are the rules:
 
@@ -115,12 +128,14 @@ GAME RULES:
 - Consumer locations: uniformly distributed on [0, 100]
 - Your location: ${config.x1}
 - Opponent location: ${config.x2}
-- Travel cost (t): ${config.travelCost} per unit distance
+- Travel cost (t): $${config.travelCost} per unit distance${t > 0 ? '' : ' (no travel cost: the two sellers are identical to every consumer)'}
 - Consumer valuation (V): $${config.consumerValue}
-- Price range: $${config.priceBounds.min} to $${config.priceBounds.max}
+- Price range: $${pMin} to $${pMax}
 - Total rounds: ${config.rounds}
 - Current round: ${currentRound}
 - Monopoly price (if you were alone): $${monopolyPrice.toFixed(2)}
+- One-shot Nash equilibrium price for this travel cost: $${nashPrice.toFixed(2)} (profit $${(nashPrice * 50).toFixed(0)} each)
+- Joint-profit (collusive) price for this travel cost: $${collusivePrice.toFixed(2)} (profit $${(collusivePrice * 50).toFixed(0)} each if both charge it)
 
 HOW DEMAND WORKS:
 - Consumers buy from whoever offers the lowest total cost (price + travel cost)
@@ -130,10 +145,12 @@ HOW DEMAND WORKS:
 - Your profit = YourPrice × YourDemand
 
 KEY INSIGHTS:
-- Lower prices attract consumers who are farther from you
-- The indifferent consumer location: x* = (x1 + x2)/2 + (OpponentPrice - YourPrice)/(2×${config.travelCost})
+${perDollar
+  ? `- Every $1 you price below your opponent wins you ${perDollar} customers (and every $1 above loses ${perDollar}); the indifferent consumer is at x* = (x1 + x2)/2 + (OpponentPrice - YourPrice)/(2×${config.travelCost})`
+  : '- The cheaper seller gets ALL 100 consumers; equal prices split them 50/50. Any price above your opponent sells nothing.'}
 - But consumers only buy if they get non-negative utility
 - The monopoly price maximizes profit when there's no competition
+- A rational competitor prices close to the one-shot Nash price above; only price higher if the opponent has clearly been keeping prices high round after round, and undercut if the opponent undercuts
 
 OBJECTIVE:
 Maximize your total profit across all rounds.
