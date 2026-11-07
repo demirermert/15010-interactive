@@ -188,12 +188,18 @@ lab-d, lab-e, lab-f .onrender.com.
 - Next lab on the six: repoint rootDir and restore that lab's build and start commands (L1-demand/server used
   `npm install` / `npm start`, no health check), and run `set_l13_redirects.sh --remove`.
 
+The three games (Mert, 2026-11-07): sellers stay at 0 and 100 in all three; the walking cost falls, $1, $0.30, $0. Nash
+prices $100, $30, $0 (profit each $5,000, $1,500, $0); collusive prices $150, $185, $200 (profit each $7,500, $9,250,
+$10,000). Why not the 2025 positions (0/100, 35/65, 50/50): with this demand formula 35/65 is identical to 0/100 for every
+pair of prices below about $160 (only the midpoint enters), and a correct straight-line model has no stable price for sellers
+closer than 25/75 (undercutting by the walk between them takes the whole street; prices cycle). The quick-setup buttons on the
+instructor form set the walking cost; the student page prints it under the street ("Walking costs $0.30 per block" / "Walking is
+free"); `how-the-game-computes-prices.html` section 2 has the reasoning. Tested locally at all three walking costs with
+`test/sim_class.mjs --t 1|0.3|0` (36/36 server checks each; the ChatGPT check needs a service) and in Chrome.
+
 Open with Mert (nothing decided yet):
 
 - 15010.ai addresses: `lab13` for students, `lab13xx` carrying the key for Mert. None yet.
-- The 35/65 market: with this demand code it is identical to 0/100 for prices up to $165 (only the midpoint between the
-  sellers matters). Options offered: a lower walking cost per round (t 1 / 0.3 / 0) or a true location model (which has no
-  stable price at 35/65).
 - Rounds and seconds per game; the student rules wording; whether students see the $200 / $1 model numbers.
 - Then: a run sheet in task 32's shape, a phone rehearsal with the TAs, the lab section in the Class 13 deck
   (teaching1-slides-now, task 7) with the addresses, rules and debrief numbers.

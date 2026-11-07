@@ -34,8 +34,10 @@ if (args.help || !args.host || !args.key) {
 const HOST = args.host, KEY = String(args.key);
 const N = Number(args.students || 7), ROUNDS = Number(args.rounds || 10);
 const ROUND_TIME = Number(args['round-time'] || 5), BREAK = Number(args.break || 3);
+const T = args.t === undefined ? 1 : Number(args.t);          // walking cost: 1 (Game 1), 0.3 (Game 2), 0 (Game 3)
+const NASH = T * 100;                                          // sellers at 0 and 100: Nash price = t x 100
 const QUIET = Boolean(args.quiet);
-const BASE = `https://${HOST}`;
+const BASE = /^https?:\/\//.test(HOST) ? HOST : `https://${HOST}`;   // --host http://localhost:4999 for a local server
 
 const results = [];
 const check = (name, ok, detail = '') => { results.push({ name, ok }); console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? '  (' + detail + ')' : ''}`); };
@@ -70,7 +72,8 @@ function client(label) {
 
 // ---- the game ---------------------------------------------------------------------------------------------------
 const config = { rounds: ROUNDS, roundTime: ROUND_TIME, breakTime: BREAK, priceBounds: { min: 0, max: 250 },
-  modelType: 'hotelling', travelCost: 1, consumerValue: 200, x1: 0, x2: 100, showOpponentName: true };
+  modelType: 'hotelling', travelCost: T, consumerValue: 200, x1: 0, x2: 100, showOpponentName: true };
+console.log(`game: ${N} students, ${ROUNDS} rounds of ${ROUND_TIME} s, walking cost $${T} (Nash $${NASH}) on ${BASE}`);
 let code = null;
 const students = [];
 const roundStart = {};        // round -> time the instructor saw roundStarted
@@ -138,6 +141,9 @@ try {
   const lobby = await instr.until('sessionUpdate', p => (p.players || []).some(q => q.name === 'Leaves Early' && q.connected === false)).catch(() => null);
   const leaverRow = lobby && (lobby.players || []).find(p => p.name === 'Leaves Early');
   check('a student who closed the page shows as disconnected in the lobby', Boolean(leaverRow), JSON.stringify(leaverRow));
+
+  // --lobby S: hold the lobby open S seconds so a real phone can join the bots (for rehearsals and screenshots)
+  if (args.lobby) { console.log(`      lobby open for ${args.lobby} s: join with code ${code}`); await sleep(Number(args.lobby) * 1000); }
 
   // start
   instr.s.emit('startSession', { sessionCode: code });
@@ -271,7 +277,8 @@ try {
     if (round === ROUNDS) {
       const aiPrices = Object.values(instr.got.roundSummary || {}).map(x => x.p).flatMap(p => (p.results || []).flatMap(q => [q.playerA, q.playerB])).filter(p => /ChatGPT|AI Player/.test(p.name || '')).map(p => p.price);
       if (aiPrices.length) log(`AI seat prices by round: ${aiPrices.join(', ')}`);
-      if (aiPrices.length) check('AI seat never fell back to a forced random price (all its prices are round numbers near Nash)', aiPrices.every(p => Number.isInteger(p * 100) && p >= 50 && p <= 200), aiPrices.join(', '));
+      if (aiPrices.length && /ChatGPT/.test(aiName || '')) check(`ChatGPT seat plays near the Nash price $${NASH} (within $15) and never a forced random price`, aiPrices.every(p => Number.isInteger(p * 100) && Math.abs(p - NASH) <= 15), aiPrices.join(', '));
+      else if (aiPrices.length) log('AI seat without a key: random prices, as expected locally');
     }
     log(`round ${round} done: prices ${chosen.join(', ')}`);
   }

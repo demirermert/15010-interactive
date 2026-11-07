@@ -15,7 +15,8 @@ function buildApiUrl(path) {
 
 // Defaults are the games as played in 2025 (slides, speaker notes and the Nov 20, 2025 Section A transcript; set 2026-11-02):
 // 100 consumers on a street from 0 to 100, each worth $200, $1 per unit walked, zero cost; 10 rounds, 60 s in round 1,
-// then 50, 40 and 30 s; a 10 s break; prices 0 to 250. The three quick-setup buttons move the sellers (0/100, 35/65, 50/50).
+// then 50, 40 and 30 s; a 10 s break; prices 0 to 250. The three quick-setup buttons keep the sellers at 0 and 100 and set the
+// walking cost ($1, $0.30, $0; Nash prices $100, $30, $0), see the presets below.
 const DEFAULT_CONFIG = {
   rounds: 10,
   roundTime: 30,
@@ -289,21 +290,23 @@ export default function InstructorPage() {
 
           {showCreateForm && (
             <form onSubmit={handleCreateSession} className="setup-form">
-              {/* the three markets of the 2025 deck: same customers, the sellers moved closer each time (2026-11-02) */}
+              {/* the three markets: same street, sellers at the two ends, walking gets cheaper each game (Mert, 2026-11-07).
+                  2025 moved the sellers (0/100, 35/65, 50/50) instead, but with this demand formula 35/65 is identical to
+                  0/100 (only the midpoint enters), and a correct straight-line model has no stable price off the ends. */}
               <div className="presets">
                 <div className="bgk">Quick setup</div>
                 {[
-                  ['Round 1', 'full differentiation', 0, 100],
-                  ['Round 2', 'less differentiation', 35, 65],
-                  ['Round 3', 'no differentiation', 50, 50]
-                ].map(([name, what, a, b]) => (
+                  ['Round 1', 'full differentiation', 1, 'walking costs $1 a block'],
+                  ['Round 2', 'less differentiation', 0.3, 'walking costs 30¢ a block'],
+                  ['Round 3', 'no differentiation', 0, 'walking is free']
+                ].map(([name, what, t, label]) => (
                   <button key={name} type="button"
-                    className={instructorConfig.modelType === 'hotelling' && Number(instructorConfig.x1) === a && Number(instructorConfig.x2) === b ? 'on' : ''}
+                    className={instructorConfig.modelType === 'hotelling' && Number(instructorConfig.travelCost) === t && Number(instructorConfig.x1) === 0 && Number(instructorConfig.x2) === 100 ? 'on' : ''}
                     onClick={() => {
-                      setInstructorConfig(cfg => ({ ...cfg, modelType: 'hotelling', x1: a, x2: b }));
+                      setInstructorConfig(cfg => ({ ...cfg, modelType: 'hotelling', x1: 0, x2: 100, travelCost: t }));
                       setSessionName(prev => (prev && !/^Round \d/.test(prev) ? prev : name));
                     }}>
-                    <b>{name}</b><span>{what} · sellers at {a} and {b}</span>
+                    <b>{name}</b><span>{what} · {label}</span>
                   </button>
                 ))}
               </div>

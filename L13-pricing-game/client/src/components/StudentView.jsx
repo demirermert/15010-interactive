@@ -228,6 +228,12 @@ export function StudentView({
         <div className="card">
           <div className="gname">Your market</div>
           <Street x1={myX} x2={rivalX} />
+          {/* the walking cost is what differs between the three games (2026-11-07), so it is always shown */}
+          <div className="hint" style={{ fontWeight: 600, color: '#1F2E5C' }}>
+            {Number(config.travelCost) > 0
+              ? <>Walking costs {money(config.travelCost, 2)} per block.</>
+              : <>Walking is free: customers simply buy from the cheaper seller.</>}
+          </div>
           <div className="hint">Customers live along the street and buy from the seller that leaves them the most: what the
             drink is worth to them, minus its price, minus the walk. If both are too costly, they buy nothing.</div>
         </div>
