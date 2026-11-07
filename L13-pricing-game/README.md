@@ -163,17 +163,25 @@ Done so far (commits 2298d7c to 388e0de, all 2026-11-02):
   `server/server.js` before trusting them, or write new ones, and keep them in this folder.
 
 Deployed 2026-11-07 (Mert: six services, one per section, since A/B/C and D/E/F play at the same time): `lab-a` to
-`lab-f` (Starter, course-games workspace) now run this folder at commit 81ef39f: rootDir `L13-pricing-game`, the build
-and start commands above, health check `/health`, NODE_VERSION 20, ALLOWED_ORIGINS `*`. Each section's existing `DASH_KEY`
-is its instructor key (`/instructor?key=<DASH_KEY>`). Hosts: lab-a, lab-b, lab-c-bj7i, lab-d, lab-e, lab-f .onrender.com.
-`pricing-game` stays as the rehearsal copy with its own INSTRUCTOR_KEY. Next lab on the six: repoint rootDir and
-restore that lab's build and start commands (L1-demand/server used `npm install` / `npm start`, no health check).
+`lab-f` (Starter, course-games workspace) run this folder at commit 81ef39f: rootDir `L13-pricing-game`, the build and
+start commands above, health check `/health`, NODE_VERSION 20, ALLOWED_ORIGINS `*`. Hosts: lab-a, lab-b, lab-c-bj7i,
+lab-d, lab-e, lab-f .onrender.com.
+
+- Instructor key: ONE common `INSTRUCTOR_KEY` on all six (Mert, 2026-11-07; the value is on the services and in the
+  `l13-<x>xx` redirects, not in git). server.js falls back to the section's `DASH_KEY` when `INSTRUCTOR_KEY` is unset.
+- ChatGPT seat: one Parley key per section (`OPENAI_API_KEY`), `OPENAI_BASE_URL` Parley, `AI_MODEL` gpt-5.4, put on the
+  six by `set_parley.sh` (reads `~/parley_keys_sections.txt`, lines `A=` to `F=`; never prints a key). Startup log on
+  each service: "OpenAI API initialized for AI player (https://parley.api.mit.edu/v1, model gpt-5.4)".
+- Addresses: `15010.ai/l13-<x>` (students, 302 to the service root) and `15010.ai/l13-<x>xx` (instructor page with the
+  key), every capitalisation, with and without trailing slash, in the Cloudflare `vanity_redirects` list, written by
+  `set_l13_redirects.sh` (`--remove` after class). Not the `lab-proxy` Worker: the game expects to sit at the root of its
+  address, so it cannot be served under the `/l13-a/` prefix. The Worker's rollback list `lab_redirects` was restored to L1.
+- `pricing-game` (srv-dbk7vu0473hc73ft9nag) stays as the rehearsal copy with its own key (`~/.pricing_game_key`).
+- Next lab on the six: repoint rootDir and restore that lab's build and start commands (L1-demand/server used
+  `npm install` / `npm start`, no health check), and run `set_l13_redirects.sh --remove`.
 
 Open with Mert (nothing decided yet):
 
-- 15010.ai addresses: point `15010.ai/L13-<X>` and `L13-<X>XX` at the six services (`set_lecture_redirects.sh L13`; the
-  script needs an L13 entry whose dashboard path is `/instructor?key=<DASH_KEY>`). Not done yet.
-- The ChatGPT seat on the six: they have no Parley settings yet, so the odd student out plays random prices.
 - 15010.ai addresses: `lab13` for students, `lab13xx` carrying the key for Mert. None yet.
 - The 35/65 market: with this demand code it is identical to 0/100 for prices up to $165 (only the midpoint between the
   sellers matters). Options offered: a lower walking cost per round (t 1 / 0.3 / 0) or a true location model (which has no
