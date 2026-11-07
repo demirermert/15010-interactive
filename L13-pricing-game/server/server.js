@@ -11,7 +11,8 @@ import { initializeOpenAI } from './aiPlayer.js';
 
 const PORT = process.env.PORT || 4000;
 // With INSTRUCTOR_KEY set (Render), the instructor pages and the session REST calls need it; students never do.
-const INSTRUCTOR_KEY = process.env.INSTRUCTOR_KEY || '';
+// On the six section services (lab-a..lab-f) the section's existing DASH_KEY serves as the key (2026-11-07).
+const INSTRUCTOR_KEY = process.env.INSTRUCTOR_KEY || process.env.DASH_KEY || '';
 if (!INSTRUCTOR_KEY) console.warn('⚠ No INSTRUCTOR_KEY set - anyone who finds /instructor can run the game');
 
 // A classroom game must not die on one bad message: log and carry on (2026-11-02 audit)

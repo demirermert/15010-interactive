@@ -133,3 +133,47 @@ Environment variables (set in the Render dashboard):
   the server; students receive only their own pair's results; the instructor pages need `INSTRUCTOR_KEY`; CSV cells are
   escaped; a round can only be submitted to while it is open and every price is acknowledged.
 - 2026-11-02: the 2026 lab look for the student and instructor pages; one Render service serves client and server.
+
+## Where things stand (2026-11-07)
+
+Owner: the teaching23-games agent (iTerm tab, created 2026-11-07), handed over from teaching6-labs, which built and
+audited the 2026 version. Class 13 is the Thursday after Class 12 (Tue 2026-11-10); check the syllabus. Sections D 8:35, A 10:05.
+
+Done so far (commits 2298d7c to 388e0de, all 2026-11-02):
+
+- Renamed from L16; one Render service `pricing-game` (Starter, course-games workspace, service id srv-dbk7vu0473hc73ft9nag)
+  serves the React client and the Socket.io server. Students: `pricing-game.onrender.com`, join with the 4-letter code.
+  Instructor: `/instructor?key=<key>` once per browser, then `/instructor` and `/manage/<CODE>`.
+- The 2026 lab look on the student and instructor pages.
+- The audit (about 80 scripted checks plus an independent review) and its fixes, listed in the change log above: the
+  process crash on malformed socket messages, settings validation, the price lost on reconnect, no rejoin, ghost
+  partners, instructor takeover, leaderboard doubling, the swapped-seller demand bug, the 2025 crash (a NaN demand from
+  a zero denominator arriving as null).
+- The ChatGPT seat for the odd student out runs through MIT Parley (`gpt-5.4`, about 1 s, plays the Nash price;
+  `gpt-5.5` is too slow, `gpt-5.4-mini` underprices) and decides at the start of each round, so rounds end on time.
+- Form defaults = the 2025 games: 10 rounds at 60/50/40 then 30 s, 10 s breaks, V $200, t $1, prices 0 to 250, sellers
+  at 0/100, 35/65 and 50/50 through quick-setup buttons.
+- Dashboard: the three 2025 charts only (average price by round with a one-sd band, total profit by pair, individual
+  profits by pair), no Nash or collusion lines and no histogram (Mert, 2026-11-02: "just introduce the visualisation,
+  not adding lines"); find a pair; click a market to see its price paths. `how-the-game-computes-prices.html` explains
+  the model with a calculator that runs the server's formula.
+- The audit and fuzz scripts (`audit.mjs`, `fuzz.mjs`, about 90k cases, `set_parley.sh`) lived in a session scratchpad
+  that is gone. The Jul 2026 bots in this folder (`pricing-game-automation.js`, `test-automation.js`, `load-test/`,
+  `AUTOMATION-README.md`, `QUICK-TEST-GUIDE.md`) predate the rewrite: check them against the socket events in
+  `server/server.js` before trusting them, or write new ones, and keep them in this folder.
+
+Open with Mert (nothing decided yet):
+
+- One session per section on the one service (recommended) versus six services.
+- 15010.ai addresses: `lab13` for students, `lab13xx` carrying the key for Mert. None yet.
+- The 35/65 market: with this demand code it is identical to 0/100 for prices up to $165 (only the midpoint between the
+  sellers matters). Options offered: a lower walking cost per round (t 1 / 0.3 / 0) or a true location model (which has no
+  stable price at 35/65).
+- Rounds and seconds per game; the student rules wording; whether students see the $200 / $1 model numbers.
+- Then: a run sheet in task 32's shape, a phone rehearsal with the TAs, the lab section in the Class 13 deck
+  (teaching1-slides-now, task 7) with the addresses, rules and debrief numbers.
+
+Rules that bite: never deploy on a class day (the game lives in memory and SQLite on the service disk, a deploy or restart
+ends it and clears the history); the service does not auto-deploy, push then trigger a deploy; Render snapshots env vars
+when a deploy starts; download the CSV after every session; the keys (`~/.pricing_game_key`, `~/.parley_key`) go onto the
+service by Mert, never read or paste a key value; Starter plan, never free.
