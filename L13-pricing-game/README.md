@@ -162,9 +162,18 @@ Done so far (commits 2298d7c to 388e0de, all 2026-11-02):
   `AUTOMATION-README.md`, `QUICK-TEST-GUIDE.md`) predate the rewrite: check them against the socket events in
   `server/server.js` before trusting them, or write new ones, and keep them in this folder.
 
+Deployed 2026-11-07 (Mert: six services, one per section, since A/B/C and D/E/F play at the same time): `lab-a` to
+`lab-f` (Starter, course-games workspace) now run this folder at commit 81ef39f: rootDir `L13-pricing-game`, the build
+and start commands above, health check `/health`, NODE_VERSION 20, ALLOWED_ORIGINS `*`. Each section's existing `DASH_KEY`
+is its instructor key (`/instructor?key=<DASH_KEY>`). Hosts: lab-a, lab-b, lab-c-bj7i, lab-d, lab-e, lab-f .onrender.com.
+`pricing-game` stays as the rehearsal copy with its own INSTRUCTOR_KEY. Next lab on the six: repoint rootDir and
+restore that lab's build and start commands (L1-demand/server used `npm install` / `npm start`, no health check).
+
 Open with Mert (nothing decided yet):
 
-- One session per section on the one service (recommended) versus six services.
+- 15010.ai addresses: point `15010.ai/L13-<X>` and `L13-<X>XX` at the six services (`set_lecture_redirects.sh L13`; the
+  script needs an L13 entry whose dashboard path is `/instructor?key=<DASH_KEY>`). Not done yet.
+- The ChatGPT seat on the six: they have no Parley settings yet, so the odd student out plays random prices.
 - 15010.ai addresses: `lab13` for students, `lab13xx` carrying the key for Mert. None yet.
 - The 35/65 market: with this demand code it is identical to 0/100 for prices up to $165 (only the midpoint between the
   sellers matters). Options offered: a lower walking cost per round (t 1 / 0.3 / 0) or a true location model (which has no
