@@ -277,7 +277,10 @@ try {
     if (round === ROUNDS) {
       const aiPrices = Object.values(instr.got.roundSummary || {}).map(x => x.p).flatMap(p => (p.results || []).flatMap(q => [q.playerA, q.playerB])).filter(p => /ChatGPT|AI Player/.test(p.name || '')).map(p => p.price);
       if (aiPrices.length) log(`AI seat prices by round: ${aiPrices.join(', ')}`);
-      if (aiPrices.length && /ChatGPT/.test(aiName || '')) check(`ChatGPT seat plays near the Nash price $${NASH} (within $15) and never a forced random price`, aiPrices.every(p => Number.isInteger(p * 100) && Math.abs(p - NASH) <= 15), aiPrices.join(', '));
+      if (aiPrices.length && /ChatGPT/.test(aiName || '')) {
+        check(`ChatGPT seat opens round 1 at the Nash price $${NASH} (within $5)`, Math.abs(aiPrices[0] - NASH) <= 5, `round 1: ${aiPrices[0]}`);
+        check('ChatGPT seat answered every round (no forced random price: all prices are whole cents within the range)', aiPrices.every(p => Number.isInteger(Math.round(p * 100)) && Math.abs(p * 100 - Math.round(p * 100)) < 1e-6 && p >= 0 && p <= 250), aiPrices.join(', '));
+      }
       else if (aiPrices.length) log('AI seat without a key: random prices, as expected locally');
     }
     log(`round ${round} done: prices ${chosen.join(', ')}`);

@@ -17,6 +17,15 @@ function buildApiUrl(path) {
 // 100 consumers on a street from 0 to 100, each worth $200, $1 per unit walked, zero cost; 10 rounds, 60 s in round 1,
 // then 50, 40 and 30 s; a 10 s break; prices 0 to 250. The three quick-setup buttons keep the sellers at 0 and 100 and set the
 // walking cost ($1, $0.30, $0; Nash prices $100, $30, $0), see the presets below.
+// The three games of the class (Mert, 2026-11-07): same street, sellers at 0 and 100, walking gets cheaper each game.
+// Nash prices $100, $30, $0. (2025 moved the sellers instead, 0/100, 35/65, 50/50, but with this demand formula 35/65 is
+// identical to 0/100, and a correct straight-line model has no stable price off the ends.)
+export const DEFAULT_GAMES = [
+  { name: 'Round 1', what: 'full differentiation', t: 1, label: 'walking costs $1 a block' },
+  { name: 'Round 2', what: 'less differentiation', t: 0.3, label: 'walking costs 30¢ a block' },
+  { name: 'Round 3', what: 'no differentiation', t: 0, label: 'walking is free' }
+];
+
 const DEFAULT_CONFIG = {
   rounds: 10,
   roundTime: 30,
@@ -83,55 +92,75 @@ export default function InstructorPage() {
     }
   };
 
+  // The settings the server gets, from a form state (the form, or DEFAULT_CONFIG for the default games)
+  const configPayload = cfg => ({
+    rounds: Number(cfg.rounds),
+    roundTime: cfg.differentTimePerRound ? cfg.roundTimes.map(t => Number(t)) : Number(cfg.roundTime),
+    breakTime: Number(cfg.breakTime),
+    marketSize: Number(cfg.marketSize),
+    modelType: cfg.modelType,
+    // Logit parameters
+    alpha: Number(cfg.alpha),
+    sigma: Number(cfg.sigma),
+    // Hotelling parameters
+    travelCost: Number(cfg.travelCost),
+    consumerValue: Number(cfg.consumerValue),
+    x1: Number(cfg.x1),
+    x2: Number(cfg.x2),
+    priceBounds: { min: Number(cfg.priceMin), max: Number(cfg.priceMax) },
+    enableChat: Boolean(cfg.enableChat),
+    hideRoundCount: Boolean(cfg.hideRoundCount),
+    showOpponentName: Boolean(cfg.showOpponentName),
+    showModelParameters: Boolean(cfg.showModelParameters)
+  });
+
+  const postSession = async (name, cfg) => {
+    const response = await fetch(buildApiUrl('/session'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...keyHeaders() },
+      body: JSON.stringify({ instructorName, sessionName: name, config: configPayload(cfg) })
+    });
+    if (!response.ok) {
+      const body = await response.json();
+      throw new Error(body.error || 'Failed to create session');
+    }
+    return response.json();
+  };
+
+  // "New Game": one session from the form, as in 2025
   const handleCreateSession = async (event) => {
     event.preventDefault();
     setErrorMessage('');
     try {
-      const payload = {
-        instructorName: instructorName,
-        sessionName: sessionName.trim() || `${instructorName}'s Game`,
-        config: {
-          rounds: Number(instructorConfig.rounds),
-          roundTime: instructorConfig.differentTimePerRound 
-            ? instructorConfig.roundTimes.map(t => Number(t))
-            : Number(instructorConfig.roundTime),
-          breakTime: Number(instructorConfig.breakTime),
-          marketSize: Number(instructorConfig.marketSize),
-          modelType: instructorConfig.modelType,
-          // Logit parameters
-          alpha: Number(instructorConfig.alpha),
-          sigma: Number(instructorConfig.sigma),
-          // Hotelling parameters
-          travelCost: Number(instructorConfig.travelCost),
-          consumerValue: Number(instructorConfig.consumerValue),
-          x1: Number(instructorConfig.x1),
-          x2: Number(instructorConfig.x2),
-          priceBounds: {
-            min: Number(instructorConfig.priceMin),
-            max: Number(instructorConfig.priceMax)
-          },
-          enableChat: Boolean(instructorConfig.enableChat),
-          hideRoundCount: Boolean(instructorConfig.hideRoundCount),
-          showOpponentName: Boolean(instructorConfig.showOpponentName),
-          showModelParameters: Boolean(instructorConfig.showModelParameters)
-        }
-      };
-      const response = await fetch(buildApiUrl('/session'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...keyHeaders() },
-        body: JSON.stringify(payload)
-      });
-      if (!response.ok) {
-        const body = await response.json();
-        throw new Error(body.error || 'Failed to create session');
-      }
-      const data = await response.json();
+      const data = await postSession(sessionName.trim() || `${instructorName}'s Game`, instructorConfig);
       // Redirect to the management page (instructor view)
       navigate(`/manage/${data.code}`, { 
         state: { instructorName: instructorName } 
       });
     } catch (err) {
       setErrorMessage(err.message);
+    }
+  };
+
+  // "Add the three default games" (Mert, 2026-11-07): one click creates the three games of the class with the default
+  // settings, named default-1, default-2, default-3 (numbering continues if pressed again). They appear in the list below;
+  // open each from there when its turn comes. A game's settings cannot be changed once it is created: for a variant, use
+  // New Game.
+  const [addingDefaults, setAddingDefaults] = useState(false);
+  const handleAddDefaults = async () => {
+    setErrorMessage('');
+    setAddingDefaults(true);
+    try {
+      let n = instructorSessions.reduce((m, s) => Math.max(m, Number((/^default-(\d+)$/.exec(s.session_name || s.sessionName || '') || [])[1] || 0)), 0);
+      for (const game of DEFAULT_GAMES) {
+        n += 1;
+        await postSession(`default-${n}`, { ...DEFAULT_CONFIG, modelType: 'hotelling', x1: 0, x2: 100, travelCost: game.t });
+      }
+      await fetchInstructorSessions();
+    } catch (err) {
+      setErrorMessage(err.message);
+    } finally {
+      setAddingDefaults(false);
     }
   };
 
@@ -280,26 +309,24 @@ export default function InstructorPage() {
         <section style={{ marginBottom: '2rem', padding: '1.5rem', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
             <h2 style={{ margin: 0 }}>Create New Session</h2>
-            <button 
-              className="primary"
-              onClick={() => setShowCreateForm(!showCreateForm)}
-            >
-              {showCreateForm ? 'Hide Form' : 'New Game'}
-            </button>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button className="primary" type="button" onClick={handleAddDefaults} disabled={addingDefaults}
+                title="Creates the three games of the class with the default settings (walking cost $1, 30¢, free) as default-1, default-2, default-3">
+                {addingDefaults ? 'Adding…' : 'Add the three default games'}
+              </button>
+              <button type="button" onClick={() => setShowCreateForm(!showCreateForm)}>
+                {showCreateForm ? 'Hide Form' : 'New Game (custom)'}
+              </button>
+            </div>
           </div>
+          {!showCreateForm && errorMessage && <p style={{ color: '#dc2626' }}>{errorMessage}</p>}
 
           {showCreateForm && (
             <form onSubmit={handleCreateSession} className="setup-form">
-              {/* the three markets: same street, sellers at the two ends, walking gets cheaper each game (Mert, 2026-11-07).
-                  2025 moved the sellers (0/100, 35/65, 50/50) instead, but with this demand formula 35/65 is identical to
-                  0/100 (only the midpoint enters), and a correct straight-line model has no stable price off the ends. */}
+              {/* the three games (DEFAULT_GAMES) as presets for a custom session */}
               <div className="presets">
                 <div className="bgk">Quick setup</div>
-                {[
-                  ['Round 1', 'full differentiation', 1, 'walking costs $1 a block'],
-                  ['Round 2', 'less differentiation', 0.3, 'walking costs 30¢ a block'],
-                  ['Round 3', 'no differentiation', 0, 'walking is free']
-                ].map(([name, what, t, label]) => (
+                {DEFAULT_GAMES.map(({ name, what, t, label }) => (
                   <button key={name} type="button"
                     className={instructorConfig.modelType === 'hotelling' && Number(instructorConfig.travelCost) === t && Number(instructorConfig.x1) === 0 && Number(instructorConfig.x2) === 100 ? 'on' : ''}
                     onClick={() => {
@@ -647,65 +674,22 @@ export default function InstructorPage() {
                 </div>
               </div>
               
-              <div className="input-row" style={{ marginTop: '1rem' }}>
-                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '0.5rem' }}>
-                  <input
-                    type="checkbox"
-                    checked={instructorConfig.enableChat}
-                    onChange={event => setInstructorConfig(cfg => ({ ...cfg, enableChat: event.target.checked }))}
-                    style={{ width: 'auto', cursor: 'pointer' }}
-                  />
-                  <span>Enable chat between paired students</span>
-                </label>
-                <small style={{ color: '#6b7280', fontSize: '0.875rem', marginLeft: '1.75rem' }}>
-                  💬 Students matched together can chat during the game
-                </small>
-              </div>
-
-              <div className="input-row">
-                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '0.5rem' }}>
-                  <input
-                    type="checkbox"
-                    checked={instructorConfig.hideRoundCount}
-                    onChange={event => setInstructorConfig(cfg => ({ ...cfg, hideRoundCount: event.target.checked }))}
-                    style={{ width: 'auto', cursor: 'pointer' }}
-                  />
-                  <span>Hide total number of rounds from students</span>
-                </label>
-                <small style={{ color: '#6b7280', fontSize: '0.875rem', marginLeft: '1.75rem' }}>
-                  🔢 Students will see "Round X" instead of "Round X of Y"
-                </small>
-              </div>
-
-              <div className="input-row">
-                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '0.5rem' }}>
-                  <input
-                    type="checkbox"
-                    checked={instructorConfig.showOpponentName}
-                    onChange={event => setInstructorConfig(cfg => ({ ...cfg, showOpponentName: event.target.checked }))}
-                    style={{ width: 'auto', cursor: 'pointer' }}
-                  />
-                  <span>Show opponent names to students</span>
-                </label>
-                <small style={{ color: '#6b7280', fontSize: '0.875rem', marginLeft: '1.75rem' }}>
-                  👥 Students will see who they are paired with during the game
-                </small>
-              </div>
-
-              <div className="input-row">
-                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '0.5rem' }}>
-                  <input
-                    type="checkbox"
-                    checked={instructorConfig.showModelParameters}
-                    onChange={event => setInstructorConfig(cfg => ({ ...cfg, showModelParameters: event.target.checked }))}
-                    style={{ width: 'auto', cursor: 'pointer' }}
-                  />
-                  <span>Show model parameters to students</span>
-                </label>
-                <small style={{ color: '#6b7280', fontSize: '0.875rem', marginLeft: '1.75rem' }}>
-                  📊 Students will see the detailed market parameters (travel cost, consumer value, etc.)
-                </small>
-              </div>
+              {/* the four on/off settings in one place (Mert, 2026-11-07) */}
+              <fieldset className="options">
+                <legend className="bgk">Options</legend>
+                {[
+                  ['enableChat', 'Enable chat between paired students', 'Students matched together can chat during the game'],
+                  ['hideRoundCount', 'Hide the total number of rounds', 'Students see "Round 3" instead of "Round 3 of 10"'],
+                  ['showOpponentName', 'Show opponent names', 'Students see who they are paired with'],
+                  ['showModelParameters', 'Show model parameters', 'Students see the walking cost and the customer value']
+                ].map(([key, title, help]) => (
+                  <label key={key} className="opt">
+                    <input type="checkbox" checked={Boolean(instructorConfig[key])}
+                      onChange={event => setInstructorConfig(cfg => ({ ...cfg, [key]: event.target.checked }))} />
+                    <span><b>{title}</b><small>{help}</small></span>
+                  </label>
+                ))}
+              </fieldset>
 
               <button type="submit" className="primary">
                 Create Session

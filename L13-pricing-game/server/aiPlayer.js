@@ -20,11 +20,23 @@ export function isOpenAIInitialized() {
   return openai !== null;
 }
 
+// The one-shot Nash price of the demand the server computes (2026-11-07). Street model with the market covered:
+// t x 100 (every $1 below the rival wins 1/(2t) customers), $0 when walking is free or both sellers stand on the same
+// spot; logit: no closed form, so the midpoint of the range. Used in the prompt and whenever the model cannot answer.
+export function nashPrice(config) {
+  const { min, max } = config.priceBounds;
+  const clamp = p => Math.max(min, Math.min(max, Math.round(p * 100) / 100));
+  if (config.modelType === 'hotelling') {
+    const t = Number(config.travelCost) || 0;
+    return clamp(t > 0 && config.x1 !== config.x2 ? t * 100 : 0);
+  }
+  return clamp((min + max) / 2);
+}
+
 export async function getAIPriceDecision(config, history = [], opponentHistory = []) {
-  // If OpenAI is not initialized, return a random price
+  // Without a key the seat plays the one-shot Nash price (it used to play random prices, 2026-11-07)
   if (!openai) {
-    const randomPrice = config.priceBounds.min + Math.random() * (config.priceBounds.max - config.priceBounds.min);
-    return Math.round(randomPrice * 100) / 100;
+    return nashPrice(config);
   }
 
   try {
@@ -66,14 +78,14 @@ export async function getAIPriceDecision(config, history = [], opponentHistory =
       console.log(`[AI Player] ChatGPT chose ${price}`);
       return price;
     } else {
-      console.warn('[AI Player] Could not parse price from ChatGPT response, using random price');
-      const randomPrice = config.priceBounds.min + Math.random() * (config.priceBounds.max - config.priceBounds.min);
+      console.warn('[AI Player] Could not parse price from ChatGPT response, playing the Nash price');
+      const randomPrice = nashPrice(config);
       return Math.round(randomPrice * 100) / 100;
     }
   } catch (error) {
     console.error('[AI Player] Error calling OpenAI API:', error.message);
-    // Fallback to random price
-    const randomPrice = config.priceBounds.min + Math.random() * (config.priceBounds.max - config.priceBounds.min);
+    // Fallback: the Nash price (a random price used to go in here, 2026-11-07)
+    const randomPrice = nashPrice(config);
     return Math.round(randomPrice * 100) / 100;
   }
 }
@@ -150,7 +162,9 @@ ${perDollar
   : '- The cheaper seller gets ALL 100 consumers; equal prices split them 50/50. Any price above your opponent sells nothing.'}
 - But consumers only buy if they get non-negative utility
 - The monopoly price maximizes profit when there's no competition
-- A rational competitor prices close to the one-shot Nash price above; only price higher if the opponent has clearly been keeping prices high round after round, and undercut if the opponent undercuts
+- In round 1, charge the one-shot Nash price above. In later rounds, best-respond to what the opponent actually did: if the opponent
+  has kept prices well above the Nash price in the last rounds, you may raise yours toward theirs (never above the collusive price);
+  if the opponent undercuts you, move back down toward the Nash price. Do not undercut below the Nash price.
 
 OBJECTIVE:
 Maximize your total profit across all rounds.
