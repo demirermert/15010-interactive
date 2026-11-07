@@ -190,7 +190,12 @@ lab-d, lab-e, lab-f .onrender.com.
 
 The three games (Mert, 2026-11-07): sellers stay at 0 and 100 in all three; the walking cost falls, $1, $0.30, $0. Nash
 prices $100, $30, $0 (profit each $5,000, $1,500, $0); collusive prices $150, $185, $200 (profit each $7,500, $9,250,
-$10,000). Why not the 2025 positions (0/100, 35/65, 50/50): with this demand formula 35/65 is identical to 0/100 for every
+$10,000). Instructor page (Mert, 2026-11-07): "Add the three default games" opens the settings form prefilled with the
+class defaults and the three walking costs (editable), and Confirm creates `default-1`, `default-2`, `default-3` (numbering
+continues on a second press); "New Game" is the single-session form as in 2025 (no presets); the four on/off settings sit in
+one Options box. A game's settings cannot be changed after it is created. The ChatGPT seat is told the Nash and collusive
+price for the walking cost, opens at the Nash price and then responds to its rival; if the model fails it plays the Nash
+price (used to be random). Why not the 2025 positions (0/100, 35/65, 50/50): with this demand formula 35/65 is identical to 0/100 for every
 pair of prices below about $160 (only the midpoint enters), and a correct straight-line model has no stable price for sellers
 closer than 25/75 (undercutting by the walk between them takes the whole street; prices cycle). The quick-setup buttons on the
 instructor form set the walking cost. Students are NOT shown the walking cost or any model number (Mert, 2026-11-07, as in

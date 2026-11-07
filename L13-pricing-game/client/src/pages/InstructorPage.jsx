@@ -142,21 +142,35 @@ export default function InstructorPage() {
     }
   };
 
-  // "Add the three default games" (Mert, 2026-11-07): one click creates the three games of the class with the default
-  // settings, named default-1, default-2, default-3 (numbering continues if pressed again). They appear in the list below;
-  // open each from there when its turn comes. A game's settings cannot be changed once it is created: for a variant, use
-  // New Game.
+  // Two ways to create games (Mert, 2026-11-07):
+  //  - "New Game": the form, one session, as in 2025.
+  //  - "Add the three default games": the same form prefilled with the class defaults plus the three walking costs
+  //    ($1, 30¢, free), to look over and change if wanted; Confirm creates the three, named default-1, default-2,
+  //    default-3 (numbering continues if pressed again). They appear in the list below; open each when its turn comes.
+  //    A game's settings cannot be changed once it is created.
+  const [formMode, setFormMode] = useState('custom');            // 'custom' | 'defaults'
+  const [defaultCosts, setDefaultCosts] = useState(DEFAULT_GAMES.map(g => g.t));
   const [addingDefaults, setAddingDefaults] = useState(false);
+  const openForm = mode => {
+    setErrorMessage('');
+    setFormMode(mode);
+    if (mode === 'defaults') {
+      setInstructorConfig({ ...DEFAULT_CONFIG, modelType: 'hotelling', x1: 0, x2: 100, travelCost: DEFAULT_GAMES[0].t });
+      setDefaultCosts(DEFAULT_GAMES.map(g => g.t));
+    }
+    setShowCreateForm(true);
+  };
   const handleAddDefaults = async () => {
     setErrorMessage('');
     setAddingDefaults(true);
     try {
       let n = instructorSessions.reduce((m, s) => Math.max(m, Number((/^default-(\d+)$/.exec(s.session_name || s.sessionName || '') || [])[1] || 0)), 0);
-      for (const game of DEFAULT_GAMES) {
+      for (const t of defaultCosts) {
         n += 1;
-        await postSession(`default-${n}`, { ...DEFAULT_CONFIG, modelType: 'hotelling', x1: 0, x2: 100, travelCost: game.t });
+        await postSession(`default-${n}`, { ...instructorConfig, modelType: 'hotelling', travelCost: Number(t) });
       }
       await fetchInstructorSessions();
+      setShowCreateForm(false);
     } catch (err) {
       setErrorMessage(err.message);
     } finally {
@@ -310,43 +324,49 @@ export default function InstructorPage() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
             <h2 style={{ margin: 0 }}>Create New Session</h2>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button className="primary" type="button" onClick={handleAddDefaults} disabled={addingDefaults}
-                title="Creates the three games of the class with the default settings (walking cost $1, 30¢, free) as default-1, default-2, default-3">
-                {addingDefaults ? 'Adding…' : 'Add the three default games'}
-              </button>
-              <button type="button" onClick={() => setShowCreateForm(!showCreateForm)}>
-                {showCreateForm ? 'Hide Form' : 'New Game (custom)'}
-              </button>
+              {showCreateForm ? (
+                <button type="button" onClick={() => setShowCreateForm(false)}>Hide Form</button>
+              ) : (
+                <>
+                  <button className="primary" type="button" onClick={() => openForm('defaults')}
+                    title="Opens the settings of the three games of the class (walking cost $1, 30¢, free) to confirm; creates default-1, default-2, default-3">
+                    Add the three default games
+                  </button>
+                  <button type="button" onClick={() => openForm('custom')}>New Game</button>
+                </>
+              )}
             </div>
           </div>
           {!showCreateForm && errorMessage && <p style={{ color: '#dc2626' }}>{errorMessage}</p>}
 
           {showCreateForm && (
-            <form onSubmit={handleCreateSession} className="setup-form">
-              {/* the three games (DEFAULT_GAMES) as presets for a custom session */}
-              <div className="presets">
-                <div className="bgk">Quick setup</div>
-                {DEFAULT_GAMES.map(({ name, what, t, label }) => (
-                  <button key={name} type="button"
-                    className={instructorConfig.modelType === 'hotelling' && Number(instructorConfig.travelCost) === t && Number(instructorConfig.x1) === 0 && Number(instructorConfig.x2) === 100 ? 'on' : ''}
-                    onClick={() => {
-                      setInstructorConfig(cfg => ({ ...cfg, modelType: 'hotelling', x1: 0, x2: 100, travelCost: t }));
-                      setSessionName(prev => (prev && !/^Round \d/.test(prev) ? prev : name));
-                    }}>
-                    <b>{name}</b><span>{what} · {label}</span>
-                  </button>
-                ))}
-              </div>
-              <div className="input-row">
-                <label htmlFor="session-name">Session Name</label>
-                <input
-                  id="session-name"
-                  type="text"
-                  value={sessionName}
-                  onChange={event => setSessionName(event.target.value)}
-                  placeholder={`e.g., "MBA Section A" or "Spring 2025"`}
-                />
-              </div>
+            <form onSubmit={formMode === 'defaults' ? (e => { e.preventDefault(); handleAddDefaults(); }) : handleCreateSession} className="setup-form">
+              {formMode === 'defaults' ? (
+                <div className="presets games3">
+                  <div className="bgk">The three default games · sellers at 0 and 100 · named default-1, default-2, default-3</div>
+                  {DEFAULT_GAMES.map(({ name, what }, i) => (
+                    <label key={name} className="game">
+                      <b>{name}</b><span>{what}</span>
+                      <span className="tin">walking cost $
+                        <input type="number" step="any" min="0" value={defaultCosts[i]}
+                          onChange={e => setDefaultCosts(cs => cs.map((c, j) => (j === i ? (e.target.value === '' ? '' : Number(e.target.value)) : c)))} />
+                        per block</span>
+                    </label>
+                  ))}
+                  <p className="small">Everything below applies to all three games. Nash prices with the default walking costs: $100, $30, $0.</p>
+                </div>
+              ) : (
+                <div className="input-row">
+                  <label htmlFor="session-name">Session Name</label>
+                  <input
+                    id="session-name"
+                    type="text"
+                    value={sessionName}
+                    onChange={event => setSessionName(event.target.value)}
+                    placeholder={`e.g., "MBA Section A" or "Spring 2025"`}
+                  />
+                </div>
+              )}
               <div className="input-row">
                 <label>Rounds</label>
                 <input
@@ -556,7 +576,7 @@ export default function InstructorPage() {
               
               {instructorConfig.modelType === 'hotelling' && (
                 <>
-                  <div className="input-row">
+                  <div className="input-row" style={formMode === 'defaults' ? { display: 'none' } : undefined}>
                     <label>Travel cost (t)</label>
                     <input
                       type="number"
@@ -691,8 +711,8 @@ export default function InstructorPage() {
                 ))}
               </fieldset>
 
-              <button type="submit" className="primary">
-                Create Session
+              <button type="submit" className="primary" disabled={addingDefaults}>
+                {formMode === 'defaults' ? (addingDefaults ? 'Creating…' : 'Confirm: create the three games') : 'Create Session'}
               </button>
               {errorMessage && <p style={{ color: '#dc2626' }}>{errorMessage}</p>}
             </form>
