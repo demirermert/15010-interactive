@@ -475,10 +475,14 @@ export default function SessionPage() {
     return () => clearInterval(fallbackTimer);
   }, [roundActive, hasSubmitted]);
 
-  // Socket.io gives a reconnecting socket a new id, and the server knows nothing about it until we join again.
-  // Without this a student whose wifi blipped in the lobby was paired as an offline ghost (2026-11-02 audit).
+  // Staying in the game through drops. Socket.io gives a reconnecting socket a new id, and the server knows nothing
+  // about it until we join again, so every 'connect' rejoins (2026-11-02 audit: without this a student whose wifi
+  // blipped in the lobby was paired as an offline ghost). Coming back to the page (phone unlocked, app switched,
+  // back button, network back): a phone that was dark for a while usually has a dead socket that Socket.io only
+  // notices after its ping timeout, up to 45 s of a stale screen, so after more than 15 s away the connection is
+  // remade at once and the rejoin brings the current round, the submitted price and the history (2026-11-08).
   useEffect(() => {
-    const onConnect = () => {
+    const rejoin = () => {
       const { joinInfo, sessionCode, studentCodeFromUrl } = latest.current;
       if (!joinInfo || !sessionCode) return;
       if (joinInfo.role === 'student' && (studentCodeFromUrl || joinInfo.studentCode)) {
@@ -487,64 +491,34 @@ export default function SessionPage() {
         socket.emit('joinSession', { sessionCode, playerName: joinInfo.playerName, role: 'instructor', key: getKey() });
       }
     };
+    const back = awayMs => {
+      if (!latest.current.joinInfo) return;
+      if (!socket.connected) { socket.connect(); return; } // 'connect' rejoins
+      if (awayMs > 15000) { socket.disconnect(); socket.connect(); return; } // the socket may be dead without knowing it
+      rejoin(); // a short absence: just ask for the state again
+    };
+    let hiddenAt = null;
+    const onVisibility = () => {
+      if (document.hidden) { hiddenAt = Date.now(); return; }
+      if (hiddenAt === null) return;
+      const away = Date.now() - hiddenAt;
+      hiddenAt = null;
+      back(away);
+    };
+    const onPageShow = e => { if (e.persisted) back(Infinity); }; // restored from the back-forward cache
+    const onOnline = () => back(Infinity);
     // 'connect' fires on every connection, automatic or not; the first one finds no joinInfo and does nothing
-    socket.on('connect', onConnect);
-    return () => socket.off('connect', onConnect);
-  }, []);
-
-  // Handle page visibility changes (mobile app switching)
-  useEffect(() => {
-    let wasHidden = false;
-    
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        // Page became hidden (user switched apps)
-        wasHidden = true;
-        console.log('Page hidden - user switched apps');
-      } else if (wasHidden) {
-        // Page became visible again after being hidden
-        console.log('Page visible again - checking connection...');
-        
-        // Check if socket is disconnected
-        if (!socket.connected) {
-          console.log('Socket disconnected - reconnecting...');
-          socket.connect();
-        }
-        
-        // If we have joinInfo (were in a session), force a rejoin to refresh state
-        if (joinInfo && sessionCode) {
-          console.log('Refreshing session state...');
-          
-          // Wait a moment for socket to reconnect, then rejoin
-          setTimeout(() => {
-            if (joinInfo.role === 'student' && studentCodeFromUrl) {
-              socket.emit('joinSession', {
-                sessionCode,
-                playerName: joinInfo.playerName,
-                studentCode: studentCodeFromUrl,
-                role: 'student'
-              });
-            } else if (joinInfo.role === 'instructor') {
-              socket.emit('joinSession', {
-                sessionCode,
-                playerName: joinInfo.playerName,
-                role: 'instructor',
-                key: getKey()
-              });
-            }
-          }, 500); // Give socket 500ms to reconnect
-        }
-        
-        wasHidden = false;
-      }
-    };
-    
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
+    socket.on('connect', rejoin);
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pageshow', onPageShow);
+    window.addEventListener('online', onOnline);
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      socket.off('connect', rejoin);
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pageshow', onPageShow);
+      window.removeEventListener('online', onOnline);
     };
-  }, [joinInfo, sessionCode, studentCodeFromUrl]);
+  }, []);
 
   // Auto-join if coming from instructor or student page, or if student code in URL
   useEffect(() => {

@@ -149,6 +149,24 @@ Environment variables (set in the Render dashboard):
   Deployed the same day with Mert's OK as commit f484688 to the six section services (Render API, one deploy each,
   all live in about two minutes; every host serves the new bundle, checked by the "That is not a number" message and
   `inputMode:"decimal"` in the served JavaScript). The rehearsal copy `pricing-game` was not redeployed.
+- 2026-11-08 (later, Mert: "will this be robust to students refreshing their page?", "we don't want the students to
+  have connection issues and drop"): a new test, `test/refresh.mjs` (50 checks, three games at once on its own server
+  on port 4997), plus two real games in Chrome, reload the student at every stage. A plain reload was already handled
+  (personal link `/session/<CODE>/<6-letter code>`, the server moves the seat to the new socket and carries the
+  submitted price, the timer, the history and the pairing over). Fixed: (1) a reload after the game ended showed a
+  total of $0 and no rounds, since the server sent the history only while running (now also when complete);
+  (2) a student who closed the tab and typed the code again on the join page was told the game had started and lost
+  the seat, since the join page wiped the browser's seat keys and joined as new (now the join page recognises a code
+  it holds a seat for and goes straight back to the personal link; the "already started" message points to the
+  personal link); (3) only connected phones were paired at Start (2026-11-02 audit), so a phone locked while the
+  rules were explained sat out the whole game (now everyone in the lobby is paired, connected or not, except an
+  offline seat whose name a connected seat also holds, which is a student who joined twice; a dark phone wakes up,
+  rejoins and gets the running round); (4) the rival's name (when shown) came back as "Rival" after a reload until
+  the next round (now resent on rejoin); (5) coming back to the page after more than 15 s away (phone unlocked,
+  app switch, back button, network back) remakes the socket at once instead of waiting up to 45 s for Socket.io's
+  ping timeout to notice a dead one, then rejoins. Not changed: a student with no browser memory of the seat (other
+  device, private window) cannot get back in once the game has started, by design (a seat can only be reclaimed with
+  its personal code).
 
 ## Where things stand (2026-11-07)
 
@@ -188,6 +206,10 @@ Done so far (commits 2298d7c to 388e0de, all 2026-11-02):
   settings validation; `node test/drive.mjs --host <url> --key <key> --code <CODE>` runs the instructor's side so one
   real phone or browser tab can play against the ChatGPT seat. Both fuzz tests pass on the 2026-11-08 code; the
   browser run in Chrome (two games, typing 35,5 / 35.555 / abc / -5 / 1e2 / 1,000 / $42 / 0 / nothing) matched.
+  `node test/refresh.mjs` (own server on port 4997, about 30 s) reloads students at every stage of three games at
+  once: lobby, mid-round before and after submitting, break, a missed round, a dark phone at Start, a duplicate seat,
+  a latecomer, two tabs, the instructor mid-game, a reload in flight at Start, after game over. Run all three after
+  any change to the server or the client.
 - The 2026-11-02 audit and fuzz scripts (`audit.mjs`, `fuzz.mjs`, about 90k cases) lived in a session scratchpad
   that is gone. The Jul 2026 bots in this folder (`pricing-game-automation.js`, `test-automation.js`, `load-test/`,
   `AUTOMATION-README.md`, `QUICK-TEST-GUIDE.md`) predate the rewrite: check them against the socket events in

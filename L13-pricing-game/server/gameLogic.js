@@ -316,7 +316,7 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
         if (session.status === STATUS.SETUP) {
           throw new Error('This session is not open yet. Please wait for the instructor to open the lobby.');
         } else if (session.status !== STATUS.LOBBY) {
-          throw new Error('Game has already started. New students cannot join.');
+          throw new Error('The game has already started, so new players cannot join. If you were in it, go back to the page your phone had before (your personal link).');
         }
       }
       
@@ -360,12 +360,14 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
         spectator: socket.data.role === 'student' && session.status !== STATUS.LOBBY && session.status !== STATUS.SETUP && !actualPlayer?.pairId
       };
       
-      // If rejoining mid-round or mid-game, send current state and history
-      if (session.status === STATUS.RUNNING && session.currentRound > 0) {
+      // If rejoining mid-round, mid-game or after the end, send current state and history (2026-11-08: after the
+      // end too, otherwise a reloaded game-over card showed a total of $0 and no rounds)
+      if ((session.status === STATUS.RUNNING || session.status === STATUS.COMPLETE) && session.currentRound > 0) {
         const player = session.players.get(socket.id);
-        
-        // If instructor is rejoining, send all round summaries for dashboard
-        if (role === 'instructor' && session.roundResults && session.roundResults.length > 0) {
+
+        // If instructor is rejoining mid-game, send all round summaries for the dashboard (after the end the
+        // dashboard loads them from the database)
+        if (role === 'instructor' && session.status === STATUS.RUNNING && session.roundResults && session.roundResults.length > 0) {
           const leaderboard = leaderboardOf(session);
           session.roundResults.forEach(roundResult => {
             socket.emit('roundSummary', {
@@ -393,7 +395,14 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
             history: player.history
           });
         }
-        
+
+        // The rival's name again, when the game shows it (2026-11-08: a reloaded page said "Rival" until the next round)
+        if (session.config.showOpponentName && player?.pairId && session.status === STATUS.RUNNING) {
+          const pair = session.pairs.find(p => p.id === player.pairId);
+          const rival = pair && session.players.get(pair.playerA === socket.id ? pair.playerB : pair.playerA);
+          if (rival) socket.emit('opponentInfo', { opponentName: rival.name });
+        }
+
         // If a round is currently active (timer is running), send round state
         if (roundIsOpen(session) && (role === 'instructor' || player?.pairId)) {
           const hasSubmitted = player && player.pairId && 
@@ -460,11 +469,18 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
       if (session.status !== STATUS.LOBBY) {
         throw new Error('Session already started');
       }
-      // Only students whose phone is connected now are paired; one who left the lobby would otherwise
-      // leave a partner playing against random prices all game (2026-11-02 audit)
-      const students = Array.from(session.players.values()).filter(p => p.role === 'student' && p.connected);
+      // Everyone who joined the lobby is paired, connected or not (2026-11-08, Mert: no student may lose the game
+      // to a connection blip). A locked phone drops its socket within a minute, so when the instructor presses
+      // Start after explaining the rules many phones are "offline"; they wake up, rejoin and get the running round.
+      // (The 2026-11-02 audit paired only connected phones so that a student who left would not leave a partner
+      // against random prices; in a classroom that is the rarer case, and the forced price covers it.) The one
+      // ghost we can recognise is dropped: an offline seat whose name is also held by a connected seat, which is a
+      // student who joined twice (a browser that forgot its seat and came back through the join page).
+      const all = Array.from(session.players.values()).filter(p => p.role === 'student');
+      const liveNames = new Set(all.filter(p => p.connected).map(p => p.name.trim().toLowerCase()));
+      const students = all.filter(p => p.connected || !liveNames.has(p.name.trim().toLowerCase()));
       if (students.length < 1) {
-        throw new Error('Need at least one connected student to start');
+        throw new Error('Need at least one student to start');
       }
       pairStudents(session, students);
       session.status = STATUS.RUNNING;

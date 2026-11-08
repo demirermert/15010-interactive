@@ -34,15 +34,25 @@ export default function StudentPage() {
       return;
     }
     
-    // Solution #2: Clear ALL old student session data when manually joining
-    // This ensures no stale data from previous sessions
-    Object.keys(localStorage).forEach(key => {
-      if (key.startsWith('student_')) {
-        localStorage.removeItem(key);
-      }
-    });
-    console.log('Cleared all previous student session data');
-    
+    const code = sessionCodeInput.trim().toUpperCase();
+
+    // A browser that already holds a seat in this game goes straight back to it (2026-11-08: a student who closed
+    // the tab and typed the code again was told "the game has already started" and lost the seat). The seat's key
+    // is student_<session code>_<personal code>; seats in other games are forgotten.
+    let seat = null;
+    try {
+      Object.keys(localStorage).forEach(key => {
+        if (!key.startsWith('student_')) return;
+        const m = key.match(/^student_([A-Z0-9]+)_([A-Z0-9]+)$/);
+        if (m && m[1] === code) seat = m[2];
+        else localStorage.removeItem(key);
+      });
+    } catch { /* storage blocked: join as new */ }
+    if (seat) {
+      navigate(`/session/${code}/${seat}`);
+      return;
+    }
+
     // If name is not provided, generate a random name
     let fullName;
     if (!name.trim()) {
@@ -52,7 +62,7 @@ export default function StudentPage() {
     }
     
     // Redirect to session page (server will generate unique code)
-    navigate(`/session/${sessionCodeInput.toUpperCase()}`, {
+    navigate(`/session/${code}`, {
       state: { studentName: fullName }
     });
   };
