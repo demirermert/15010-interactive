@@ -146,6 +146,9 @@ Environment variables (set in the Render dashboard):
   `test/fuzz_demand.mjs`, `test/fuzz_prices.mjs` (starts a local server, 15 configurations at once, 46 kinds of
   payload, 277 checks, about 25 s), `test/drive.mjs` (the instructor's side of one game, for a real phone).
   `how-the-game-computes-prices.html` still carries its own copy of the old formula (left as written, per Mert).
+  Deployed the same day with Mert's OK as commit f484688 to the six section services (Render API, one deploy each,
+  all live in about two minutes; every host serves the new bundle, checked by the "That is not a number" message and
+  `inputMode:"decimal"` in the served JavaScript). The rehearsal copy `pricing-game` was not redeployed.
 
 ## Where things stand (2026-11-07)
 
@@ -191,9 +194,13 @@ Done so far (commits 2298d7c to 388e0de, all 2026-11-02):
   `server/server.js` before trusting them, or write new ones, and keep them in this folder.
 
 Deployed 2026-11-07 (Mert: six services, one per section, since A/B/C and D/E/F play at the same time): `lab-a` to
-`lab-f` (Starter, course-games workspace) run this folder at commit 81ef39f: rootDir `L13-pricing-game`, the build and
-start commands above, health check `/health`, NODE_VERSION 20, ALLOWED_ORIGINS `*`. Hosts: lab-a, lab-b, lab-c-bj7i,
-lab-d, lab-e, lab-f .onrender.com.
+`lab-f` (Starter, course-games workspace) run this folder (first 81ef39f, then 9be1e58; since 2026-11-08 f484688, the
+tested price entry and demand): rootDir `L13-pricing-game`, the build and start commands above, health check
+`/health`, NODE_VERSION 20, ALLOWED_ORIGINS `*`. Hosts: lab-a, lab-b, lab-c-bj7i, lab-d, lab-e, lab-f .onrender.com.
+The services do not auto-deploy: after a push, `POST https://api.render.com/v1/services/<id>/deploys` with the key
+from `~/.render_key` for each of the six (ids: lab-a srv-dae9ij0n74is73cu1ibg, lab-b srv-dae9ijmq1p3s738f8ig0, lab-c
+srv-dae9ik0n74is73cu1nl0, lab-d srv-dae9ikht0dsc739br6t0, lab-e srv-dae9ikon74is73cu1qpg, lab-f srv-dae9il8u01pc73dkl9rg),
+then poll the deploy status until `live` and grep each host's served bundle for a string that only the new code has.
 
 - Instructor key: ONE common `INSTRUCTOR_KEY` on all six (Mert, 2026-11-07; the value is on the services and in the
   `l13-<x>xx` redirects, not in git). server.js falls back to the section's `DASH_KEY` when `INSTRUCTOR_KEY` is unset.
