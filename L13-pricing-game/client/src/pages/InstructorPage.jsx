@@ -25,13 +25,14 @@ function buildApiUrl(path) {
 //    to 0/100, and a correct straight-line model has no stable price off the ends. 10 rounds, more time in the first rounds;
 //  - a bonus game with chat on the second market (2025: 35/65, "you have more time in this game to chat", about 5 rounds
 //    of 60 s, names hidden until the end).
-// Each entry patches DEFAULT_CONFIG; `base` 'default' is numbered default-1, -2, -3 (continuing past existing ones).
+// Every game uses per-round times (Mert, 2026-11-08: the demo and the bonus game too). Each entry patches DEFAULT_CONFIG;
+// `base` 'default' is numbered default-1, -2, -3 (continuing past existing ones); the others are default-demo, default-chat.
 export const DEFAULT_GAMES = [
-  { base: 'demo', label: 'Demo', cfg: { rounds: 3, differentTimePerRound: false, roundTime: 40, roundTimes: [], travelCost: 0.1, consumerValue: 100 } },
+  { base: 'default-demo', label: 'Demo', cfg: { rounds: 3, differentTimePerRound: true, roundTime: 40, roundTimes: [40, 40, 40], travelCost: 0.1, consumerValue: 100 } },
   { base: 'default', label: 'Game 1', cfg: { travelCost: 1 } },
   { base: 'default', label: 'Game 2', cfg: { travelCost: 0.3 } },
   { base: 'default', label: 'Game 3', cfg: { travelCost: 0 } },
-  { base: 'chat', label: 'Bonus game with chat', cfg: { travelCost: 0.3, enableChat: true, rounds: 5, differentTimePerRound: false, roundTime: 60, roundTimes: [] } }
+  { base: 'default-chat', label: 'Bonus game with chat', cfg: { travelCost: 0.3, enableChat: true, rounds: 5, differentTimePerRound: true, roundTime: 60, roundTimes: [60, 60, 60, 60, 60] } }
 ];
 
 const DEFAULT_CONFIG = {
@@ -338,7 +339,8 @@ export default function InstructorPage() {
   //  - "New Game": the form, one session, as in 2025.
   //  - "Add the default games": one copy of the same form per game of DEFAULT_GAMES side by side (demo, three games, bonus
   //    game with chat), each prefilled and edited on its own (times, rounds, anything); any can be removed before Confirm,
-  //    which creates them named demo, default-1, default-2, default-3, chat (numbering continues if pressed again). They
+  //    which creates them named default-demo, default-1, default-2, default-3, default-chat (numbering continues if
+  //    pressed again). They
   //    appear in the list below; open each when its turn comes. A game's settings cannot be changed once created.
   const [formMode, setFormMode] = useState('custom');            // 'custom' | 'defaults'
   const [defaultGames, setDefaultGames] = useState([]);          // [{ name, cfg }] x 3 while the defaults form is open
@@ -355,7 +357,7 @@ export default function InstructorPage() {
           n += 1;
           name = `default-${n}`;
         } else {
-          for (let k = 2; names.includes(name); k += 1) name = `${g.base}-${k}`; // demo-2 if a demo already exists
+          for (let k = 2; names.includes(name); k += 1) name = `${g.base}-${k}`; // default-demo-2 if one already exists
         }
         return {
           name,

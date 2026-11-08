@@ -192,9 +192,10 @@ The three games (Mert, 2026-11-07): sellers stay at 0 and 100 in all three; the 
 prices $100, $30, $0 (profit each $5,000, $1,500, $0); collusive prices $150, $185, $200 (profit each $7,500, $9,250,
 $10,000). Instructor page (Mert, 2026-11-07/08): "Add the default games" shows one complete settings form per game of the
 2025 class side by side (demo, Game 1, Game 2, Game 3, bonus game with chat), each prefilled and edited on its own (its
-times, rounds, prices, options, anything); any column can be removed before Confirm, which creates them as `demo`,
-`default-1`, `default-2`, `default-3`, `chat` (numbering continues on a second press); "New Game" is the single-session
-form as in 2025 (no presets); the four on/off settings sit in one Options box.
+times, rounds, prices, options, anything; every game uses per-round times, the demo 40/40/40 s, the chat game 60 s x 5);
+any column can be removed before Confirm, which creates them as `default-demo`, `default-1`, `default-2`, `default-3`,
+`default-chat` (numbering continues on a second press); "New Game" is the single-session form as in 2025 (no presets);
+the four on/off settings sit in one Options box.
 
 What 2025 actually was (found 2026-11-08 from the Nov 20, 2025 recordings of sections A and D, the screen captures, the
 slides and the game's git history; no session export survives and the 2025 service is gone): both sections ran a DEMO
