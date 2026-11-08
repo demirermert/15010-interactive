@@ -133,6 +133,19 @@ Environment variables (set in the Render dashboard):
   the server; students receive only their own pair's results; the instructor pages need `INSTRUCTOR_KEY`; CSV cells are
   escaped; a round can only be submitted to while it is open and every price is acknowledged.
 - 2026-11-02: the 2026 lab look for the student and instructor pages; one Render service serves client and server.
+- 2026-11-08 (teaching23-games, after Mert asked for a thorough test of the price entry and the calculation):
+  the street demand is now computed by exact integration over the street's breakpoints (`server/demandModel.js`,
+  mirrored in `client/src/econ.js`). A brute-force check (`test/fuzz_demand.mjs`: 200,000 consumers, 400k price
+  pairs) showed the old closed form was right only with the sellers at the two ends of the street, which every 2026
+  default game uses; with sellers inside the street it dropped the customers one seller reaches beyond the other's
+  reach (35/65, t $0.30, prices $100 vs $200: 65 customers instead of 100), and with both sellers on one spot it
+  ignored the walking cost. The server takes only a number or a numeric string as a price (through `Number()` an
+  empty string, null or [] counted as $0 and true as $1), keeps prices to the cent, and clamps the forced random price
+  inside fractional bounds. The price box is a text box read by `parsePrice` (a number box on an English keyboard
+  silently dropped a comma: 35,5 became 355, 3,5 became $35); "Submitted at" shows the server's figure. New tests:
+  `test/fuzz_demand.mjs`, `test/fuzz_prices.mjs` (starts a local server, 15 configurations at once, 46 kinds of
+  payload, 277 checks, about 25 s), `test/drive.mjs` (the instructor's side of one game, for a real phone).
+  `how-the-game-computes-prices.html` still carries its own copy of the old formula (left as written, per Mert).
 
 ## Where things stand (2026-11-07)
 
@@ -165,6 +178,13 @@ Done so far (commits 2298d7c to 388e0de, all 2026-11-02):
   It deletes its session at the end (`--keep` to leave it). Runs on 2026-11-07: 38/38 on lab-d (7 students, ChatGPT seat
   answered 100 every round in about 2 s) and 38/38 on lab-e with 81 students (rounds still ended within 0.3 s of time).
   Never run during a class.
+- Tests (2026-11-08): `node test/fuzz_demand.mjs [--quick]` checks the demand formula against a brute-force street for
+  10 seller layouts x 7 walking costs x 4 valuations x 4 price ranges (plus the logit model and the client's copy of
+  the formula); `node test/fuzz_prices.mjs [--quick]` starts its own server on port 4999 and plays 15 games at once
+  with every kind of payload a phone could send, checking replies, results, forced prices, leaderboards, CSV and the
+  settings validation; `node test/drive.mjs --host <url> --key <key> --code <CODE>` runs the instructor's side so one
+  real phone or browser tab can play against the ChatGPT seat. Both fuzz tests pass on the 2026-11-08 code; the
+  browser run in Chrome (two games, typing 35,5 / 35.555 / abc / -5 / 1e2 / 1,000 / $42 / 0 / nothing) matched.
 - The 2026-11-02 audit and fuzz scripts (`audit.mjs`, `fuzz.mjs`, about 90k cases) lived in a session scratchpad
   that is gone. The Jul 2026 bots in this folder (`pricing-game-automation.js`, `test-automation.js`, `load-test/`,
   `AUTOMATION-README.md`, `QUICK-TEST-GUIDE.md`) predate the rewrite: check them against the socket events in

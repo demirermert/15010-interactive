@@ -11,28 +11,31 @@ function logitDemand(pA, pB, c) {
   return [c.marketSize * eA / den, c.marketSize * eB / den];
 }
 
+// Exact integration over the street's breakpoints, the same as the server (rewritten 2026-11-08, see demandModel.js)
 function hotellingDemand(pA, pB, c) {
-  const { travelCost: t, x1, x2, consumerValue: V } = c;
-  if (x1 > x2) { const r = hotellingDemand(pB, pA, { ...c, x1: x2, x2: x1 }); return [r[1], r[0]]; }
-  if (x1 === x2 || !(t > 0)) {
-    if (pA === pB) return V >= pA ? [50, 50] : [0, 0];
-    if (pA < pB) return V >= pA ? [100, 0] : [0, 0];
-    return V >= pB ? [0, 100] : [0, 0];
+  const { x1, x2, consumerValue: V } = c;
+  const t = Number(c.travelCost) || 0;
+  const offerA = x => V - pA - t * Math.abs(x - x1);
+  const offerB = x => V - pB - t * Math.abs(x - x2);
+  const points = [0, 100, x1, x2];
+  if (t > 0) {
+    const reachA = (V - pA) / t, reachB = (V - pB) / t;
+    const mid = (x1 + x2) / 2, shift = (pB - pA) / (2 * t);
+    points.push(x1 - reachA, x1 + reachA, x2 - reachB, x2 + reachB, mid + shift, mid - shift);
   }
-  const xStar = (x1 + x2) / 2 + (pB - pA) / (2 * t);
-  const lA = Math.max(0, x1 - (V - pA) / t), rA = Math.min(100, x1 + (V - pA) / t);
-  const lB = Math.max(0, x2 - (V - pB) / t), rB = Math.min(100, x2 + (V - pB) / t);
+  const cuts = [...new Set(points.filter(p => Number.isFinite(p) && p >= 0 && p <= 100))].sort((a, b) => a - b);
   let dA = 0, dB = 0;
-  if (rA >= lA || rB >= lB) {
-    const s = Math.max(lA, lB), e = Math.min(rA, rB);
-    if (e >= s) {
-      const split = Math.max(s, Math.min(xStar, e));
-      dA = Math.max(0, split - lA);
-      dB = Math.max(0, rB - split);
-    } else {
-      dA = Math.max(0, rA - lA);
-      dB = Math.max(0, rB - lB);
-    }
+  for (let i = 0; i + 1 < cuts.length; i += 1) {
+    const length = cuts[i + 1] - cuts[i];
+    if (length <= 0) continue;
+    const m = (cuts[i] + cuts[i + 1]) / 2;
+    const a = offerA(m), b = offerB(m);
+    if (a < 0 && b < 0) continue;
+    if (b < 0) dA += length;
+    else if (a < 0) dB += length;
+    else if (Math.abs(a - b) < 1e-9) { dA += length / 2; dB += length / 2; }
+    else if (a > b) dA += length;
+    else dB += length;
   }
   return [Math.max(0, Math.min(100, dA)), Math.max(0, Math.min(100, dB))];
 }
@@ -71,6 +74,24 @@ export function referencePrices(config) {
     collusion: coll,
     collusionProfit: cv
   };
+}
+
+// What a student typed, read as a price (2026-11-08): a number box on an English keyboard silently drops a comma
+// (35,5 became 355, which the bounds caught, and 3,5 became $35, which nothing caught), so the price box is a text box
+// and this reads it. Spaces and a dollar sign are dropped; a comma with no point is a decimal comma when one or two
+// digits follow it (35,5), otherwise a thousands separator (1,000); with both, the mark that comes last is the decimal
+// one (1,250.50 or 1.250,50). Digits with at most one decimal mark; anything else (letters, 1e2, hex) is NaN.
+export function parsePrice(text) {
+  let s = String(text ?? '').replace(/[\s$]/g, '');
+  if (s === '') return NaN;
+  const lastComma = s.lastIndexOf(','), lastPoint = s.lastIndexOf('.');
+  if (lastComma >= 0 && lastPoint >= 0) {
+    s = lastComma > lastPoint ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '');
+  } else if (lastComma >= 0) {
+    s = /^-?\d+,\d{1,2}$/.test(s) ? s.replace(',', '.') : s.replace(/,/g, '');
+  }
+  if (!/^-?(\d+\.?\d*|\.\d+)$/.test(s)) return NaN;
+  return Number(s);
 }
 
 export function money(v, digits = 0) {

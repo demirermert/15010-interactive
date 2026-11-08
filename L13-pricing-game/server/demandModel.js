@@ -27,158 +27,62 @@ export function computeLogitDemand({
   };
 }
 
+// Consumers live along a street from 0 to 100, one per unit of length. A consumer at x gets V - price - t|x - spot|
+// from a seller, buys from the seller that leaves them the most, and buys nothing if both leave them less than zero.
+// Equal offers are split in half.
+//
+// Rewritten 2026-11-08 (teaching23-games) after a brute-force check of the earlier closed form: that version gave the
+// right numbers when the sellers stand at the two ends of the street (every 2026 default game: spots 0 and 100) but
+// (a) with the sellers inside the street (e.g. 35 and 65, the 2025 layout) it forgot the customers one seller reaches
+//     beyond the other's reach, so a seller facing a rival priced near V could lose a third of the market, and
+// (b) with both sellers on the same spot it ignored the walking cost, so a price above V - t x 50 still sold to all.
+// This version integrates exactly: on each stretch between two breakpoints (the ends of the street, the two spots, the
+// four points where a seller's offer hits zero, and the point where the two offers are equal) the winner is the
+// same everywhere, so the stretch's length goes to that winner. No special cases, any spots in any order, t = 0 too.
 export function computeHotellingDemand({
   priceA,
   priceB,
   config
 }) {
   const { travelCost, x1, x2, consumerValue } = config;
+  const t = Number(travelCost) || 0;
+  const V = consumerValue;
+  const offerA = x => V - priceA - t * Math.abs(x - x1);
+  const offerB = x => V - priceB - t * Math.abs(x - x2);
 
-  // The formulas below assume firm A is the left one (x1 <= x2). If the instructor typed them the other way round,
-  // compute with the roles swapped and swap the answer back (2026-11-02 audit: x1 > x2 gave both firms zero demand).
-  if (x1 > x2) {
-    const r = computeHotellingDemand({ priceA: priceB, priceB: priceA, config: { ...config, x1: x2, x2: x1 } });
-    return { demandA: r.demandB, demandB: r.demandA, shareA: r.shareB, shareB: r.shareA };
+  const points = [0, 100, x1, x2];
+  if (t > 0) {
+    const reachA = (V - priceA) / t, reachB = (V - priceB) / t;
+    points.push(x1 - reachA, x1 + reachA, x2 - reachB, x2 + reachB);
+    // the two offers are equal at x* = (x1 + x2)/2 + (pB - pA)/(2t) when A stands to the left of B, and at the
+    // mirror point when A stands to the right; an extra breakpoint costs nothing, so both go in
+    const mid = (x1 + x2) / 2, shift = (priceB - priceA) / (2 * t);
+    points.push(mid + shift, mid - shift);
   }
-  
-  // Special case: firms at the same location, or no travel cost at all (then location does not matter):
-  // the cheaper firm takes everyone who is willing to buy; equal prices split the market.
-  if (x1 === x2 || !(travelCost > 0)) {
-    let demandA, demandB;
-    
-    if (priceA === priceB) {
-      // Same location, same price
-      // Check if anyone buys: need V - price - 0 >= 0 (no travel cost at firm location)
-      if (consumerValue >= priceA) {
-        // Split demand equally
-        demandA = 50;
-        demandB = 50;
-      } else {
-        // Price too high, no one buys
-        demandA = 0;
-        demandB = 0;
-      }
-    } else if (priceA < priceB) {
-      // A charges less - check if anyone buys from A
-      if (consumerValue >= priceA) {
-        demandA = 100;
-        demandB = 0;
-      } else {
-        demandA = 0;
-        demandB = 0;
-      }
-    } else {
-      // B charges less - check if anyone buys from B
-      if (consumerValue >= priceB) {
-        demandA = 0;
-        demandB = 100;
-      } else {
-        demandA = 0;
-        demandB = 0;
-      }
-    }
-    
-    const shareA = demandA / 100;
-    const shareB = demandB / 100;
-    
-    return {
-      demandA,
-      demandB,
-      shareA,
-      shareB
-    };
-  }
-  
-  // Standard case: firms at different locations
-  // Calculate indifferent consumer location (between firms)
-  // At location x, utility from A: V - p1 - t|x - x1|
-  // At location x, utility from B: V - p2 - t|x - x2|
-  // Indifferent when utilities are equal
-  
-  // For x between x1 and x2 (assuming x1 < x2):
-  // V - p1 - t(x - x1) = V - p2 - t(x2 - x)
-  // -p1 - tx + tx1 = -p2 - tx2 + tx
-  // p2 - p1 = tx2 + tx - tx - tx1 = t(x2 + x1 - 2x)
-  // x* = (x1 + x2)/2 + (p2 - p1)/(2t)
-  const xStar = (x1 + x2) / 2 + (priceB - priceA) / (2 * travelCost);
-  
-  // Now find participation boundaries
-  // A consumer at location x buys from firm A if: V - priceA - t|x - x1| >= 0
-  // A consumer at location x buys from firm B if: V - priceB - t|x - x2| >= 0
-  
-  // Find the leftmost consumer who buys from firm A
-  // For consumers to the left of or at x1: distance = |x - x1| = x1 - x (if x < x1) or 0 (if x = x1)
-  // At x1: utility = V - priceA - 0 = V - priceA
-  // Moving left from x1: utility = V - priceA - t(x1 - x)
-  // Leftmost buyer from A: V - priceA - t(x1 - x) = 0 => x = x1 - (V - priceA)/t
-  const leftmostA = Math.max(0, x1 - (consumerValue - priceA) / travelCost);
-  
-  // Find the rightmost consumer who buys from firm A
-  // For consumers to the right of x1: distance = x - x1
-  // Rightmost buyer from A: V - priceA - t(x - x1) = 0 => x = x1 + (V - priceA)/t
-  const rightmostA = Math.min(100, x1 + (consumerValue - priceA) / travelCost);
-  
-  // Find the leftmost consumer who buys from firm B
-  // For consumers to the left of x2: distance = x2 - x
-  // Leftmost buyer from B: V - priceB - t(x2 - x) = 0 => x = x2 - (V - priceB)/t
-  const leftmostB = Math.max(0, x2 - (consumerValue - priceB) / travelCost);
-  
-  // Find the rightmost consumer who buys from firm B
-  // For consumers to the right of or at x2: distance = |x - x2| = x - x2 (if x > x2) or 0 (if x = x2)
-  // Rightmost buyer from B: V - priceB - t(x - x2) = 0 => x = x2 + (V - priceB)/t
-  const rightmostB = Math.min(100, x2 + (consumerValue - priceB) / travelCost);
-  
-  // Now determine the market split
+  const cuts = [...new Set(points.filter(p => Number.isFinite(p) && p >= 0 && p <= 100))].sort((a, b) => a - b);
+
   let demandA = 0;
   let demandB = 0;
-  
-  // Check if anyone buys at all
-  if (rightmostA >= leftmostA || rightmostB >= leftmostB) {
-    // Find the effective boundaries for each firm
-    // Firm A serves from leftmostA to min(xStar, rightmostA)
-    // But also need to check if firm B's range overlaps
-    
-    // The actual split point is the indifferent consumer, but bounded by participation
-    let splitPoint = xStar;
-    
-    // Firm A can serve [leftmostA, rightmostA]
-    // Firm B can serve [leftmostB, rightmostB]
-    
-    // Find overlap region where both could serve
-    const overlapStart = Math.max(leftmostA, leftmostB);
-    const overlapEnd = Math.min(rightmostA, rightmostB);
-    
-    if (overlapEnd >= overlapStart) {
-      // There's an overlap - use indifferent consumer to split
-      splitPoint = Math.max(overlapStart, Math.min(xStar, overlapEnd));
-      
-      // Firm A: from leftmostA to splitPoint
-      demandA = Math.max(0, splitPoint - leftmostA);
-      
-      // Firm B: from splitPoint to rightmostB
-      demandB = Math.max(0, rightmostB - splitPoint);
-    } else {
-      // No overlap - each firm has its own region
-      // Firm A serves [leftmostA, rightmostA]
-      demandA = Math.max(0, rightmostA - leftmostA);
-      
-      // Firm B serves [leftmostB, rightmostB]
-      demandB = Math.max(0, rightmostB - leftmostB);
-    }
+  for (let i = 0; i + 1 < cuts.length; i += 1) {
+    const length = cuts[i + 1] - cuts[i];
+    if (length <= 0) continue;
+    const m = (cuts[i] + cuts[i + 1]) / 2;
+    const a = offerA(m), b = offerB(m);
+    if (a < 0 && b < 0) continue;            // nobody on this stretch buys
+    if (b < 0) demandA += length;            // only A's offer is worth taking
+    else if (a < 0) demandB += length;
+    else if (Math.abs(a - b) < 1e-9) { demandA += length / 2; demandB += length / 2; }
+    else if (a > b) demandA += length;
+    else demandB += length;
   }
-  
-  // Cap at [0, 100]
+
   demandA = Math.max(0, Math.min(100, demandA));
   demandB = Math.max(0, Math.min(100, demandB));
-  
-  const shareA = demandA / 100;
-  const shareB = demandB / 100;
-  
   return {
     demandA,
     demandB,
-    shareA,
-    shareB
+    shareA: demandA / 100,
+    shareB: demandB / 100
   };
 }
 

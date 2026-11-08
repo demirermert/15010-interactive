@@ -660,10 +660,11 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
     console.log(`[Session ${session.code}] Round ${session.currentRound} timer expired - finalizing round`);
     const seenPairs = new Set();
     
-    // A whole-dollar random price inside the game's price bounds for anyone who did not submit
+    // A whole-dollar random price inside the game's price bounds for anyone who did not submit (clamped at both
+    // ends: with a min price of, say, $0.50 the floor used to land below it, 2026-11-08 fuzz test)
     const getRandomPrice = () => {
       const { min, max } = session.config.priceBounds;
-      return Math.min(max, Math.floor(min + Math.random() * (max - min + 1)));
+      return Math.max(min, Math.min(max, Math.floor(min + Math.random() * (max - min + 1))));
     };
       
     // An AI decision still in flight gets a short grace period, then a random price like anyone else
@@ -726,16 +727,21 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
       if (!player.pairId) {
         throw new Error('You were not paired when the game started, so you are sitting this one out.');
       }
-      const numericPrice = Number(price);
+      // Only a number, or a string holding one, is a price (2026-11-08 fuzz test: through Number() an empty string,
+      // null or [] used to count as $0 and true as $1). It is kept to the cent, so the phone's "Submitted at", the
+      // results, the dashboard and the CSV all show the same number; -0 becomes 0.
+      const raw = typeof price === 'string' ? price.trim() : price;
+      const numericPrice = typeof raw === 'number' ? raw : (typeof raw === 'string' && raw !== '' ? Number(raw) : NaN);
       const { min, max } = session.config.priceBounds;
       if (!Number.isFinite(numericPrice)) {
         throw new Error('Price must be numeric');
       }
-      if (numericPrice < min || numericPrice > max) {
+      const cents = Math.round(numericPrice * 100 + 1e-9) / 100;
+      if (cents < min || cents > max) {
         throw new Error(`Price must be between ${min} and ${max}`);
       }
-      recordSubmission(session, socket.id, numericPrice, false);
-      socket.emit('priceAccepted', { round: session.currentRound, price: numericPrice });
+      recordSubmission(session, socket.id, cents, false);
+      socket.emit('priceAccepted', { round: session.currentRound, price: cents });
       emitSubmissionProgress(session);
       concludeRoundIfReady(session);
     } catch (err) {

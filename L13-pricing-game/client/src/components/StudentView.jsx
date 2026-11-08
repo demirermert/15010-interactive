@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { RoundsChart, Street } from '../charts.jsx';
-import { money, pct, roundTimeFor } from '../econ.js';
+import { money, pct, roundTimeFor, parsePrice } from '../econ.js';
 
 // The student page in the 2026 lab look (2026-11-02; the 2025 page is in git history).
 // Left: this round (the price box, then the round's result). Right: the market and every round so far.
@@ -75,9 +75,9 @@ export function StudentView({
 
   const handleSubmit = event => {
     event.preventDefault();
-    const numeric = Number(price);
-    if (price === '' || !Number.isFinite(numeric)) {
-      setError('Enter a price.');
+    const numeric = parsePrice(price); // the box is a text box: a number box swallowed commas (2026-11-08)
+    if (!Number.isFinite(numeric)) {
+      setError(String(price).trim() === '' ? 'Enter a price.' : 'That is not a number. Type digits only, with a point or a comma for cents (for example 35.50).');
       return;
     }
     if (numeric < priceBounds.min || numeric > priceBounds.max) {
@@ -172,7 +172,7 @@ export function StudentView({
         <form onSubmit={handleSubmit}>
           <div className="pin">
             <span>$</span>
-            <input ref={inputRef} type="number" inputMode="decimal" step="any" value={done && price === '' && (sent ?? acceptedPrice) != null ? (sent ?? acceptedPrice) : price}
+            <input ref={inputRef} type="text" inputMode="decimal" autoComplete="off" value={done && price === '' && (acceptedPrice ?? sent) != null ? (acceptedPrice ?? sent) : price}
               onChange={e => setPrice(e.target.value)} disabled={done} placeholder="0" aria-label="Your price" />
           </div>
           <div className="hint">Between {money(priceBounds.min)} and {money(priceBounds.max)}.
@@ -181,7 +181,8 @@ export function StudentView({
         </form>
         {error && <div className="fb no">{error}</div>}
         {errorMessage && <div className="fb no" onClick={onDismissError}>{errorMessage}</div>}
-        {done && !errorMessage && <div className="fb ok">Submitted{(sent ?? acceptedPrice) != null ? <> at <b>{money(sent ?? acceptedPrice, Number.isInteger(sent ?? acceptedPrice) ? 0 : 2)}</b></> : null}. Results appear when the clock runs out.</div>}
+        {/* the server's figure (kept to the cent) once it has answered, the typed one until then */}
+        {done && !errorMessage && <div className="fb ok">Submitted{(acceptedPrice ?? sent) != null ? <> at <b>{money(acceptedPrice ?? sent, Number.isInteger(acceptedPrice ?? sent) ? 0 : 2)}</b></> : null}. Results appear when the clock runs out.</div>}
       </div>
     );
   } else if (between) {
