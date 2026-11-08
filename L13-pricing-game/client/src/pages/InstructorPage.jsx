@@ -16,13 +16,22 @@ function buildApiUrl(path) {
 // Defaults are the games as played in 2025 (slides, speaker notes and the Nov 20, 2025 Section A transcript; set 2026-11-02):
 // 100 consumers on a street from 0 to 100, each worth $200, $1 per unit walked, zero cost; 10 rounds, 60 s in round 1,
 // then 50, 40 and 30 s; a 10 s break; prices 0 to 250.
-// The three games of the class (Mert, 2026-11-07): same street, sellers at 0 and 100, walking gets cheaper each game
-// ($1, 30¢, free; Nash prices $100, $30, $0). (2025 moved the sellers instead, 0/100, 35/65, 50/50, but with this demand
-// formula 35/65 is identical to 0/100, and a correct straight-line model has no stable price off the ends.)
+// The games of the class (Mert, 2026-11-07/08), in the order of the 2025 class (both sections, from the recordings):
+//  - demo: Mert plus a student volunteer against the ChatGPT seat, on his phone on the projector; 2025 settings read off
+//    the screen capture: 3 rounds of 40 s, prices 0 to 250, very low differentiation (t = $0.10: a $50 vs $47.50 round
+//    split 37.5/62.5), "average willingness to pay $100" on the slide (V = 100);
+//  - three real games: same street, sellers at 0 and 100, walking gets cheaper each game ($1, 30¢, free; Nash prices
+//    $100, $30, $0). 2025 moved the sellers instead (0/100, 35/65, 50/50), but with this demand formula 35/65 is identical
+//    to 0/100, and a correct straight-line model has no stable price off the ends. 10 rounds, more time in the first rounds;
+//  - a bonus game with chat on the second market (2025: 35/65, "you have more time in this game to chat", about 5 rounds
+//    of 60 s, names hidden until the end).
+// Each entry patches DEFAULT_CONFIG; `base` 'default' is numbered default-1, -2, -3 (continuing past existing ones).
 export const DEFAULT_GAMES = [
-  { what: 'full differentiation', t: 1, label: 'walking costs $1 a block' },
-  { what: 'less differentiation', t: 0.3, label: 'walking costs 30¢ a block' },
-  { what: 'no differentiation', t: 0, label: 'walking is free' }
+  { base: 'demo', label: 'Demo', cfg: { rounds: 3, differentTimePerRound: false, roundTime: 40, roundTimes: [], travelCost: 0.1, consumerValue: 100 } },
+  { base: 'default', label: 'Game 1', cfg: { travelCost: 1 } },
+  { base: 'default', label: 'Game 2', cfg: { travelCost: 0.3 } },
+  { base: 'default', label: 'Game 3', cfg: { travelCost: 0 } },
+  { base: 'chat', label: 'Bonus game with chat', cfg: { travelCost: 0.3, enableChat: true, rounds: 5, differentTimePerRound: false, roundTime: 60, roundTimes: [] } }
 ];
 
 const DEFAULT_CONFIG = {
@@ -327,10 +336,10 @@ export default function InstructorPage() {
 
   // Two ways to create games (Mert, 2026-11-07):
   //  - "New Game": the form, one session, as in 2025.
-  //  - "Add the three default games": three copies of the same form side by side, prefilled with the class defaults and
-  //    the three walking costs ($1, 30¢, free), each game with its own settings (times, rounds, anything) to look over and
-  //    change if wanted; Confirm creates the three, named default-1, default-2, default-3 (numbering continues if pressed
-  //    again). They appear in the list below; open each when its turn comes. A game's settings cannot be changed once created.
+  //  - "Add the default games": one copy of the same form per game of DEFAULT_GAMES side by side (demo, three games, bonus
+  //    game with chat), each prefilled and edited on its own (times, rounds, anything); any can be removed before Confirm,
+  //    which creates them named demo, default-1, default-2, default-3, chat (numbering continues if pressed again). They
+  //    appear in the list below; open each when its turn comes. A game's settings cannot be changed once created.
   const [formMode, setFormMode] = useState('custom');            // 'custom' | 'defaults'
   const [defaultGames, setDefaultGames] = useState([]);          // [{ name, cfg }] x 3 while the defaults form is open
   const [addingDefaults, setAddingDefaults] = useState(false);
@@ -338,15 +347,27 @@ export default function InstructorPage() {
     setErrorMessage('');
     setFormMode(mode);
     if (mode === 'defaults') {
-      const used = instructorSessions.reduce((m, s) => Math.max(m, Number((/^default-(\d+)$/.exec(s.sessionName || s.session_name || '') || [])[1] || 0)), 0);
-      setDefaultGames(DEFAULT_GAMES.map((g, i) => ({
-        name: `default-${used + i + 1}`,
-        cfg: { ...DEFAULT_CONFIG, roundTimes: [...DEFAULT_CONFIG.roundTimes], modelType: 'hotelling', x1: 0, x2: 100, travelCost: g.t }
-      })));
+      const names = instructorSessions.map(s => s.sessionName || s.session_name || '');
+      let n = names.reduce((m, name) => Math.max(m, Number((/^default-(\d+)$/.exec(name) || [])[1] || 0)), 0);
+      setDefaultGames(DEFAULT_GAMES.map(g => {
+        let name = g.base;
+        if (g.base === 'default') {
+          n += 1;
+          name = `default-${n}`;
+        } else {
+          for (let k = 2; names.includes(name); k += 1) name = `${g.base}-${k}`; // demo-2 if a demo already exists
+        }
+        return {
+          name,
+          label: g.label,
+          cfg: { ...DEFAULT_CONFIG, roundTimes: [...DEFAULT_CONFIG.roundTimes], modelType: 'hotelling', x1: 0, x2: 100, ...g.cfg }
+        };
+      }));
     }
     setShowCreateForm(true);
   };
   const setDefaultGame = (i, patch) => setDefaultGames(games => games.map((g, j) => (j === i ? { ...g, ...patch } : g)));
+  const removeDefaultGame = i => setDefaultGames(games => games.filter((_, j) => j !== i));
   const setDefaultCfg = i => updater => setDefaultGames(games => games.map((g, j) => (j === i ? { ...g, cfg: typeof updater === 'function' ? updater(g.cfg) : updater } : g)));
   const handleAddDefaults = async () => {
     setErrorMessage('');
@@ -370,8 +391,8 @@ export default function InstructorPage() {
     const t = Number(cfg.travelCost) || 0;
     const apart = Number(cfg.x1) !== Number(cfg.x2);
     const nash = t > 0 && apart ? t * 100 : 0;
-    const what = !apart || t === 0 ? 'no differentiation' : t < 1 ? 'less differentiation' : 'full differentiation';
-    return `${what} · Nash price $${Math.round(nash * 100) / 100}`;
+    const what = !apart || t === 0 ? 'no differentiation' : t < 0.2 ? 'very low differentiation' : t < 1 ? 'less differentiation' : 'full differentiation';
+    return `${what} · Nash price $${Math.round(nash * 100) / 100}${cfg.enableChat ? ' · chat on' : ''}`;
   };
 
   const handleDownload = (code, event) => {
@@ -498,7 +519,7 @@ export default function InstructorPage() {
   }
 
   return (
-    <div className="app-shell portal">
+    <div className={`app-shell portal${showCreateForm && formMode === 'defaults' ? ' wide' : ''}`}>
       <div className="card">
         <header style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
@@ -525,8 +546,8 @@ export default function InstructorPage() {
               ) : (
                 <>
                   <button className="primary" type="button" onClick={() => openForm('defaults')}
-                    title="Opens the settings of the three games of the class (walking cost $1, 30¢, free) to confirm; creates default-1, default-2, default-3">
-                    Add the three default games
+                    title="Opens the games of the class as played in 2025 (demo, three games, bonus game with chat), each with its own settings, to look over and confirm">
+                    Add the default games
                   </button>
                   <button type="button" onClick={() => openForm('custom')}>New Game</button>
                 </>
@@ -555,11 +576,11 @@ export default function InstructorPage() {
 
           {showCreateForm && formMode === 'defaults' && (
             <form onSubmit={e => { e.preventDefault(); handleAddDefaults(); }} className="setup-form three">
-              <p className="small">The three games of the class, side by side, each with its own settings. Look them over, change what you want, then confirm; the three appear in the list below, ready to open one at a time.</p>
+              <p className="small">The games of the class as played in 2025, side by side, each with its own settings: the demo (you and a volunteer against ChatGPT, 3 rounds of 40 s), the three games, and the bonus game with chat. Remove any you do not want, change what you like, then confirm; they appear in the list below, ready to open one at a time.</p>
               {defaultGames.map((g, i) => (
-                <div key={i} className="gcol">
+                <div key={`${g.label}-${g.name}`} className="gcol">
                   <div className="ghead">
-                    <b>Game {i + 1}</b>
+                    <b>{g.label}<button type="button" className="rm" onClick={() => removeDefaultGame(i)} title="Leave this game out">✕ remove</button></b>
                     <span>{describe(g.cfg)}</span>
                   </div>
                   <div className="input-row">
@@ -569,8 +590,8 @@ export default function InstructorPage() {
                   <GameFields cfg={g.cfg} setCfg={setDefaultCfg(i)} compact />
                 </div>
               ))}
-              <button type="submit" className="primary" disabled={addingDefaults}>
-                {addingDefaults ? 'Creating…' : 'Confirm: create the three games'}
+              <button type="submit" className="primary" disabled={addingDefaults || defaultGames.length === 0}>
+                {addingDefaults ? 'Creating…' : defaultGames.length === 1 ? 'Confirm: create this game' : `Confirm: create the ${['', '', 'two', 'three', 'four', 'five'][defaultGames.length] || defaultGames.length} games`}
               </button>
               {errorMessage && <p style={{ color: '#dc2626' }}>{errorMessage}</p>}
             </form>

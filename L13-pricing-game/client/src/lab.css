@@ -123,6 +123,7 @@ body{margin:0;font:16px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,s
 
 /* instructor portal: the session list and the new-game form */
 .portal.app-shell{max-width:1100px}
+.portal.app-shell.wide{max-width:1680px} /* the default games side by side (up to five) */
 .portal .card{border:1px solid var(--line);box-shadow:none}
 .portal .eyebrow{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--red);margin:0 0 4px}
 .portal h1{color:var(--navy);font-size:26px}.portal h2{color:var(--navy);font-size:19px}
@@ -134,10 +135,12 @@ body{margin:0;font:16px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,s
 .portal .setup-form input[type=text],.portal .setup-form input[type=number],.portal .setup-form select{border:1.5px solid #cfd4da;font:inherit}
 .portal .setup-form .small{grid-column:1 / -1;margin:0 0 6px;font-size:13px;color:var(--muted)}
 /* the three default games side by side, each a complete form of its own (2026-11-07) */
-.portal .setup-form.three{grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;align-items:start}
+.portal .setup-form.three{grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:14px;align-items:start}
 .portal .gcol{display:grid;grid-template-columns:1fr;gap:2px;padding:12px 14px 6px;border:1.5px solid var(--navy);border-radius:10px;background:#fff;min-width:0}
 .portal .gcol .ghead{display:flex;flex-direction:column;gap:2px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--line)}
-.portal .gcol .ghead b{color:var(--navy);font-size:16px}
+.portal .gcol .ghead b{color:var(--navy);font-size:16px;display:flex;justify-content:space-between;align-items:baseline}
+.portal .gcol .ghead .rm{font-size:12px;font-weight:600;color:var(--muted);border:0;background:none;padding:0 2px;cursor:pointer}
+.portal .gcol .ghead .rm:hover{color:var(--red)}
 .portal .gcol .ghead span{font-size:12.5px;color:var(--muted)}
 .portal .gcol .input-row{margin-bottom:.7rem;gap:.3rem}
 .portal .gcol input[type=text],.portal .gcol input[type=number],.portal .gcol select{padding:.5rem .6rem;font-size:.9rem;min-width:0;width:100%;box-sizing:border-box}

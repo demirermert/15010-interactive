@@ -190,10 +190,27 @@ lab-d, lab-e, lab-f .onrender.com.
 
 The three games (Mert, 2026-11-07): sellers stay at 0 and 100 in all three; the walking cost falls, $1, $0.30, $0. Nash
 prices $100, $30, $0 (profit each $5,000, $1,500, $0); collusive prices $150, $185, $200 (profit each $7,500, $9,250,
-$10,000). Instructor page (Mert, 2026-11-07): "Add the three default games" shows three complete settings forms side by
-side, prefilled with the class defaults and the three walking costs; each game is edited on its own (its times, rounds,
-prices, options, anything), and Confirm creates `default-1`, `default-2`, `default-3` (numbering continues on a second
-press); "New Game" is the single-session form as in 2025 (no presets); the four on/off settings sit in one Options box. A game's settings cannot be changed after it is created. The ChatGPT seat is told the Nash and collusive
+$10,000). Instructor page (Mert, 2026-11-07/08): "Add the default games" shows one complete settings form per game of the
+2025 class side by side (demo, Game 1, Game 2, Game 3, bonus game with chat), each prefilled and edited on its own (its
+times, rounds, prices, options, anything); any column can be removed before Confirm, which creates them as `demo`,
+`default-1`, `default-2`, `default-3`, `chat` (numbering continues on a second press); "New Game" is the single-session
+form as in 2025 (no presets); the four on/off settings sit in one Options box.
+
+What 2025 actually was (found 2026-11-08 from the Nov 20, 2025 recordings of sections A and D, the screen captures, the
+slides and the game's git history; no session export survives and the 2025 service is gone): both sections ran a DEMO
+first (Mert plus a student "consultant" against the ChatGPT seat, on his phone mirrored to the projector; the screen
+capture shows 3 rounds of 40 s, prices $0 to $250, a $50 vs $47.50 round splitting 37.5/62.5, i.e. t = $0.10, slide
+"average willingness to pay $100, very low differentiation"), then four games: 0/100 (code PWNT in D, KAXX in A; dashboard
+"Hotelling Model | t=$1 | V=$200 | x1=0 | x2=100", Round 10 of 10, 60 students in D), 35/65 (DUUZ, ZTLK), 50/50 (crashed
+in both sections, replayed in incognito: PBFL then GNJR, LZGZ then PMPT), and a bonus game with chat on the 35/65 market
+(XWJN, KRCT; "you have more time in this game to chat"; about 5 rounds of 60 s by the clock; names hidden until the end;
+chats not stored). 10 rounds per real game; Mert said only "more time in the first couple of rounds, then less" and, for
+game 2, "less time this time". The exact per-round seconds of the real games are not recoverable: the projector showed the
+QR slide during play, the 2025 form had no presets (its code default was 2 rounds of 10 s, so he typed each game in by
+hand), and rounds end early once every pair has submitted, so elapsed times (5.5 to 7.5 min per game) are only lower bounds.
+The 60/50/40/30 schedule comes from the slide notes and the course-hub tips. Other 2025 instructors: B and E varied t (1,
+0.5, 0) with 30 s rounds (20 s later) and 10 s breaks, final game t = 0 with chat; C and F used t = 0.5, 10 rounds of 30 s
+(F: five of 30 then five of 20), after a 5-round trial at t = 0 and WTP $100. A game's settings cannot be changed after it is created. The ChatGPT seat is told the Nash and collusive
 price for the walking cost, opens at the Nash price and then responds to its rival; if the model fails it plays the Nash
 price (used to be random). Why not the 2025 positions (0/100, 35/65, 50/50): with this demand formula 35/65 is identical to 0/100 for every
 pair of prices below about $160 (only the midpoint enters), and a correct straight-line model has no stable price for sellers
