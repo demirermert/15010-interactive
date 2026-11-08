@@ -129,26 +129,26 @@ body{margin:0;font:16px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,s
 .portal button{font:inherit;font-weight:600;font-size:14px;border:1px solid var(--line);border-radius:8px;padding:8px 14px;background:#fff;color:var(--navy)}
 .portal button.primary{background:var(--navy);border-color:var(--navy);color:#fff}
 .portal .setup-form{display:grid;grid-template-columns:1fr 1fr;gap:4px 20px;margin-top:1rem}
-.portal .setup-form>.presets,.portal .setup-form>button[type=submit],.portal .setup-form>p{grid-column:1 / -1}
+.portal .setup-form>button[type=submit],.portal .setup-form>p{grid-column:1 / -1}
 .portal .setup-form label{font-size:14px;color:#555}
 .portal .setup-form input[type=text],.portal .setup-form input[type=number],.portal .setup-form select{border:1.5px solid #cfd4da;font:inherit}
-.portal .presets{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
-.portal .presets .bgk{grid-column:1 / -1;font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
-.portal .presets button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:10px 14px;border:1.5px solid #cfd4da}
-.portal .presets button span{font-weight:400;font-size:13px;color:var(--muted)}
-.portal .presets button.on{border-color:var(--navy);background:#eef3fa}
-.portal .games3 .game{display:flex;flex-direction:column;gap:4px;padding:10px 14px;border:1.5px solid var(--navy);background:#eef3fa;border-radius:8px;font-size:14px;color:#333}
-.portal .games3 .game span{font-weight:400;font-size:13px;color:var(--muted)}
-.portal .games3 .game .tin{display:flex;align-items:center;gap:4px;color:#333;margin-top:4px}
-.portal .games3 .game .tin input{width:72px;padding:4px 6px;border:1.5px solid #cfd4da;border-radius:6px;font:inherit}
-.portal .games3 .small{grid-column:1 / -1;margin:2px 0 0;font-size:12.5px;color:var(--muted)}
+.portal .setup-form .small{grid-column:1 / -1;margin:0 0 6px;font-size:13px;color:var(--muted)}
+/* the three default games side by side, each a complete form of its own (2026-11-07) */
+.portal .setup-form.three{grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;align-items:start}
+.portal .gcol{display:grid;grid-template-columns:1fr;gap:2px;padding:12px 14px 6px;border:1.5px solid var(--navy);border-radius:10px;background:#fff;min-width:0}
+.portal .gcol .ghead{display:flex;flex-direction:column;gap:2px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.portal .gcol .ghead b{color:var(--navy);font-size:16px}
+.portal .gcol .ghead span{font-size:12.5px;color:var(--muted)}
+.portal .gcol .input-row{margin-bottom:.7rem;gap:.3rem}
+.portal .gcol input[type=text],.portal .gcol input[type=number],.portal .gcol select{padding:.5rem .6rem;font-size:.9rem;min-width:0;width:100%;box-sizing:border-box}
 .portal .setup-form>button[type=submit]{padding:12px;font-size:16px;margin-top:10px}
-.portal .setup-form>.options{grid-column:1 / -1;display:grid;grid-template-columns:1fr 1fr;gap:8px 20px;margin:14px 0 4px;padding:12px 14px 14px;border:1.5px solid #e3e6ea;border-radius:10px}
-.portal .options legend{padding:0 6px}
+.portal .setup-form .options{grid-column:1 / -1;display:grid;grid-template-columns:1fr 1fr;gap:8px 20px;margin:14px 0 4px;padding:12px 14px 14px;border:1.5px solid #e3e6ea;border-radius:10px;min-width:0}
+.portal .gcol .options{grid-template-columns:1fr;gap:8px;margin:6px 0 10px;padding:10px 12px 12px}
+.portal .options legend{padding:0 6px;font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .portal .options .opt{display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:14px;color:#333}
 .portal .options .opt input{width:auto;margin-top:3px;cursor:pointer}
 .portal .options .opt span{display:flex;flex-direction:column}
 .portal .options .opt small{color:var(--muted);font-size:12.5px}
-@media (max-width:800px){.portal .setup-form>.options{grid-template-columns:1fr}}
-@media (max-width:800px){.portal .setup-form,.portal .presets{grid-template-columns:1fr}}
+@media (max-width:800px){.portal .setup-form .options{grid-template-columns:1fr}}
+@media (max-width:800px){.portal .setup-form,.portal .setup-form.three{grid-template-columns:1fr}}
 @media (max-width:560px){.lab .vs .v{font-size:19px}.lab .vs .v.big{font-size:21px}.lab table.hist{font-size:13px}.lab table.hist th,.lab table.hist td{padding:6px 5px}.lab .steps span{width:24px;height:24px;font-size:12px}}

@@ -15,15 +15,14 @@ function buildApiUrl(path) {
 
 // Defaults are the games as played in 2025 (slides, speaker notes and the Nov 20, 2025 Section A transcript; set 2026-11-02):
 // 100 consumers on a street from 0 to 100, each worth $200, $1 per unit walked, zero cost; 10 rounds, 60 s in round 1,
-// then 50, 40 and 30 s; a 10 s break; prices 0 to 250. The three quick-setup buttons keep the sellers at 0 and 100 and set the
-// walking cost ($1, $0.30, $0; Nash prices $100, $30, $0), see the presets below.
-// The three games of the class (Mert, 2026-11-07): same street, sellers at 0 and 100, walking gets cheaper each game.
-// Nash prices $100, $30, $0. (2025 moved the sellers instead, 0/100, 35/65, 50/50, but with this demand formula 35/65 is
-// identical to 0/100, and a correct straight-line model has no stable price off the ends.)
+// then 50, 40 and 30 s; a 10 s break; prices 0 to 250.
+// The three games of the class (Mert, 2026-11-07): same street, sellers at 0 and 100, walking gets cheaper each game
+// ($1, 30¢, free; Nash prices $100, $30, $0). (2025 moved the sellers instead, 0/100, 35/65, 50/50, but with this demand
+// formula 35/65 is identical to 0/100, and a correct straight-line model has no stable price off the ends.)
 export const DEFAULT_GAMES = [
-  { name: 'Round 1', what: 'full differentiation', t: 1, label: 'walking costs $1 a block' },
-  { name: 'Round 2', what: 'less differentiation', t: 0.3, label: 'walking costs 30¢ a block' },
-  { name: 'Round 3', what: 'no differentiation', t: 0, label: 'walking is free' }
+  { what: 'full differentiation', t: 1, label: 'walking costs $1 a block' },
+  { what: 'less differentiation', t: 0.3, label: 'walking costs 30¢ a block' },
+  { what: 'no differentiation', t: 0, label: 'walking is free' }
 ];
 
 const DEFAULT_CONFIG = {
@@ -50,6 +49,190 @@ const DEFAULT_CONFIG = {
   showOpponentName: false,
   showModelParameters: false
 };
+
+// The settings of one game: every field of the form. `cfg` is a form state shaped like DEFAULT_CONFIG and `setCfg` takes an
+// updater (cfg => cfg). The "New Game" form shows it once in two columns; the default games show it three times side by side
+// (`compact`: one column, smaller round-time boxes), each game with its own settings (Mert, 2026-11-07).
+function GameFields({ cfg, setCfg, compact = false }) {
+  // value/onChange/onBlur for a number field: '' while being typed, `fallback` if left empty
+  const numField = (key, fallback) => ({
+    value: cfg[key],
+    onChange: event => {
+      const value = event.target.value === '' ? '' : Number(event.target.value);
+      setCfg(c => ({ ...c, [key]: value }));
+    },
+    onBlur: event => {
+      if (event.target.value === '') setCfg(c => ({ ...c, [key]: fallback }));
+    }
+  });
+  const setRoundTime = (i, value) => setCfg(c => {
+    const roundTimes = [...(c.roundTimes || [])];
+    while (roundTimes.length <= i) roundTimes.push(c.roundTime);
+    roundTimes[i] = value;
+    return { ...c, roundTimes };
+  });
+  const pair = { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: compact ? '0 10px' : '1rem' };
+
+  return (
+    <>
+      <div className="input-row">
+        <label>Rounds</label>
+        <input
+          type="number"
+          min="1"
+          step="1"
+          value={cfg.rounds}
+          onChange={event => {
+            const newRounds = event.target.value === '' ? '' : Number(event.target.value);
+            setCfg(c => {
+              // If different time per round is enabled, adjust the array
+              if (c.differentTimePerRound) {
+                const numRounds = newRounds === '' ? 1 : newRounds;
+                const roundTimes = Array(numRounds).fill(0).map((_, i) => c.roundTimes[i] || c.roundTime);
+                return { ...c, rounds: newRounds, roundTimes };
+              }
+              return { ...c, rounds: newRounds };
+            });
+          }}
+          onBlur={event => {
+            if (event.target.value === '') setCfg(c => ({ ...c, rounds: 1 }));
+          }}
+        />
+      </div>
+
+      <div className="input-row">
+        <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '0.5rem' }}>
+          <input
+            type="checkbox"
+            checked={cfg.differentTimePerRound}
+            onChange={event => {
+              const checked = event.target.checked;
+              setCfg(c => ({ ...c, differentTimePerRound: checked, roundTimes: checked ? Array(Number(c.rounds)).fill(c.roundTime) : [] }));
+            }}
+            style={{ width: 'auto', cursor: 'pointer' }}
+          />
+          <span>Set different time for each round</span>
+        </label>
+      </div>
+
+      {!cfg.differentTimePerRound && (
+        <div className="input-row">
+          <label>Seconds per round</label>
+          <input type="number" min="10" step="1" {...numField('roundTime', 10)} />
+        </div>
+      )}
+
+      {cfg.differentTimePerRound && (
+        <div className="input-row">
+          <div style={{ display: 'grid', gridTemplateColumns: compact ? 'repeat(5, minmax(0, 1fr))' : 'repeat(auto-fill, minmax(120px, 1fr))', gap: '0.5rem' }}>
+            {Array.from({ length: Number(cfg.rounds) }).map((_, i) => {
+              const currentValue = cfg.roundTimes[i] !== undefined ? cfg.roundTimes[i] : cfg.roundTime;
+              return (
+                <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                  <label style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500 }}>{compact ? `R${i + 1}` : `Round ${i + 1}`}</label>
+                  <input
+                    type="number"
+                    min="10"
+                    step="1"
+                    value={currentValue}
+                    onChange={event => setRoundTime(i, event.target.value === '' ? '' : Number(event.target.value))}
+                    onBlur={event => { if (event.target.value === '') setRoundTime(i, 10); }}
+                    style={compact ? { padding: '0.4rem 0.3rem', fontSize: '0.8rem', textAlign: 'center' } : { padding: '0.5rem', fontSize: '0.875rem' }}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <div className="input-row">
+        <label>Break between rounds (seconds)</label>
+        <input type="number" min="0" step="1" {...numField('breakTime', 0)} />
+      </div>
+      <div className="input-row">
+        <label>Market size</label>
+        <input type="number" min="1" step="1" {...numField('marketSize', 1)} />
+      </div>
+
+      <div className="input-row">
+        <label>Competition Model</label>
+        <select
+          value={cfg.modelType}
+          onChange={event => setCfg(c => ({ ...c, modelType: event.target.value }))}
+          style={{ padding: '0.5rem', fontSize: '1rem', borderRadius: '4px', border: '1px solid #d1d5db' }}
+        >
+          <option value="logit">Logit Model</option>
+          <option value="hotelling">Hotelling Model</option>
+        </select>
+      </div>
+
+      {cfg.modelType === 'logit' && (
+        <>
+          <div className="input-row">
+            <label>Price sensitivity (alpha)</label>
+            <input type="number" step="any" {...numField('alpha', 1)} />
+          </div>
+          <div className="input-row">
+            <label>Differentiation (sigma)</label>
+            <input type="number" step="any" {...numField('sigma', 1)} />
+          </div>
+        </>
+      )}
+
+      {cfg.modelType === 'hotelling' && (
+        <>
+          <div className="input-row">
+            <label>Travel cost (t)</label>
+            <input type="number" step="any" min="0" {...numField('travelCost', 0)} />
+          </div>
+          <div className="input-row">
+            <label>Consumer valuation (V)</label>
+            <input type="number" step="any" min="0" {...numField('consumerValue', 0)} />
+          </div>
+          <div style={pair}>
+            <div className="input-row">
+              <label>Firm 1 location (x₁)</label>
+              <input type="number" step="any" min="0" max="100" {...numField('x1', 0)} />
+            </div>
+            <div className="input-row">
+              <label>Firm 2 location (x₂)</label>
+              <input type="number" step="any" min="0" max="100" {...numField('x2', 0)} />
+            </div>
+          </div>
+        </>
+      )}
+
+      <div style={pair}>
+        <div className="input-row">
+          <label>Min price</label>
+          <input type="number" step="any" {...numField('priceMin', 0)} />
+        </div>
+        <div className="input-row">
+          <label>Max price</label>
+          <input type="number" step="any" {...numField('priceMax', 100)} />
+        </div>
+      </div>
+
+      {/* the four on/off settings in one place (Mert, 2026-11-07) */}
+      <fieldset className="options">
+        <legend className="bgk">Options</legend>
+        {[
+          ['enableChat', 'Enable chat between paired students', 'Students matched together can chat during the game'],
+          ['hideRoundCount', 'Hide the total number of rounds', 'Students see "Round 3" instead of "Round 3 of 10"'],
+          ['showOpponentName', 'Show opponent names', 'Students see who they are paired with'],
+          ['showModelParameters', 'Show model parameters', 'Students see the walking cost and the customer value']
+        ].map(([key, title, help]) => (
+          <label key={key} className="opt">
+            <input type="checkbox" checked={Boolean(cfg[key])}
+              onChange={event => setCfg(c => ({ ...c, [key]: event.target.checked }))} />
+            <span><b>{title}</b><small>{help}</small></span>
+          </label>
+        ))}
+      </fieldset>
+    </>
+  );
+}
 
 export default function InstructorPage() {
   const navigate = useNavigate();
@@ -144,30 +327,33 @@ export default function InstructorPage() {
 
   // Two ways to create games (Mert, 2026-11-07):
   //  - "New Game": the form, one session, as in 2025.
-  //  - "Add the three default games": the same form prefilled with the class defaults plus the three walking costs
-  //    ($1, 30¢, free), to look over and change if wanted; Confirm creates the three, named default-1, default-2,
-  //    default-3 (numbering continues if pressed again). They appear in the list below; open each when its turn comes.
-  //    A game's settings cannot be changed once it is created.
+  //  - "Add the three default games": three copies of the same form side by side, prefilled with the class defaults and
+  //    the three walking costs ($1, 30¢, free), each game with its own settings (times, rounds, anything) to look over and
+  //    change if wanted; Confirm creates the three, named default-1, default-2, default-3 (numbering continues if pressed
+  //    again). They appear in the list below; open each when its turn comes. A game's settings cannot be changed once created.
   const [formMode, setFormMode] = useState('custom');            // 'custom' | 'defaults'
-  const [defaultCosts, setDefaultCosts] = useState(DEFAULT_GAMES.map(g => g.t));
+  const [defaultGames, setDefaultGames] = useState([]);          // [{ name, cfg }] x 3 while the defaults form is open
   const [addingDefaults, setAddingDefaults] = useState(false);
   const openForm = mode => {
     setErrorMessage('');
     setFormMode(mode);
     if (mode === 'defaults') {
-      setInstructorConfig({ ...DEFAULT_CONFIG, modelType: 'hotelling', x1: 0, x2: 100, travelCost: DEFAULT_GAMES[0].t });
-      setDefaultCosts(DEFAULT_GAMES.map(g => g.t));
+      const used = instructorSessions.reduce((m, s) => Math.max(m, Number((/^default-(\d+)$/.exec(s.sessionName || s.session_name || '') || [])[1] || 0)), 0);
+      setDefaultGames(DEFAULT_GAMES.map((g, i) => ({
+        name: `default-${used + i + 1}`,
+        cfg: { ...DEFAULT_CONFIG, roundTimes: [...DEFAULT_CONFIG.roundTimes], modelType: 'hotelling', x1: 0, x2: 100, travelCost: g.t }
+      })));
     }
     setShowCreateForm(true);
   };
+  const setDefaultGame = (i, patch) => setDefaultGames(games => games.map((g, j) => (j === i ? { ...g, ...patch } : g)));
+  const setDefaultCfg = i => updater => setDefaultGames(games => games.map((g, j) => (j === i ? { ...g, cfg: typeof updater === 'function' ? updater(g.cfg) : updater } : g)));
   const handleAddDefaults = async () => {
     setErrorMessage('');
     setAddingDefaults(true);
     try {
-      let n = instructorSessions.reduce((m, s) => Math.max(m, Number((/^default-(\d+)$/.exec(s.session_name || s.sessionName || '') || [])[1] || 0)), 0);
-      for (const t of defaultCosts) {
-        n += 1;
-        await postSession(`default-${n}`, { ...instructorConfig, modelType: 'hotelling', travelCost: Number(t) });
+      for (const [i, g] of defaultGames.entries()) {
+        await postSession(g.name.trim() || `default-${i + 1}`, g.cfg);
       }
       await fetchInstructorSessions();
       setShowCreateForm(false);
@@ -176,6 +362,16 @@ export default function InstructorPage() {
     } finally {
       setAddingDefaults(false);
     }
+  };
+  // What the instructor sees at the top of each default game's column: how differentiated the sellers are and the
+  // one-shot Nash price of the game as set (t x 100 with sellers apart; $0 when walking is free or they share a spot)
+  const describe = cfg => {
+    if (cfg.modelType !== 'hotelling') return 'logit model';
+    const t = Number(cfg.travelCost) || 0;
+    const apart = Number(cfg.x1) !== Number(cfg.x2);
+    const nash = t > 0 && apart ? t * 100 : 0;
+    const what = !apart || t === 0 ? 'no differentiation' : t < 1 ? 'less differentiation' : 'full differentiation';
+    return `${what} · Nash price $${Math.round(nash * 100) / 100}`;
   };
 
   const handleDownload = (code, event) => {
@@ -339,380 +535,42 @@ export default function InstructorPage() {
           </div>
           {!showCreateForm && errorMessage && <p style={{ color: '#dc2626' }}>{errorMessage}</p>}
 
-          {showCreateForm && (
-            <form onSubmit={formMode === 'defaults' ? (e => { e.preventDefault(); handleAddDefaults(); }) : handleCreateSession} className="setup-form">
-              {formMode === 'defaults' ? (
-                <div className="presets games3">
-                  <div className="bgk">The three default games · sellers at 0 and 100 · named default-1, default-2, default-3</div>
-                  {DEFAULT_GAMES.map(({ name, what }, i) => (
-                    <label key={name} className="game">
-                      <b>{name}</b><span>{what}</span>
-                      <span className="tin">walking cost $
-                        <input type="number" step="any" min="0" value={defaultCosts[i]}
-                          onChange={e => setDefaultCosts(cs => cs.map((c, j) => (j === i ? (e.target.value === '' ? '' : Number(e.target.value)) : c)))} />
-                        per block</span>
-                    </label>
-                  ))}
-                  <p className="small">Everything below applies to all three games. Nash prices with the default walking costs: $100, $30, $0.</p>
-                </div>
-              ) : (
-                <div className="input-row">
-                  <label htmlFor="session-name">Session Name</label>
-                  <input
-                    id="session-name"
-                    type="text"
-                    value={sessionName}
-                    onChange={event => setSessionName(event.target.value)}
-                    placeholder={`e.g., "MBA Section A" or "Spring 2025"`}
-                  />
-                </div>
-              )}
+          {showCreateForm && formMode === 'custom' && (
+            <form onSubmit={handleCreateSession} className="setup-form">
               <div className="input-row">
-                <label>Rounds</label>
+                <label htmlFor="session-name">Session Name</label>
                 <input
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={instructorConfig.rounds}
-                  onChange={event => {
-                    const newRounds = event.target.value === '' ? '' : Number(event.target.value);
-                    setInstructorConfig(cfg => {
-                      // If different time per round is enabled, adjust the array
-                      if (cfg.differentTimePerRound) {
-                        const numRounds = newRounds === '' ? 1 : newRounds;
-                        const newRoundTimes = Array(numRounds).fill(0).map((_, i) => 
-                          cfg.roundTimes[i] || cfg.roundTime
-                        );
-                        return { ...cfg, rounds: newRounds, roundTimes: newRoundTimes };
-                      }
-                      return { ...cfg, rounds: newRounds };
-                    });
-                  }}
-                  onBlur={event => {
-                    if (event.target.value === '') {
-                      setInstructorConfig(cfg => ({ ...cfg, rounds: 1 }));
-                    }
-                  }}
+                  id="session-name"
+                  type="text"
+                  value={sessionName}
+                  onChange={event => setSessionName(event.target.value)}
+                  placeholder={`e.g., "MBA Section A" or "Spring 2025"`}
                 />
               </div>
-              
-              <div className="input-row">
-                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '0.5rem' }}>
-                  <input
-                    type="checkbox"
-                    checked={instructorConfig.differentTimePerRound}
-                    onChange={event => {
-                      const checked = event.target.checked;
-                      setInstructorConfig(cfg => {
-                        // Initialize roundTimes array when enabling
-                        const roundTimes = checked 
-                          ? Array(Number(cfg.rounds)).fill(cfg.roundTime)
-                          : [];
-                        return { ...cfg, differentTimePerRound: checked, roundTimes };
-                      });
-                    }}
-                    style={{ width: 'auto', cursor: 'pointer' }}
-                  />
-                  <span>Set different time for each round</span>
-                </label>
-              </div>
-              
-              {!instructorConfig.differentTimePerRound && (
-                <div className="input-row">
-                  <label>Seconds per round</label>
-                  <input
-                    type="number"
-                    min="10"
-                    step="1"
-                    value={instructorConfig.roundTime}
-                    onChange={event => {
-                      const value = event.target.value === '' ? '' : Number(event.target.value);
-                      setInstructorConfig(cfg => ({ ...cfg, roundTime: value }));
-                    }}
-                    onBlur={event => {
-                      if (event.target.value === '') {
-                        setInstructorConfig(cfg => ({ ...cfg, roundTime: 10 }));
-                      }
-                    }}
-                  />
-                </div>
-              )}
-              
-              {instructorConfig.differentTimePerRound && (
-                <div className="input-row">
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '0.5rem' }}>
-                    {Array.from({ length: Number(instructorConfig.rounds) }).map((_, i) => {
-                      // Get the value, defaulting to roundTime only if undefined
-                      const currentValue = instructorConfig.roundTimes[i] !== undefined 
-                        ? instructorConfig.roundTimes[i] 
-                        : instructorConfig.roundTime;
-                      
-                      return (
-                        <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                          <label style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500 }}>
-                            Round {i + 1}
-                          </label>
-                          <input
-                            type="number"
-                            min="10"
-                            step="1"
-                            value={currentValue}
-                            onChange={event => {
-                              const value = event.target.value === '' ? '' : Number(event.target.value);
-                              const newRoundTimes = [...(instructorConfig.roundTimes || [])];
-                              // Ensure array is large enough
-                              while (newRoundTimes.length <= i) {
-                                newRoundTimes.push(instructorConfig.roundTime);
-                              }
-                              newRoundTimes[i] = value;
-                              setInstructorConfig(cfg => ({ ...cfg, roundTimes: newRoundTimes }));
-                            }}
-                            onBlur={event => {
-                              if (event.target.value === '') {
-                                const newRoundTimes = [...(instructorConfig.roundTimes || [])];
-                                while (newRoundTimes.length <= i) {
-                                  newRoundTimes.push(instructorConfig.roundTime);
-                                }
-                                newRoundTimes[i] = 10;
-                                setInstructorConfig(cfg => ({ ...cfg, roundTimes: newRoundTimes }));
-                              }
-                            }}
-                            style={{ padding: '0.5rem', fontSize: '0.875rem' }}
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-              
-              <div className="input-row">
-                <label>Break between rounds (seconds)</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={instructorConfig.breakTime}
-                  onChange={event => {
-                    const value = event.target.value === '' ? '' : Number(event.target.value);
-                    setInstructorConfig(cfg => ({ ...cfg, breakTime: value }));
-                  }}
-                  onBlur={event => {
-                    if (event.target.value === '') {
-                      setInstructorConfig(cfg => ({ ...cfg, breakTime: 0 }));
-                    }
-                  }}
-                />
-              </div>
-              <div className="input-row">
-                <label>Market size</label>
-                <input
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={instructorConfig.marketSize}
-                  onChange={event => {
-                    const value = event.target.value === '' ? '' : Number(event.target.value);
-                    setInstructorConfig(cfg => ({ ...cfg, marketSize: value }));
-                  }}
-                  onBlur={event => {
-                    if (event.target.value === '') {
-                      setInstructorConfig(cfg => ({ ...cfg, marketSize: 1 }));
-                    }
-                  }}
-                />
-              </div>
-              
-              <div className="input-row">
-                <label>Competition Model</label>
-                <select
-                  value={instructorConfig.modelType}
-                  onChange={event => setInstructorConfig(cfg => ({ ...cfg, modelType: event.target.value }))}
-                  style={{ padding: '0.5rem', fontSize: '1rem', borderRadius: '4px', border: '1px solid #d1d5db' }}
-                >
-                  <option value="logit">Logit Model</option>
-                  <option value="hotelling">Hotelling Model</option>
-                </select>
-              </div>
-              
-              {instructorConfig.modelType === 'logit' && (
-                <>
-                  <div className="input-row">
-                    <label>Price sensitivity (alpha)</label>
-                    <input
-                      type="number"
-                      step="any"
-                      value={instructorConfig.alpha}
-                      onChange={event => {
-                        const value = event.target.value === '' ? '' : Number(event.target.value);
-                        setInstructorConfig(cfg => ({ ...cfg, alpha: value }));
-                      }}
-                      onBlur={event => {
-                        if (event.target.value === '') {
-                          setInstructorConfig(cfg => ({ ...cfg, alpha: 1 }));
-                        }
-                      }}
-                    />
-                  </div>
-                  <div className="input-row">
-                    <label>Differentiation (sigma)</label>
-                    <input
-                      type="number"
-                      step="any"
-                      value={instructorConfig.sigma}
-                      onChange={event => {
-                        const value = event.target.value === '' ? '' : Number(event.target.value);
-                        setInstructorConfig(cfg => ({ ...cfg, sigma: value }));
-                      }}
-                      onBlur={event => {
-                        if (event.target.value === '') {
-                          setInstructorConfig(cfg => ({ ...cfg, sigma: 1 }));
-                        }
-                      }}
-                    />
-                  </div>
-                </>
-              )}
-              
-              {instructorConfig.modelType === 'hotelling' && (
-                <>
-                  <div className="input-row" style={formMode === 'defaults' ? { display: 'none' } : undefined}>
-                    <label>Travel cost (t)</label>
-                    <input
-                      type="number"
-                      step="any"
-                      min="0"
-                      value={instructorConfig.travelCost}
-                      onChange={event => {
-                        const value = event.target.value === '' ? '' : Number(event.target.value);
-                        setInstructorConfig(cfg => ({ ...cfg, travelCost: value }));
-                      }}
-                      onBlur={event => {
-                        // Convert to number on blur if empty
-                        if (event.target.value === '') {
-                          setInstructorConfig(cfg => ({ ...cfg, travelCost: 0 }));
-                        }
-                      }}
-                    />
-                  </div>
-                  <div className="input-row">
-                    <label>Consumer valuation (V)</label>
-                    <input
-                      type="number"
-                      step="any"
-                      min="0"
-                      value={instructorConfig.consumerValue}
-                      onChange={event => {
-                        const value = event.target.value === '' ? '' : Number(event.target.value);
-                        setInstructorConfig(cfg => ({ ...cfg, consumerValue: value }));
-                      }}
-                      onBlur={event => {
-                        // Convert to number on blur if empty
-                        if (event.target.value === '') {
-                          setInstructorConfig(cfg => ({ ...cfg, consumerValue: 0 }));
-                        }
-                      }}
-                    />
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '1rem' }}>
-                    <div className="input-row">
-                      <label>Firm 1 location (x₁)</label>
-                      <input
-                        type="number"
-                        step="any"
-                        min="0"
-                        max="100"
-                        value={instructorConfig.x1}
-                        onChange={event => {
-                          const value = event.target.value === '' ? '' : Number(event.target.value);
-                          setInstructorConfig(cfg => ({ ...cfg, x1: value }));
-                        }}
-                        onBlur={event => {
-                          if (event.target.value === '') {
-                            setInstructorConfig(cfg => ({ ...cfg, x1: 0 }));
-                          }
-                        }}
-                      />
-                    </div>
-                    <div className="input-row">
-                      <label>Firm 2 location (x₂)</label>
-                      <input
-                        type="number"
-                        step="any"
-                        min="0"
-                        max="100"
-                        value={instructorConfig.x2}
-                        onChange={event => {
-                          const value = event.target.value === '' ? '' : Number(event.target.value);
-                          setInstructorConfig(cfg => ({ ...cfg, x2: value }));
-                        }}
-                        onBlur={event => {
-                          if (event.target.value === '') {
-                            setInstructorConfig(cfg => ({ ...cfg, x2: 0 }));
-                          }
-                        }}
-                      />
-                    </div>
-                  </div>
-                </>
-              )}
-              
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '1rem' }}>
-                <div className="input-row">
-                  <label>Min price</label>
-                  <input
-                    type="number"
-                    step="any"
-                    value={instructorConfig.priceMin}
-                    onChange={event => {
-                      const value = event.target.value === '' ? '' : Number(event.target.value);
-                      setInstructorConfig(cfg => ({ ...cfg, priceMin: value }));
-                    }}
-                    onBlur={event => {
-                      if (event.target.value === '') {
-                        setInstructorConfig(cfg => ({ ...cfg, priceMin: 0 }));
-                      }
-                    }}
-                  />
-                </div>
-                <div className="input-row">
-                  <label>Max price</label>
-                  <input
-                    type="number"
-                    step="any"
-                    value={instructorConfig.priceMax}
-                    onChange={event => {
-                      const value = event.target.value === '' ? '' : Number(event.target.value);
-                      setInstructorConfig(cfg => ({ ...cfg, priceMax: value }));
-                    }}
-                    onBlur={event => {
-                      if (event.target.value === '') {
-                        setInstructorConfig(cfg => ({ ...cfg, priceMax: 100 }));
-                      }
-                    }}
-                  />
-                </div>
-              </div>
-              
-              {/* the four on/off settings in one place (Mert, 2026-11-07) */}
-              <fieldset className="options">
-                <legend className="bgk">Options</legend>
-                {[
-                  ['enableChat', 'Enable chat between paired students', 'Students matched together can chat during the game'],
-                  ['hideRoundCount', 'Hide the total number of rounds', 'Students see "Round 3" instead of "Round 3 of 10"'],
-                  ['showOpponentName', 'Show opponent names', 'Students see who they are paired with'],
-                  ['showModelParameters', 'Show model parameters', 'Students see the walking cost and the customer value']
-                ].map(([key, title, help]) => (
-                  <label key={key} className="opt">
-                    <input type="checkbox" checked={Boolean(instructorConfig[key])}
-                      onChange={event => setInstructorConfig(cfg => ({ ...cfg, [key]: event.target.checked }))} />
-                    <span><b>{title}</b><small>{help}</small></span>
-                  </label>
-                ))}
-              </fieldset>
+              <GameFields cfg={instructorConfig} setCfg={setInstructorConfig} />
+              <button type="submit" className="primary">Create Session</button>
+              {errorMessage && <p style={{ color: '#dc2626' }}>{errorMessage}</p>}
+            </form>
+          )}
 
+          {showCreateForm && formMode === 'defaults' && (
+            <form onSubmit={e => { e.preventDefault(); handleAddDefaults(); }} className="setup-form three">
+              <p className="small">The three games of the class, side by side, each with its own settings. Look them over, change what you want, then confirm; the three appear in the list below, ready to open one at a time.</p>
+              {defaultGames.map((g, i) => (
+                <div key={i} className="gcol">
+                  <div className="ghead">
+                    <b>Game {i + 1}</b>
+                    <span>{describe(g.cfg)}</span>
+                  </div>
+                  <div className="input-row">
+                    <label htmlFor={`default-name-${i}`}>Session Name</label>
+                    <input id={`default-name-${i}`} type="text" value={g.name} onChange={event => setDefaultGame(i, { name: event.target.value })} />
+                  </div>
+                  <GameFields cfg={g.cfg} setCfg={setDefaultCfg(i)} compact />
+                </div>
+              ))}
               <button type="submit" className="primary" disabled={addingDefaults}>
-                {formMode === 'defaults' ? (addingDefaults ? 'Creating…' : 'Confirm: create the three games') : 'Create Session'}
+                {addingDefaults ? 'Creating…' : 'Confirm: create the three games'}
               </button>
               {errorMessage && <p style={{ color: '#dc2626' }}>{errorMessage}</p>}
             </form>
