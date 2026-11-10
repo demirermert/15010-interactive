@@ -15,7 +15,7 @@ const BASE = /^https?:\/\//.test(args.host) ? args.host.replace(/\/$/, '') : `ht
 const KEY = String(args.key);
 const config = {
   rounds: 2, roundTime: [15, 60], breakTime: Number(args.break || 90), modelType: 'hotelling', travelCost: 0.004, consumerValue: 4.5,
-  marginalCost: 3.3, marketSize: 10000, x1: 0, x2: 100, priceBounds: { min: 3.3, max: 6 }, randomPriceMax: 5, showOpponentName: true
+  marginalCost: 3.3, marketSize: 10000, x1: 0, x2: 100, priceBounds: { min: 3.3, max: 10 }, randomPriceMax: 6, showOpponentName: true
 };
 const res = await fetch(BASE + '/api/session', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-instructor-key': KEY },
   body: JSON.stringify({ instructorName: 'Screens', sessionName: 'screens', config }) });

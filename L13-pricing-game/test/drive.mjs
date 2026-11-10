@@ -13,11 +13,11 @@ const args = Object.fromEntries(process.argv.slice(2).map((a, i, arr) =>
 if (!args.host || !args.key) { console.log('usage: node drive.mjs --host <url> --key <key> [--rounds R] [--round-time S] [--break S] [--t T] [--wait S] [--chat] [--hide]'); process.exit(1); }
 const BASE = /^https?:\/\//.test(args.host) ? args.host : `https://${args.host}`;
 const KEY = String(args.key);
-// gas-station settings since 2026-11-10 (since 2026-11-10 evening, the Massachusetts numbers: cost $3.30, a gallon worth $4.50, 10,000 gallons, prices $3.30-$6, random up to $5, t 0.004)
+// gas-station settings since 2026-11-10 (since 2026-11-10 evening, the Massachusetts numbers: cost $3.30, a gallon worth $4.50, 10,000 gallons, prices $3.30-$10, random up to $6, t 0.004)
 const config = {
   rounds: Number(args.rounds || 4), roundTime: Number(args['round-time'] || 45), breakTime: Number(args.break || 8),
   modelType: 'hotelling', travelCost: args.t === undefined ? 0.004 : Number(args.t), consumerValue: 4.5, marginalCost: 3.3, marketSize: 10000, x1: 0, x2: 100,
-  priceBounds: { min: 3.3, max: 6 }, randomPriceMax: 5, enableChat: Boolean(args.chat), hideRoundCount: Boolean(args.hide), showOpponentName: true
+  priceBounds: { min: 3.3, max: 10 }, randomPriceMax: 6, enableChat: Boolean(args.chat), hideRoundCount: Boolean(args.hide), showOpponentName: true
 };
 let code = args.code ? String(args.code).toUpperCase() : null; // --code XXXX drives a session created already
 if (!code) {

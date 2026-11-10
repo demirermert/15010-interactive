@@ -18,8 +18,8 @@ function buildApiUrl(path) {
 // Massachusetts figures worked out by teaching19-misc2: a station's marginal cost is about $3.30 a gallon (Boston rack
 // about $2.65, federal and MA taxes 46 cents, freight, card fees) against a $4.08 MA pump average (AAA, Nov 9); the
 // normal retail margin is 35-40 cents (NACS 2025: 39.7). Defaults: cost $3.30, a gallon worth $4.50 to a driver,
-// 10,000 gallons on the road per round when everyone buys, prices $3.30 to $6, no-submit price random from the cost up
-// to $5. Nash price = cost + 100 t, collusive = V - 50 t:
+// 10,000 gallons on the road per round when everyone buys, prices $3.30 to $10 (Mert), no-submit price random from the cost
+// up to $6. Nash price = cost + 100 t, collusive = V - 50 t:
 //  - demo: 3 rounds of 40 s, t = 0.0005 (0.05 cents a mile): Nash $3.35;
 //  - three real games, driving gets cheaper each game: t = 0.004 / 0.0015 / 0 (0.4, 0.15, 0 cents a mile), Nash $3.70 /
 //    $3.45 / $3.30 (a 40-cent margin, as in a normal week, then 15, then 0), collusive $4.30 / $4.43 / $4.50, so the
@@ -45,7 +45,7 @@ const DEFAULT_CONFIG = {
   roundTimes: [60, 50, 40, 30, 30, 30, 30, 30, 30, 30],
   marketSize: 10000, // gallons sold on the road per round when every driver buys
   marginalCost: 3.3, // a Massachusetts station's cost of a gallon, Nov 2026 (rack + taxes + freight + card fees; teaching19-misc2), shown to students
-  randomPriceMax: 5, // no price in time: a random price from the wholesale cost up to this (Mert, 2026-11-10)
+  randomPriceMax: 6, // no price in time: a random price from the wholesale cost up to this (Mert, 2026-11-10)
   modelType: 'hotelling', // 'logit' or 'hotelling'
   // Logit model parameters
   alpha: 1,
@@ -56,7 +56,7 @@ const DEFAULT_CONFIG = {
   x1: 0,
   x2: 100,
   priceMin: 3.3, // prices from the wholesale cost up (Mert, 2026-11-10: "between 2.50 and 10")
-  priceMax: 6,
+  priceMax: 10,
   defaultPrice: 3,
   enableChat: false,
   hideRoundCount: false,
