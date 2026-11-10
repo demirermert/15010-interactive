@@ -37,7 +37,9 @@ const corsConfig = allowedOrigins.includes('*')
 
 const app = express();
 const server = http.createServer(app);
-const io = new SocketIOServer(server, { cors: corsConfig });
+// Pings every 10 s with a 10 s grace (defaults 25 + 20 s), so a phone whose connection died is seen as offline, and
+// reconnects, within about 20 s instead of 45 (2026-11-10); the client's own watchdog uses the same pings.
+const io = new SocketIOServer(server, { cors: corsConfig, pingInterval: 10000, pingTimeout: 10000 });
 
 app.use(cors(corsConfig));
 app.options('*', cors(corsConfig));

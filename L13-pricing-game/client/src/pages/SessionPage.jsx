@@ -64,7 +64,7 @@ export default function SessionPage() {
   });
   // The socket handlers are registered once, so they read the current values through this ref (2026-11-02 audit)
   const latest = useRef({});
-  latest.current = { joinInfo, sessionCode, studentCodeFromUrl, hasAttemptedJoin, userName, isManagePage };
+  latest.current = { joinInfo, sessionCode, studentCodeFromUrl, hasAttemptedJoin, userName, isManagePage, sessionStatus: session?.status };
 
   // Clear all state when session code changes (navigating to a new session)
   useEffect(() => {
@@ -494,9 +494,25 @@ export default function SessionPage() {
     const back = awayMs => {
       if (!latest.current.joinInfo) return;
       if (!socket.connected) { socket.connect(); return; } // 'connect' rejoins
-      if (awayMs > 15000) { socket.disconnect(); socket.connect(); return; } // the socket may be dead without knowing it
-      rejoin(); // a short absence: just ask for the state again
+      // a phone that was dark for more than a moment usually has a dead socket that still looks connected; an emit on it is
+      // lost and Socket.io would notice only at its next ping (2026-11-10 evening, Mert's phone showed round 1 some 8-10 s
+      // after Start: it had been locked for less than the 15 s this used to require, so the rejoin went into a dead socket)
+      if (awayMs > 2500) { socket.disconnect(); socket.connect(); return; }
+      rejoin(); // a blink: just ask for the state again
     };
+    // A watchdog for a connection that died while the page was visible (a wifi switch, a phone that slept with the screen
+    // on): the server speaks at least every few seconds while a game is in the lobby or running (heartbeat echoes, the
+    // round clock, the break countdown) and pings every 10 s, so 20 s of silence on a visible page means the socket is
+    // dead; remake it, and the 'connect' handler rejoins.
+    let lastHeard = Date.now();
+    const heard = () => { lastHeard = Date.now(); };
+    socket.onAny(heard);
+    socket.io.on('ping', heard);
+    const watchdog = setInterval(() => {
+      const { joinInfo, sessionStatus } = latest.current;
+      if (document.hidden || !joinInfo || sessionStatus === 'complete' || sessionStatus === 'setup') return;
+      if (socket.connected && Date.now() - lastHeard > 20000) { heard(); socket.disconnect(); socket.connect(); }
+    }, 5000);
     let hiddenAt = null;
     const onVisibility = () => {
       if (document.hidden) { hiddenAt = Date.now(); return; }
@@ -514,6 +530,9 @@ export default function SessionPage() {
     window.addEventListener('online', onOnline);
     return () => {
       socket.off('connect', rejoin);
+      socket.offAny(heard);
+      socket.io.off('ping', heard);
+      clearInterval(watchdog);
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('pageshow', onPageShow);
       window.removeEventListener('online', onOnline);

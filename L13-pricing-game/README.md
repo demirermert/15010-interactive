@@ -232,6 +232,13 @@ Environment variables (set in the Render dashboard):
   0 "nothing, so they all go to the cheaper station"); the market card's hint repeats the per-mile cost. The value of
   a gallon (V) is still shown only with the option, now labelled "Also tell students the value of a gallon (V)".
   This reverses the 2026-11-07 choice of showing no model number (that was the drinks game).
+  Then (Mert: his phone showed round 1 only 8-10 s after Start): the likely cause is a phone whose socket died while
+  it sat locked for less than 15 s, the threshold the page used before remaking the connection on waking; the rejoin
+  went into a dead socket and only Socket.io's ping timeout (25 + 20 s by default) brought it back. Now the page
+  remakes the connection after any absence over 2.5 s, a watchdog remakes it after 20 s of silence on a visible page
+  while a game is in the lobby or running (the server speaks every few seconds then), and the server pings every
+  10 s with a 10 s grace (`pingInterval`/`pingTimeout` in server.js), so a dead phone connection is seen and replaced
+  within about 20 s in every case and at once when the phone wakes.
 
 ## Where things stand (2026-11-07)
 
