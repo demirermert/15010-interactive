@@ -196,3 +196,7 @@ body{margin:0;font:16px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,s
 .lab .pin2 input:focus{background:#eef3fa}
 .lab .pin2 input:disabled{color:var(--ink);opacity:1;-webkit-text-fill-color:var(--ink)}
 .lab .pin2 .unit{margin-left:auto;font-size:13px;color:var(--muted);padding-left:8px}
+/* profit boxes: the name on its own line above the label, so a long rival name no longer squeezes the figures (2026-11-10) */
+.lab .res2 .box{min-width:0}
+.lab .res2 .lbl{white-space:normal;line-height:1.25}
+.lab .res2 .lbl .who{display:block;font-size:13px;letter-spacing:0;text-transform:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px}

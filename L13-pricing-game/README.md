@@ -222,6 +222,10 @@ Environment variables (set in the Render dashboard):
   considered: one box with digits only filling from the right like a pump or card terminal (349 = $3.49); an
   on-screen keypad drawn by the page (no phone keyboard at all); a slider or +/− buttons; preset price chips. The
   two boxes are the most explicit and need no decimal point; `parsePrice` stays for anything else that sends text.
+  Then (Mert, after another phone run): the break countdown sits at the top of the result card as a clock with a
+  shrinking bar, like the round clock; both clocks turn red under 10 s (was 5 s for the round clock); the two profit
+  boxes carry the name on its own line ("You" / "Bot Ben") above "Profit this round" or "Total profit", so a long
+  rival name no longer squeezes the figures.
 
 ## Where things stand (2026-11-07)
 

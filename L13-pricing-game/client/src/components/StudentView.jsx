@@ -131,7 +131,16 @@ export function StudentView({
   const rounds = config?.rounds || 0;
   const hide = config?.hideRoundCount;
   const fullTime = roundTime || roundTimeFor(config, currentRound);
-  const low = timer <= 5;
+  const low = timer < 10; // the clock turns red under 10 s (Mert, 2026-11-10; it was 5)
+  const breakLen = Number(config?.breakTime || config?.resultRevealTime) || 10;
+  const breakLow = nextRoundCountdown != null && nextRoundCountdown < 10;
+  // the break countdown at the top of the card, in the shape of the round clock (Mert, 2026-11-10)
+  const breakClock = nextRoundCountdown != null && nextRoundCountdown > 0 ? (
+    <>
+      <div className="clock"><span className={`s${breakLow ? ' low' : ''}`}>{nextRoundCountdown}s</span><span className="l">until the next round</span></div>
+      <div className={`bar${breakLow ? ' low' : ''}`}><i style={{ width: `${Math.max(0, Math.min(100, (nextRoundCountdown / breakLen) * 100))}%` }} /></div>
+    </>
+  ) : null;
   const narrow = useNarrow();
   const played = history || [];
   const total = played.reduce((s, h) => s + (h.profit || 0), 0);
@@ -196,8 +205,8 @@ export function StudentView({
         <div className="case">Game over</div>
         <div className="qt">{total > rivalTotal ? 'You out-earned your rival over the game' : total < rivalTotal ? 'Your rival earned more over the game' : 'You and your rival earned the same'}</div>
         <div className="res2">
-          <div className="box you"><div className="lbl">Your total profit</div><div className="num" style={total < 0 ? { color: 'var(--rival)' } : undefined}>{money(total)}</div></div>
-          <div className="box rival"><div className="lbl">{rivalLabel}'s total profit</div><div className="num">{money(rivalTotal)}</div></div>
+          <div className="box you"><div className="lbl"><span className="who">You</span>Total profit</div><div className="num" style={total < 0 ? { color: 'var(--rival)' } : undefined}>{money(total)}</div></div>
+          <div className="box rival"><div className="lbl"><span className="who">{rivalLabel}</span>Total profit</div><div className="num">{money(rivalTotal)}</div></div>
         </div>
         {played.length > 0 && (
           <>
@@ -272,9 +281,10 @@ export function StudentView({
       <div className="card">
         <div className="case">Round {r.round} result</div>
         <div className="qt">{win ? 'You out-earned your rival this round' : lose ? 'Your rival earned more this round' : 'You and your rival earned the same'}</div>
+        {breakClock}
         <div className="res2">
-          <div className="box you"><div className="lbl">Your profit</div><div className="num" style={r.profit < 0 ? { color: 'var(--rival)' } : undefined}>{money(r.profit)}</div></div>
-          <div className="box rival"><div className="lbl">{rivalLabel}'s profit</div><div className="num">{money(r.opponentProfit)}</div></div>
+          <div className="box you"><div className="lbl"><span className="who">You</span>Profit this round</div><div className="num" style={r.profit < 0 ? { color: 'var(--rival)' } : undefined}>{money(r.profit)}</div></div>
+          <div className="box rival"><div className="lbl"><span className="who">{rivalLabel}</span>Profit this round</div><div className="num">{money(r.opponentProfit)}</div></div>
         </div>
         <div className="sharebar" role="img" aria-label={`market shares: you ${pct(r.share)}, rival ${pct(r.opponentShare)}`}>
           <i className="you" style={{ width: `${myShare * 100}%` }} /><i className="rival" style={{ width: `${rivalShare * 100}%` }} />
@@ -290,9 +300,6 @@ export function StudentView({
             <tr className="tot"><td>Total so far</td><td>{money(total)}</td><td>{money(rivalTotal)}</td></tr>
           </tbody>
         </table>
-        {nextRoundCountdown != null && nextRoundCountdown > 0 && (
-          <div className="fb info">Next round in <b>{nextRoundCountdown}s</b>.</div>
-        )}
       </div>
     );
   } else {
@@ -300,7 +307,7 @@ export function StudentView({
       <div className="card">
         <div className="case">Round {currentRound || 1}</div>
         <div className="qt">Get ready</div>
-        {nextRoundCountdown != null && <div className="fb info">Next round in <b>{nextRoundCountdown}s</b>.</div>}
+        {breakClock}
       </div>
     );
   }
