@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { RoundsChart, Street } from '../charts.jsx';
-import { money, pct, roundTimeFor, parsePrice, priceFmt, qty, kfmt, moneyK } from '../econ.js';
+import { money, pct, roundTimeFor, priceFmt, qty, kfmt, moneyK } from '../econ.js';
 
 // true on a phone-width screen (the rounds table then uses short figures and short headings so it needs no sideways scroll)
 function useNarrow(px = 560) {
@@ -76,15 +76,24 @@ export function StudentView({
   errorMessage,
   onDismissError
 }) {
-  const [price, setPrice] = useState('');
+  // The price is typed as dollars and cents in two boxes with the phone's digit keypad (Mert, 2026-11-10): no decimal
+  // point or comma to get wrong (a number box swallowed commas, 2026-11-08). The dollars box hands over to the cents
+  // box as soon as another digit could not fit under the max price (3 -> cents at a $10 max; 35 -> cents at $250), or
+  // on a typed point or comma; backspace in an empty cents box goes back. Cents are read as typed, so 5 means 50.
+  const [dollars, setDollars] = useState('');
+  const [cents, setCents] = useState('');
   const [error, setError] = useState('');
   const [sent, setSent] = useState(null);
   const [chatInput, setChatInput] = useState('');
   const inputRef = useRef(null);
+  const centsRef = useRef(null);
   const config = session?.config;
+  const maxDollars = Math.floor(priceBounds?.max ?? 100);
+  const maxDollarDigits = String(maxDollars).length;
 
   useEffect(() => {
-    setPrice('');
+    setDollars('');
+    setCents('');
     setError('');
     setSent(null);
   }, [currentRound]);
@@ -93,13 +102,23 @@ export function StudentView({
     if (roundActive && !hasSubmitted && inputRef.current) inputRef.current.focus();
   }, [roundActive, hasSubmitted]);
 
+  const onDollars = e => {
+    const raw = e.target.value;
+    const d = raw.replace(/\D/g, '').slice(0, maxDollarDigits);
+    setDollars(d);
+    if (/[.,]/.test(raw) || (d !== '' && Number(d + '0') > maxDollars)) centsRef.current?.focus();
+  };
+  const onCents = e => setCents(e.target.value.replace(/\D/g, '').slice(0, 2));
+  const onCentsKey = e => { if (e.key === 'Backspace' && cents === '') { e.preventDefault(); inputRef.current?.focus(); } };
+
   const handleSubmit = event => {
     event.preventDefault();
-    const numeric = parsePrice(price); // the box is a text box: a number box swallowed commas (2026-11-08)
-    if (!Number.isFinite(numeric)) {
-      setError(String(price).trim() === '' ? 'Enter a price.' : 'That is not a number. Type digits only, with a point or a comma for cents (for example 35.50).');
+    const dStr = dollars.trim(), cStr = cents.trim();
+    if (dStr === '' && cStr === '') {
+      setError('Enter a price.');
       return;
     }
+    const numeric = Number(dStr || '0') + Number((cStr || '0').padEnd(2, '0')) / 100;
     if (numeric < priceBounds.min || numeric > priceBounds.max) {
       setError(`The price must be between ${priceFmt(priceBounds.min, config)} and ${priceFmt(priceBounds.max, config)}.`);
       return;
@@ -191,8 +210,8 @@ export function StudentView({
               <tbody>
                 <tr><td>Total profit</td><td className="you">{money(total)}</td><td className="rival">{money(rivalTotal)}</td></tr>
                 <tr><td>Average price</td><td>{priceFmt(myAvgPrice, config)}</td><td>{priceFmt(rivalAvgPrice, config)}</td></tr>
-                <tr><td>Gallons sold</td><td>{qty(myGallons)}</td><td>{qty(rivalGallons)}</td></tr>
                 <tr><td>Market share, average</td><td>{pct(myAvgShare)}</td><td>{pct(rivalAvgShare)}</td></tr>
+                <tr><td>Gallons sold</td><td>{qty(myGallons)}</td><td>{qty(rivalGallons)}</td></tr>
                 <tr><td>Rounds won</td><td>{roundsWon} of {played.length}</td><td>{roundsLost} of {played.length}</td></tr>
               </tbody>
             </table>
@@ -212,6 +231,7 @@ export function StudentView({
     );
   } else if (roundActive) {
     const done = hasSubmitted;
+    const shownPrice = acceptedPrice ?? sent; // the server's figure once it has answered, the typed one until then
     left = (
       <div className="card">
         <div className="case">Round {currentRound}{!hide && rounds ? ` of ${rounds}` : ''}</div>
@@ -219,10 +239,16 @@ export function StudentView({
         <div className="clock"><span className={`s${low ? ' low' : ''}`}>{Math.max(0, timer)}s</span><span className="l">left in this round</span></div>
         <div className={`bar${low ? ' low' : ''}`}><i style={{ width: `${Math.max(0, Math.min(100, (timer / (fullTime || 1)) * 100))}%` }} /></div>
         <form onSubmit={handleSubmit}>
-          <div className="pin">
-            <span>$</span>
-            <input ref={inputRef} type="text" inputMode="decimal" autoComplete="off" value={done && price === '' && (acceptedPrice ?? sent) != null ? (acceptedPrice ?? sent) : price}
-              onChange={e => setPrice(e.target.value)} disabled={done} placeholder="0" aria-label="Your price" />
+          <div className="pin2">
+            <span className="cur">$</span>
+            <input ref={inputRef} className="dollars" type="text" inputMode="numeric" pattern="[0-9]*" autoComplete="off" maxLength={maxDollarDigits}
+              style={{ width: `${maxDollarDigits + 0.8}ch` }} value={done && shownPrice != null ? String(Math.floor(shownPrice)) : dollars}
+              onChange={onDollars} disabled={done} placeholder="0" aria-label="Dollars" />
+            <span className="dot">.</span>
+            <input ref={centsRef} className="cents" type="text" inputMode="numeric" pattern="[0-9]*" autoComplete="off" maxLength={2}
+              value={done && shownPrice != null ? String(Math.round((shownPrice - Math.floor(shownPrice)) * 100)).padStart(2, '0') : cents}
+              onChange={onCents} onKeyDown={onCentsKey} disabled={done} placeholder="00" aria-label="Cents" />
+            <span className="unit">per gallon</span>
           </div>
           <div className="hint">Price per gallon, between {priceFmt(priceBounds.min, config)} and {priceFmt(priceBounds.max, config)}.
  If you don't submit in time, the game picks a random price for you.</div>
@@ -258,8 +284,8 @@ export function StudentView({
           <thead><tr><th /><th className="you">You</th><th className="rival">{rivalLabel}</th></tr></thead>
           <tbody>
             <tr><td>Price per gallon</td><td className="you">{priceFmt(r.price, config)}</td><td className="rival">{priceFmt(r.opponentPrice, config)}</td></tr>
-            <tr><td>Gallons sold</td><td>{qty(r.demand)}</td><td>{qty(r.opponentDemand)}</td></tr>
             <tr><td>Market share</td><td>{pct(r.share)}</td><td>{pct(r.opponentShare)}</td></tr>
+            <tr><td>Gallons sold</td><td>{qty(r.demand)}</td><td>{qty(r.opponentDemand)}</td></tr>
             <tr><td>Profit this round</td><td className="you">{money(r.profit)}</td><td className="rival">{money(r.opponentProfit)}</td></tr>
             <tr className="tot"><td>Total so far</td><td>{money(total)}</td><td>{money(rivalTotal)}</td></tr>
           </tbody>
@@ -308,7 +334,7 @@ export function StudentView({
             <table className="hist rounds" style={{ marginTop: 12 }}>
               <thead><tr>
                 <th>{narrow ? '#' : 'Round'}</th><th>You</th><th>{narrow ? 'Rival' : rivalLabel}</th>
-                <th>{narrow ? 'Gallons' : 'Your gallons'}</th><th>{narrow ? 'Profit' : 'Your profit'}</th><th>{narrow ? 'Rival profit' : `${rivalLabel}'s profit`}</th>
+                <th>{narrow ? 'Share' : 'Your share'}</th><th>{narrow ? 'Profit' : 'Your profit'}</th><th>{narrow ? 'Rival profit' : `${rivalLabel}'s profit`}</th>
               </tr></thead>
               <tbody>
                 {hist.map(h => (
@@ -316,12 +342,12 @@ export function StudentView({
                     <td>{h.round}</td>
                     <td className="you">{priceFmt(h.price, config)}</td>
                     <td className="rival">{priceFmt(h.opponentPrice, config)}</td>
-                    <td>{narrow ? kfmt(h.demand) : `${qty(h.demand)} (${pct(h.share)})`}</td>
+                    <td>{pct(h.share)}</td>
                     <td>{narrow ? moneyK(h.profit) : money(h.profit)}</td>
                     <td>{narrow ? moneyK(h.opponentProfit) : money(h.opponentProfit)}</td>
                   </tr>
                 ))}
-                <tr className="tot"><td>Total</td><td /><td /><td>{narrow ? kfmt(myGallons) : qty(myGallons)}</td><td style={{ color: 'var(--ok)' }}>{narrow ? moneyK(total) : money(total)}</td><td>{narrow ? moneyK(rivalTotal) : money(rivalTotal)}</td></tr>
+                <tr className="tot"><td>{narrow ? 'Total' : 'Total (share: average)'}</td><td /><td /><td>{pct(myAvgShare)}</td><td style={{ color: 'var(--ok)' }}>{narrow ? moneyK(total) : money(total)}</td><td>{narrow ? moneyK(rivalTotal) : money(rivalTotal)}</td></tr>
               </tbody>
             </table>
             </div>

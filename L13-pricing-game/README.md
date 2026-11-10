@@ -214,6 +214,14 @@ Environment variables (set in the Render dashboard):
   line, the result card, the forced price when nothing is sent (cents, inside $2.50-$10), the game-over card and
   the rank, the phone layout at 520 px (result and game over), the dashboard's panels and hover box in the archived
   view, and the CSV (16 rows, every profit = (price − 2.50) × quantity). Test game deleted afterwards.
+  After his own run (Mert): the rounds table shows the market share, not the gallons (the result and game-over
+  cards list the share first and the gallons under it); the price is typed as DOLLARS and CENTS in two boxes with
+  the phone's digit keypad (`.pin2`): the dollars box hands over to the cents box as soon as another digit could not
+  fit under the max price (3 at a $10 max, 35 at $250) or on a typed point or comma, backspace in an empty cents box
+  goes back, cents are read as typed (5 = 50), the boxes show the server's figure once the price is in. Other ways
+  considered: one box with digits only filling from the right like a pump or card terminal (349 = $3.49); an
+  on-screen keypad drawn by the page (no phone keyboard at all); a slider or +/− buttons; preset price chips. The
+  two boxes are the most explicit and need no decimal point; `parsePrice` stays for anything else that sends text.
 
 ## Where things stand (2026-11-07)
 
