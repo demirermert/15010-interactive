@@ -230,6 +230,13 @@ Done so far (commits 2298d7c to 388e0de, all 2026-11-02):
   once: lobby, mid-round before and after submitting, break, a missed round, a dark phone at Start, a duplicate seat,
   a latecomer, two tabs, the instructor mid-game, a reload in flight at Start, after game over. Run all three after
   any change to the server or the client.
+- "Test this with me" (Mert, 2026-11-10): when he says so, the agent (1) deploys the current code to lab-a if it is
+  not there yet (never on a class day), (2) runs `node test/setup_test.mjs --host https://lab-a.onrender.com --key
+  <the common instructor key>` which creates one game (Game 1 settings cut to 3 rounds of 45 s, 12 s breaks, names
+  shown; flags change any of it) and opens its lobby, then exits, (3) opens `https://15010.ai/l13-axx` (stores the
+  key in Safari) and then `https://lab-a.onrender.com/manage/<CODE>` in Safari, and (4) tells him the code. He joins
+  from his phone at `15010.ai/l13-a` and presses "Start the game" on the dashboard himself. Alone he plays the
+  ChatGPT seat. First run: session KTTJ on lab-a, 2026-11-10.
 - The 2026-11-02 audit and fuzz scripts (`audit.mjs`, `fuzz.mjs`, about 90k cases) lived in a session scratchpad
   that is gone. The Jul 2026 bots in this folder (`pricing-game-automation.js`, `test-automation.js`, `load-test/`,
   `AUTOMATION-README.md`, `QUICK-TEST-GUIDE.md`) predate the rewrite: check them against the socket events in
