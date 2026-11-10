@@ -207,6 +207,13 @@ Environment variables (set in the Render dashboard):
   2025; hovering a market in either pair chart opens a floating box with the pair's two price paths and one line per
   round with both prices and both profits (the 2025 page had this), a click still pins the market's chart below;
   the chart points name the round and the value on hover.
+  Then tested on lab-a itself (Mert: "test this yourself"): a 4-round game with two scripted students
+  (`test/bots.mjs --host <url> --code XXXX --n 2`, random prices from the cost up), one student in Chrome and the
+  ChatGPT seat through Parley (it priced $3.50, $3.54, $3.50, $4.49: the Nash price, then up when its rival priced
+  high; never below cost). Checked: the join address 15010.ai/l13-a, the lobby, the round card and the submitted
+  line, the result card, the forced price when nothing is sent (cents, inside $2.50-$10), the game-over card and
+  the rank, the phone layout at 520 px (result and game over), the dashboard's panels and hover box in the archived
+  view, and the CSV (16 rows, every profit = (price − 2.50) × quantity). Test game deleted afterwards.
 
 ## Where things stand (2026-11-07)
 
