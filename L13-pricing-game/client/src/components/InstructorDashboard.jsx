@@ -78,6 +78,8 @@ export function InstructorDashboard({
   const [search, setSearch] = useState('');
   const [pairSearch, setPairSearch] = useState('');
   const [selectedPair, setSelectedPair] = useState(null);
+  const [hover, setHover] = useState(null); // { key, x, y }: the pair under the mouse, for the floating history box
+  const onHover = (key, e) => setHover(key ? { key, x: e.clientX, y: e.clientY } : null);
   const config = session?.config;
   const status = session?.status;
   const code = session?.code || '';
@@ -101,7 +103,6 @@ export function InstructorDashboard({
   const roundPrices = Array.from({ length: nRounds }, (_, i) => pricesOf(byRound.find(r => r.round === i + 1)));
   const avgSeries = roundPrices.map(avg);
   const sdSeries = roundPrices.map(sd);
-  const lastRound = latestRound ? { ...latestRound, results: asPairs(latestRound.results) } : null;
 
   const pairTotals = useMemo(() => {
     const m = new Map();
@@ -116,6 +117,9 @@ export function InstructorDashboard({
   }, [byRound]);
   const shownPairs = pairTotals.filter(r => !pairSearch || r.label.toLowerCase().includes(pairSearch.toLowerCase()));
   const detail = pairTotals.find(r => r.key === selectedPair) || pairTotals[0] || null;
+  const hoverRow = hover ? pairTotals.find(r => r.key === hover.key) : null;
+  const priceLabel = 'Price ($ per gallon)';
+  const vw = typeof window !== 'undefined' ? window.innerWidth : 1200, vh = typeof window !== 'undefined' ? window.innerHeight : 800;
 
   const filteredBoard = (leaderboard || []).filter(r => r.name.toLowerCase().includes(search.toLowerCase()));
 
@@ -176,8 +180,6 @@ export function InstructorDashboard({
     state = <div className="empty-note">Loading the session…</div>;
   }
 
-  const pairs = lastRound?.results || [];
-
   return (
     <div className="dash">
       <div className="page">
@@ -214,7 +216,7 @@ export function InstructorDashboard({
             <div className="qtext">The average price the room set in each round; the band is one standard deviation either side.</div>
             {byRound.length === 0 ? <div className="empty-note">The first round's prices appear here when it ends.</div> : (
               <>
-                <RoundsChart rounds={nRounds} height={280} series={[
+                <RoundsChart rounds={nRounds} height={280} yLabel={priceLabel} series={[
                   { label: 'Average', color: '#1F2E5C', values: avgSeries, band: [avgSeries.map((v, i) => (v == null ? null : Math.max(0, v - sdSeries[i]))), avgSeries.map((v, i) => (v == null ? null : v + sdSeries[i]))] }
                 ]} />
                 <div className="legend">
@@ -230,9 +232,9 @@ export function InstructorDashboard({
               <div className="section-label">Total profit by pair</div>
               <input className="search" placeholder="Find a name" value={pairSearch} onChange={e => setPairSearch(e.target.value)} />
             </div>
-            <div className="qtext">Both stations' profit added up over the rounds played so far, best market first. Click a market to see its prices.</div>
+            <div className="qtext">Both stations' profit added up over the rounds played so far, best market first. Hover a market for its whole history; click to keep it below.</div>
             {pairTotals.length === 0 ? <div className="empty-note">Appears after the first round.</div> : (
-              <div className="scroll" style={{ maxHeight: 520, maxWidth: 700 }}><PairBars rows={shownPairs} selected={detail?.key} onSelect={setSelectedPair} /></div>
+              <div className="scroll" style={{ maxHeight: 520, maxWidth: 700 }}><PairBars rows={shownPairs} selected={detail?.key} onSelect={setSelectedPair} onHover={onHover} /></div>
             )}
           </section>
 
@@ -262,7 +264,7 @@ export function InstructorDashboard({
               <div className="section-label">One market: {detail.label}</div>
               <div className="qtext">The two stations' prices round by round; totals {money(detail.a)} and {money(detail.b)}.</div>
               <div style={{ maxWidth: 820 }}>
-                <RoundsChart rounds={nRounds} height={220} series={[
+                <RoundsChart rounds={nRounds} height={220} yLabel={priceLabel} series={[
                   { label: detail.aName, color: '#1F2E5C', values: Array.from({ length: nRounds }, (_, i) => detail.pricesA[i] ?? null) },
                   { label: detail.bName, color: '#A31F34', values: Array.from({ length: nRounds }, (_, i) => detail.pricesB[i] ?? null), width: 2 }
                 ]} />
@@ -271,31 +273,13 @@ export function InstructorDashboard({
             </section>
           )}
 
-          <section className="panel wide">
-            <div className="section-label">Pairs · round {latestRound?.round || '–'}</div>
-            <div className="qtext">Each market in the last round played.</div>
-            {pairs.length === 0 ? <div className="empty-note">Pairs are made when the game starts; their prices appear after the first round.</div> : (
-              <div className="scroll">
-                <table className="res">
-                  <thead><tr><th>Station A</th><th className="r">Price</th><th className="r">Profit</th><th>Station B</th><th className="r">Price</th><th className="r">Profit</th></tr></thead>
-                  <tbody>
-                    {pairs.map(p => (
-                      <tr key={p.pairId} onClick={() => setSelectedPair(p.pairId)} style={{ cursor: 'pointer', background: detail?.key === p.pairId ? '#f3f5fa' : undefined }}>
-                        <td>{p.playerA?.name}</td><td className="r">{priceFmt(p.playerA?.price, config)}</td><td className="r">{money(p.playerA?.profit)}</td>
-                        <td>{p.playerB?.name}</td><td className="r">{priceFmt(p.playerB?.price, config)}</td><td className="r">{money(p.playerB?.profit)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
-
+          {/* the "Pairs · round N" table of the last round went on 2026-11-10 (Mert): the 2025 page had the five panels
+              that remain (state, average price, total profit by pair, leaderboard, individual profits, students) */}
           <section className="panel">
             <div className="section-label">Individual profits by pair</div>
-            <div className="qtext">Each station's own total within the market, best market first.</div>
+            <div className="qtext">Each station's own total within the market, best market first. Hover a market for its whole history.</div>
             {pairTotals.length === 0 ? <div className="empty-note">Appears after the first round.</div> : (
-              <div className="scroll" style={{ maxHeight: 520, maxWidth: 700 }}><PairBars rows={shownPairs} split selected={detail?.key} onSelect={setSelectedPair} /></div>
+              <div className="scroll" style={{ maxHeight: 520, maxWidth: 700 }}><PairBars rows={shownPairs} split selected={detail?.key} onSelect={setSelectedPair} onHover={onHover} /></div>
             )}
           </section>
 
@@ -319,6 +303,28 @@ export function InstructorDashboard({
             )}
           </section>
         </div>
+        {/* the whole history of the market under the mouse (the 2025 page's hover box, 2026-11-10): the two price paths
+            and one line per round with both prices and both profits */}
+        {hoverRow && (
+          <div className="hoverbox" style={{ left: Math.max(8, Math.min(hover.x + 18, vw - 470)), top: Math.max(8, Math.min(hover.y + 18, vh - 420)) }}>
+            <div className="section-label">{hoverRow.label}</div>
+            <RoundsChart rounds={nRounds} height={170} yLabel={priceLabel} series={[
+              { label: hoverRow.aName, color: '#1F2E5C', values: Array.from({ length: nRounds }, (_, i) => hoverRow.pricesA[i] ?? null) },
+              { label: hoverRow.bName, color: '#A31F34', values: Array.from({ length: nRounds }, (_, i) => hoverRow.pricesB[i] ?? null), width: 2 }
+            ]} />
+            <table className="res">
+              <thead><tr><th>Round</th><th className="r" style={{ color: '#1F2E5C' }}>{hoverRow.aName}</th><th className="r" style={{ color: '#A31F34' }}>{hoverRow.bName}</th><th className="r" style={{ color: '#1F2E5C' }}>Profit</th><th className="r" style={{ color: '#A31F34' }}>Profit</th></tr></thead>
+              <tbody>
+                {Array.from({ length: Math.max(hoverRow.pricesA.length, hoverRow.pricesB.length) }, (_, i) => (
+                  hoverRow.pricesA[i] == null && hoverRow.pricesB[i] == null ? null : (
+                    <tr key={i}><td>{i + 1}</td><td className="r">{priceFmt(hoverRow.pricesA[i], config)}</td><td className="r">{priceFmt(hoverRow.pricesB[i], config)}</td><td className="r">{money(hoverRow.profitsA[i])}</td><td className="r">{money(hoverRow.profitsB[i])}</td></tr>
+                  )
+                ))}
+                <tr className="tot"><td>Total</td><td /><td /><td className="r">{money(hoverRow.a)}</td><td className="r">{money(hoverRow.b)}</td></tr>
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

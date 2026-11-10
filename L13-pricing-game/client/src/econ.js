@@ -113,7 +113,21 @@ export function parsePrice(text) {
 
 export function money(v, digits = 0) {
   if (!Number.isFinite(v)) return '–';
-  return '$' + v.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  return (v < 0 ? '-$' : '$') + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+}
+
+// Short figures for a phone's rounds table (Mert, 2026-11-10: "K notation"): 5,050 -> 5.1K, 12,500 -> 12.5K, 1,250,000 -> 1.3M
+export function kfmt(v) {
+  if (!Number.isFinite(v)) return '–';
+  const a = Math.abs(v), sign = v < 0 ? '-' : '';
+  // one decimal, rounded on the integer tenths so 5,050 -> 5.1K (5.05 x 10 is 50.4999 in floating point); no trailing .0
+  if (a >= 1e6) return sign + String(Math.round(a / 1e5) / 10) + 'M';
+  if (a >= 1000) return sign + String(Math.round(a / 100) / 10) + 'K';
+  return sign + Math.round(a).toLocaleString('en-US');
+}
+export function moneyK(v) {
+  if (!Number.isFinite(v)) return '–';
+  return (v < 0 ? '-$' : '$') + kfmt(Math.abs(v));
 }
 
 export function pct(v) {

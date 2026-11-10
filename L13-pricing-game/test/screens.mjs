@@ -27,7 +27,7 @@ const inst = io(BASE, { transports: ['websocket'] });
 const stu = io(BASE, { transports: ['websocket'] });
 let studentCode = null;
 const bail = (msg) => { console.error(msg); inst.close(); stu.close(); process.exit(1); };
-setTimeout(() => bail('timed out'), 60000);
+setTimeout(() => bail('timed out'), args.finish ? 400000 : 60000); // --finish: play round 2 too and report the game over
 inst.on('connect', () => inst.emit('joinSession', { sessionCode: code, playerName: 'Screens', role: 'instructor', key: KEY }));
 inst.on('joinedSession', () => inst.emit('openLobby', { sessionCode: code }));
 inst.on('errorMessage', m => bail('instructor error: ' + m));
@@ -36,10 +36,14 @@ inst.on('sessionUpdate', p => {
 });
 stu.on('errorMessage', m => bail('student error: ' + m));
 stu.on('joinedSession', j => { studentCode = j.studentCode; setTimeout(() => inst.emit('startSession', { sessionCode: code }), 500); });
-stu.on('roundStarted', p => { if (p.round === 1) setTimeout(() => stu.emit('submitPrice', { sessionCode: code, price: 3.49 }), 1000); });
+stu.on('roundStarted', p => {
+  if (p.round === 1) setTimeout(() => stu.emit('submitPrice', { sessionCode: code, price: 3.49 }), 1000);
+  if (p.round === 2 && args.finish) setTimeout(() => stu.emit('submitPrice', { sessionCode: code, price: 4 }), 1000);
+});
 stu.on('roundResults', p => {
   if (p.round !== 1) return;
   console.log(`${BASE}/session/${code}/${studentCode}`);
   console.log(`round 1: $${p.price} vs $${p.opponentPrice}, ${Math.round(p.demand)} gallons, profit $${p.profit.toFixed(0)}; round 2 starts in ${config.breakTime} s and lasts 60 s`);
-  inst.close(); stu.close(); process.exit(0);
+  if (!args.finish) { inst.close(); stu.close(); process.exit(0); }
 });
+stu.on('sessionComplete', () => { console.log('game over'); inst.close(); stu.close(); process.exit(0); });

@@ -194,7 +194,19 @@ Environment variables (set in the Render dashboard):
   total so far) for both stations; grid items may shrink on a phone (`min-width:0`; the widest table used to push the
   page wider than the screen). Checked with headless Chrome at 520 px (its minimum window width; narrower
   `--window-size` values are clamped, so a 390 px shot is just a crop) using `test/screens.mjs`, which plays round 1
-  of a quick game by script and prints the student's link for the camera.
+  of a quick game by script and prints the student's link for the camera (`--finish` plays round 2 too and reports
+  the game over).
+  Later the same evening (Mert, from his phone): the AI seat is named "ChatGPT" or "AI Player" with no robot emoji;
+  the student's rounds table fits a phone with no sideways scroll (on screens up to 560 px wide it uses short
+  headings and K figures: 5,050 gallons -> 5.1K, $12,450 -> $12.5K, via `kfmt`/`moneyK`; wider screens keep the
+  full numbers); the game-over card has the shape of the round-result card (both total profits large, the average
+  market shares as a bar, one table with total profit, average price, gallons sold, average share and rounds won,
+  then the rank in the class); the course logo is bigger (46 px, 38 on a phone). Instructor dashboard (Mert: the
+  2025 panels, improved): the "Pairs · round N" table of the last round is gone; the panels are the state, the
+  average price by round, total profit by pair, the leaderboard, individual profits by pair and the students, as in
+  2025; hovering a market in either pair chart opens a floating box with the pair's two price paths and one line per
+  round with both prices and both profits (the 2025 page had this), a click still pins the market's chart below;
+  the chart points name the round and the value on hover.
 
 ## Where things stand (2026-11-07)
 

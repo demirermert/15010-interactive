@@ -39,17 +39,19 @@ export function RoundsChart({ rounds, series, lines = [], height = 260, yLabel =
         </g>
       ))}
       {series.map(s => {
-        const pts = s.values.map((v, i) => (Number.isFinite(v) ? [x(i), y(v)] : null)).filter(Boolean);
+        const pts = s.values.map((v, i) => (Number.isFinite(v) ? [x(i), y(v), i, v] : null)).filter(Boolean);
         if (!pts.length) return null;
         const band = s.band ? s.values.map((v, i) => (Number.isFinite(s.band[0][i]) && Number.isFinite(s.band[1][i]) ? i : null)).filter(i => i !== null) : [];
+        const fmt = v => '$' + (yMax < 20 ? v.toFixed(2) : Math.round(v).toLocaleString('en-US'));
         return (
           <g key={s.label}>
             {band.length > 1 && (
               <polygon fill={s.color} opacity="0.12" points={band.map(i => `${x(i)},${y(s.band[1][i])}`).concat(band.slice().reverse().map(i => `${x(i)},${y(s.band[0][i])}`)).join(' ')} />
             )}
-            <polyline points={pts.map(p => p.join(',')).join(' ')} fill="none" stroke={s.color}
+            <polyline points={pts.map(p => `${p[0]},${p[1]}`).join(' ')} fill="none" stroke={s.color}
               strokeWidth={s.width || 3} strokeDasharray={s.dashed ? '6 5' : undefined} strokeLinejoin="round" />
-            {pts.map((p, i) => <circle key={i} cx={p[0]} cy={p[1]} r={s.width ? s.width + 1.5 : 4.5} fill={s.color} />)}
+            {/* a hover on a point names the round and the value (the 2025 dashboard had this; 2026-11-10) */}
+            {pts.map(p => <circle key={p[2]} cx={p[0]} cy={p[1]} r={s.width ? s.width + 1.5 : 4.5} fill={s.color}><title>{`${s.label}, round ${p[2] + 1}: ${fmt(p[3])}`}</title></circle>)}
           </g>
         );
       })}
@@ -95,8 +97,10 @@ export function PriceBars({ values, lo = 0, hi = 100, bins = 10, marks = [], hei
   );
 }
 
-// Horizontal bars, one row per pair, best first. rows: [{ label, a, b, aName, bName }]; split: two bars (A and B) per row
-export function PairBars({ rows, split = false, rowHeight = 26, selected = null, onSelect = null }) {
+// Horizontal bars, one row per pair, best first. rows: [{ label, a, b, aName, bName }]; split: two bars (A and B) per row.
+// onSelect(key) on a click; onHover(key, event) while the mouse is over a row and onHover(null) when it leaves (the
+// dashboard shows the pair's whole history in a floating box, as the 2025 page did; 2026-11-10)
+export function PairBars({ rows, split = false, rowHeight = 26, selected = null, onSelect = null, onHover = null }) {
   const W = 640, L = 170, R = 70, T = 6;
   const H = T + rows.length * (split ? rowHeight * 2 - 6 : rowHeight) + 6;
   const vMax = Math.max(1, ...rows.map(r => (split ? Math.max(r.a, r.b) : r.a + r.b)));
@@ -107,11 +111,16 @@ export function PairBars({ rows, split = false, rowHeight = 26, selected = null,
       {rows.map((r, i) => {
         const y0 = T + i * (split ? rowHeight * 2 - 6 : rowHeight);
         const rowH = split ? rowHeight * 2 - 6 : rowHeight;
-        const pick = onSelect ? { onClick: () => onSelect(r.key), style: { cursor: 'pointer' } } : {};
+        const pick = {
+          ...(onSelect ? { onClick: () => onSelect(r.key), style: { cursor: 'pointer' } } : {}),
+          ...(onHover ? { onMouseEnter: e => onHover(r.key, e), onMouseMove: e => onHover(r.key, e), onMouseLeave: () => onHover(null) } : {})
+        };
         const hilite = selected === r.key ? <rect x={0} y={y0} width={W} height={rowH} rx="6" fill="#1F2E5C" opacity="0.08" /> : null;
+        const hit = <rect x={0} y={y0} width={W} height={rowH} fill="transparent" />; // the whole row answers the mouse, not just the bar
         if (!split) {
           return (
             <g key={r.label} {...pick}>
+              {hit}
               {hilite}
               <text x={L - 8} y={y0 + rowHeight / 2 + 4} textAnchor="end" fontSize="12" fill="#1c1c1e">{r.label}</text>
               <rect x={L} y={y0 + 4} width={w(r.a + r.b)} height={rowHeight - 8} rx="3" fill="#1F2E5C" opacity="0.85" />
@@ -122,6 +131,7 @@ export function PairBars({ rows, split = false, rowHeight = 26, selected = null,
         const h = rowHeight - 10;
         return (
           <g key={r.label} {...pick}>
+            {hit}
             {hilite}
             <text x={L - 8} y={y0 + 4 + h - 2} textAnchor="end" fontSize="12" fill="#1F2E5C">{r.aName}</text>
             <rect x={L} y={y0 + 4} width={w(r.a)} height={h} rx="3" fill="#1F2E5C" opacity="0.85" />

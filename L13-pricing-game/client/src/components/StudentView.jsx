@@ -1,6 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { RoundsChart, Street } from '../charts.jsx';
-import { money, pct, roundTimeFor, parsePrice, priceFmt, qty } from '../econ.js';
+import { money, pct, roundTimeFor, parsePrice, priceFmt, qty, kfmt, moneyK } from '../econ.js';
+
+// true on a phone-width screen (the rounds table then uses short figures and short headings so it needs no sideways scroll)
+function useNarrow(px = 560) {
+  const query = `(max-width:${px}px)`;
+  const [narrow, setNarrow] = useState(() => typeof window !== 'undefined' && window.matchMedia ? window.matchMedia(query).matches : false);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return undefined;
+    const m = window.matchMedia(query);
+    const onChange = e => setNarrow(e.matches);
+    m.addEventListener('change', onChange);
+    return () => m.removeEventListener('change', onChange);
+  }, [query]);
+  return narrow;
+}
 
 // The student page in the 2026 lab look (2026-11-02; the 2025 page is in git history). Since 2026-11-10 the two
 // players run gas stations on a road and pay a wholesale cost per gallon (Mert).
@@ -99,8 +113,16 @@ export function StudentView({
   const hide = config?.hideRoundCount;
   const fullTime = roundTime || roundTimeFor(config, currentRound);
   const low = timer <= 5;
-  const total = (history || []).reduce((s, h) => s + (h.profit || 0), 0);
-  const rivalTotal = (history || []).reduce((s, h) => s + (h.opponentProfit || 0), 0);
+  const narrow = useNarrow();
+  const played = history || [];
+  const total = played.reduce((s, h) => s + (h.profit || 0), 0);
+  const rivalTotal = played.reduce((s, h) => s + (h.opponentProfit || 0), 0);
+  // the game-over figures (Mert, 2026-11-10): gallons over the game, the average share of the road, average prices, rounds won
+  const avg = arr => (arr.length ? arr.reduce((s, x) => s + x, 0) / arr.length : NaN);
+  const myGallons = played.reduce((s, h) => s + (h.demand || 0), 0), rivalGallons = played.reduce((s, h) => s + (h.opponentDemand || 0), 0);
+  const myAvgShare = avg(played.map(h => h.share || 0)), rivalAvgShare = avg(played.map(h => h.opponentShare || 0));
+  const myAvgPrice = avg(played.map(h => h.price)), rivalAvgPrice = avg(played.map(h => h.opponentPrice));
+  const roundsWon = played.filter(h => h.profit > h.opponentProfit).length, roundsLost = played.filter(h => h.profit < h.opponentProfit).length;
   const me = playerName || history?.[0]?.name;
   const rank = leaderboard?.length ? leaderboard.findIndex(r => (playerId ? r.playerId === playerId : r.name === me)) + 1 : 0;
   const rivalLabel = config?.showOpponentName && opponentName ? opponentName : 'Rival';
@@ -147,13 +169,36 @@ export function StudentView({
       </div>
     );
   } else if (sessionStatus === 'complete') {
+    // the game-over card in the shape of the round-result card (Mert, 2026-11-10): both totals large, the average
+    // market shares as a bar, then one table for both stations
+    const s1 = Math.max(0, Math.min(1, myAvgShare || 0)), s2 = Math.max(0, Math.min(1, rivalAvgShare || 0));
     left = (
       <div className="card">
         <div className="case">Game over</div>
-        <div className="qt">Your total profit</div>
-        <div className="total">{money(total)}</div>
-        <div className="hint">Your rival made {money(rivalTotal)} in the same market.</div>
-        {rank > 0 && <div className="fb info">You placed <b>{rank}</b> of {leaderboard.length}.</div>}
+        <div className="qt">{total > rivalTotal ? 'You out-earned your rival over the game' : total < rivalTotal ? 'Your rival earned more over the game' : 'You and your rival earned the same'}</div>
+        <div className="res2">
+          <div className="box you"><div className="lbl">Your total profit</div><div className="num" style={total < 0 ? { color: 'var(--rival)' } : undefined}>{money(total)}</div></div>
+          <div className="box rival"><div className="lbl">{rivalLabel}'s total profit</div><div className="num">{money(rivalTotal)}</div></div>
+        </div>
+        {played.length > 0 && (
+          <>
+            <div className="sharebar" role="img" aria-label={`average market shares: you ${pct(myAvgShare)}, rival ${pct(rivalAvgShare)}`}>
+              <i className="you" style={{ width: `${s1 * 100}%` }} /><i className="rival" style={{ width: `${s2 * 100}%` }} />
+            </div>
+            <div className="sharelbl"><span className="you">You {pct(myAvgShare)}</span><span className="rival">{rivalLabel} {pct(rivalAvgShare)}</span></div>
+            <table className="hist res" style={{ marginTop: 10 }}>
+              <thead><tr><th /><th className="you">You</th><th className="rival">{rivalLabel}</th></tr></thead>
+              <tbody>
+                <tr><td>Total profit</td><td className="you">{money(total)}</td><td className="rival">{money(rivalTotal)}</td></tr>
+                <tr><td>Average price</td><td>{priceFmt(myAvgPrice, config)}</td><td>{priceFmt(rivalAvgPrice, config)}</td></tr>
+                <tr><td>Gallons sold</td><td>{qty(myGallons)}</td><td>{qty(rivalGallons)}</td></tr>
+                <tr><td>Market share, average</td><td>{pct(myAvgShare)}</td><td>{pct(rivalAvgShare)}</td></tr>
+                <tr><td>Rounds won</td><td>{roundsWon} of {played.length}</td><td>{roundsLost} of {played.length}</td></tr>
+              </tbody>
+            </table>
+          </>
+        )}
+        {rank > 0 && <div className="fb info">You placed <b>{rank}</b> of {leaderboard.length} in the class by total profit.</div>}
       </div>
     );
   } else if (spectator) {
@@ -258,21 +303,25 @@ export function StudentView({
               { label: rivalLabel, color: '#A31F34', values: Array.from({ length: nShown }, (_, i) => hist[i]?.opponentPrice ?? null), width: 2 }
             ]} />
             <div className="legend"><span><i style={{ background: '#1F2E5C' }} />Your price</span><span><i style={{ background: '#A31F34' }} />{rivalLabel}'s price</span></div>
+            {/* on a phone: short headings and K figures, so the six columns fit without sideways scrolling (Mert, 2026-11-10) */}
             <div style={{ overflowX: 'auto' }}>
-            <table className="hist" style={{ marginTop: 12 }}>
-              <thead><tr><th>Round</th><th>You</th><th>{rivalLabel}</th><th>Your gallons</th><th>Your profit</th><th>{rivalLabel}'s profit</th></tr></thead>
+            <table className="hist rounds" style={{ marginTop: 12 }}>
+              <thead><tr>
+                <th>{narrow ? '#' : 'Round'}</th><th>You</th><th>{narrow ? 'Rival' : rivalLabel}</th>
+                <th>{narrow ? 'Gallons' : 'Your gallons'}</th><th>{narrow ? 'Profit' : 'Your profit'}</th><th>{narrow ? 'Rival profit' : `${rivalLabel}'s profit`}</th>
+              </tr></thead>
               <tbody>
                 {hist.map(h => (
                   <tr key={h.round} className={latestResult?.round === h.round && !roundActive ? 'cur' : ''}>
                     <td>{h.round}</td>
                     <td className="you">{priceFmt(h.price, config)}</td>
                     <td className="rival">{priceFmt(h.opponentPrice, config)}</td>
-                    <td>{qty(h.demand)} ({pct(h.share)})</td>
-                    <td>{money(h.profit)}</td>
-                    <td>{money(h.opponentProfit)}</td>
+                    <td>{narrow ? kfmt(h.demand) : `${qty(h.demand)} (${pct(h.share)})`}</td>
+                    <td>{narrow ? moneyK(h.profit) : money(h.profit)}</td>
+                    <td>{narrow ? moneyK(h.opponentProfit) : money(h.opponentProfit)}</td>
                   </tr>
                 ))}
-                <tr className="tot"><td>Total</td><td /><td /><td /><td style={{ color: 'var(--ok)' }}>{money(total)}</td><td>{money(rivalTotal)}</td></tr>
+                <tr className="tot"><td>Total</td><td /><td /><td>{narrow ? kfmt(myGallons) : qty(myGallons)}</td><td style={{ color: 'var(--ok)' }}>{narrow ? moneyK(total) : money(total)}</td><td>{narrow ? moneyK(rivalTotal) : money(rivalTotal)}</td></tr>
               </tbody>
             </table>
             </div>

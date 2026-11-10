@@ -511,7 +511,7 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
     
     // If odd number of students, add an AI player
     if (shuffled.length % 2 === 1) {
-      const aiPlayerName = isOpenAIInitialized() ? 'ChatGPT 🤖' : 'AI Player 🤖';
+      const aiPlayerName = isOpenAIInitialized() ? 'ChatGPT' : 'AI Player'; // no robot emoji (Mert, 2026-11-10)
       const aiPlayer = {
         socketId: `ai-player-${Date.now()}`,
         sessionCode: session.code,
