@@ -48,6 +48,7 @@ function truth(pA, pB, c) {
     return { dA: c.marketSize * eA / (eA + eB + e0), dB: c.marketSize * eB / (eA + eB + e0), tol: 1e-6 * c.marketSize, M: c.marketSize };
   }
   const { travelCost: t, x1, x2, consumerValue: V } = c;
+  const M = c.marketSize || 100; // gallons on the road when everyone buys (2026-11-10)
   let a = 0, b = 0;
   for (let i = 0; i < G; i++) {
     const x = (i + 0.5) * (100 / G);
@@ -55,7 +56,7 @@ function truth(pA, pB, c) {
     if (uA < 0 && uB < 0) continue;
     if (Math.abs(uA - uB) < 1e-9) { a += 0.5; b += 0.5; } else if (uA > uB) a++; else b++;
   }
-  return { dA: a * 100 / G, dB: b * 100 / G, tol: 100 / G * 4, M: 100 };
+  return { dA: a * M / G, dB: b * M / G, tol: M / G * 4, M };
 }
 
 // ---- payloads a phone might send ----------------------------------------------------------------------------------
@@ -162,7 +163,9 @@ function sendAndWait(c, payload, ms = 4000) {
 const H = (travelCost, extra = {}) => ({ modelType: 'hotelling', travelCost, consumerValue: 200, x1: 0, x2: 100, priceBounds: { min: 0, max: 250 }, ...extra });
 const GAMES = [
   { name: 'game1 t=1', students: 8, rounds: 3, config: H(1) },
-  { name: 'game2 t=0.3', students: 8, rounds: 3, config: H(0.3) },
+  { name: 'game2 t=0.3 cost 40', students: 8, rounds: 3, config: H(0.3, { marginalCost: 40 }) },
+  { name: 'gas stations: cost 2.50, V 5, t 0.01, 10,000 gallons, $0-$10', students: 8, rounds: 3, config: H(0.01, { consumerValue: 5, marginalCost: 2.5, marketSize: 10000, priceBounds: { min: 0, max: 10 } }) },
+  { name: 'gas stations: no driving cost', students: 6, rounds: 2, config: H(0, { consumerValue: 5, marginalCost: 2.5, marketSize: 10000, priceBounds: { min: 0, max: 10 } }) },
   { name: 'game3 t=0', students: 8, rounds: 3, config: H(0) },
   { name: 'demo t=0.1 V=100', students: 6, rounds: 3, config: H(0.1, { consumerValue: 100 }) },
   { name: 'inner spots 35/65 t=0.3', students: 8, rounds: 3, config: H(0.3, { x1: 35, x2: 65 }) },
@@ -271,16 +274,17 @@ async function runGame(g, seed) {
       seen.push({ round, name: c.name, price: r.price, profit: r.profit });
       if (c.lastAccepted !== null) {
         if (Math.abs(r.price - c.lastAccepted) > 1e-9) mismatches.push(`round ${round} ${c.name}: result price ${r.price}, last accepted ${c.lastAccepted}`);
-      } else if (!(r.price >= lo && r.price <= hi) || (Number.isInteger(lo) && !Number.isInteger(r.price))) forcedBad.push(`round ${round} ${c.name}: forced price ${r.price} (bounds ${lo}-${hi})`);
+      } else if (!(r.price >= lo && r.price <= hi) || (hi - lo > 50 ? Number.isInteger(lo) && !Number.isInteger(r.price) : Math.abs(r.price * 100 - Math.round(r.price * 100)) > 1e-6)) forcedBad.push(`round ${round} ${c.name}: forced price ${r.price} (bounds ${lo}-${hi})`);
       const [pa, pb] = side === 'A' ? [r.price, r.opponentPrice] : [r.opponentPrice, r.price];
       const t = truth(pa, pb, serverConfig);
       const my = side === 'A' ? t.dA : t.dB, theirs = side === 'A' ? t.dB : t.dA;
+      const unitCost = serverConfig.marginalCost || 0;
       const bad = [];
       if (Math.abs(my - r.demand) > t.tol) bad.push(`demand ${r.demand.toFixed(3)} vs street ${my.toFixed(3)}`);
-      if (Math.abs(r.price * r.demand - r.profit) > 1e-6 * Math.max(1, r.profit)) bad.push(`profit ${r.profit} != price x demand ${r.price * r.demand}`);
+      if (Math.abs((r.price - unitCost) * r.demand - r.profit) > 1e-6 * Math.max(1, Math.abs(r.profit))) bad.push(`profit ${r.profit} != (price - cost) x demand ${(r.price - unitCost) * r.demand}`);
       if (Math.abs(r.demand / t.M - r.share) > 1e-9) bad.push(`share ${r.share} vs ${r.demand / t.M}`);
       if (Math.abs(theirs - r.opponentDemand) > t.tol) bad.push(`rival demand ${r.opponentDemand.toFixed(3)} vs street ${theirs.toFixed(3)}`);
-      if (Math.abs(r.opponentPrice * r.opponentDemand - r.opponentProfit) > 1e-6 * Math.max(1, r.opponentProfit)) bad.push('rival profit != price x demand');
+      if (Math.abs((r.opponentPrice - unitCost) * r.opponentDemand - r.opponentProfit) > 1e-6 * Math.max(1, Math.abs(r.opponentProfit))) bad.push('rival profit != (price - cost) x demand');
       if (![r.price, r.demand, r.profit, r.share, r.opponentPrice, r.opponentDemand, r.opponentProfit, r.opponentShare].every(Number.isFinite)) bad.push('non-finite field');
       if (bad.length) mismatches.push(`round ${round} ${c.name} (${side}) prices ${pa}/${pb}: ${bad.join('; ')}`);
       const rival = students.find(o => o.name === r.opponentName);
@@ -300,7 +304,7 @@ async function runGame(g, seed) {
   check(`${tag} every payload answered within 4 s`, timeouts === 0, `${timeouts} unanswered`);
   check(`${tag} every payload accepted or refused as expected`, wrongReplies.length === 0, wrongReplies.slice(0, 4).join(' | ') + (wrongReplies.length > 4 ? ` | +${wrongReplies.length - 4}` : ''));
   check(`${tag} results = last accepted price, demand/profit/share = the model, all finite`, mismatches.length === 0, mismatches.slice(0, 3).join(' | ') + (mismatches.length > 3 ? ` | +${mismatches.length - 3}` : ''));
-  check(`${tag} forced prices (no submission) are whole dollars inside the bounds`, forcedBad.length === 0, forcedBad.slice(0, 3).join(' | '));
+  check(`${tag} forced prices (no submission) are whole dollars inside the bounds (cents on a range of $50 or less)`, forcedBad.length === 0, forcedBad.slice(0, 3).join(' | '));
   check(`${tag} the rival's price in my results is what the rival chose (Nash for the AI seat)`, rivalMismatch.length === 0, rivalMismatch.slice(0, 3).join(' | '));
   check(`${tag} students never get other pairs' results`, leaks === 0, `${leaks}`);
 
@@ -332,7 +336,9 @@ async function settingsChecks() {
     ['roundTime [30, 2]', { roundTime: [30, 2] }], ['break 1 s', { breakTime: 1 }], ['min = max', { priceBounds: { min: 50, max: 50 } }], ['min > max', { priceBounds: { min: 60, max: 50 } }],
     ['min -1', { priceBounds: { min: -1, max: 50 } }], ['max 2e6', { priceBounds: { min: 0, max: 2e6 } }], ['t -1', { travelCost: -1 }], ["t 'x'", { travelCost: 'x' }],
     ['V 0', { consumerValue: 0 }], ['V <= min price', { consumerValue: 10, priceBounds: { min: 10, max: 50 } }], ['x1 101', { x1: 101 }], ['x2 -5', { x2: -5 }], ["x1 'left'", { x1: 'left' }],
-    ['logit sigma 0', { modelType: 'logit', sigma: 0 }], ['logit alpha -1', { modelType: 'logit', alpha: -1 }], ['logit market 0', { modelType: 'logit', marketSize: 0 }]
+    ['logit sigma 0', { modelType: 'logit', sigma: 0 }], ['logit alpha -1', { modelType: 'logit', alpha: -1 }], ['logit market 0', { modelType: 'logit', marketSize: 0 }],
+    ['cost -1', { marginalCost: -1 }], ["cost 'x'", { marginalCost: 'x' }], ['cost = max price', { marginalCost: 250 }], ['cost >= V', { marginalCost: 200, priceBounds: { min: 0, max: 300 } }],
+    ['market size 0 (gallons)', { marketSize: 0 }], ["market size 'big'", { marketSize: 'big' }]
   ];
   for (const [label, patch] of bad) {
     const r = await api('/session', { method: 'POST', body: JSON.stringify({ instructorName: 'Fuzz', sessionName: 'fuzz bad', config: { ...base, ...patch } }) });
@@ -348,7 +354,10 @@ async function settingsChecks() {
     ['per-round list longer than rounds is cut', { rounds: 2, roundTime: [40, 30, 20] }, c => JSON.stringify(c.roundTime) === '[40,30]'],
     ['x1 > x2 allowed', { x1: 100, x2: 0 }, c => c.x1 === 100 && c.x2 === 0], ['t = 0 allowed', { travelCost: 0 }, c => c.travelCost === 0],
     ['unknown model type -> hotelling', { modelType: 'cournot' }, c => c.modelType === 'hotelling'],
-    ['missing fields -> defaults', { rounds: undefined, roundTime: undefined, breakTime: undefined }, c => c.rounds === 10 && c.roundTime === 30 && c.breakTime === 10]
+    ['missing fields -> defaults', { rounds: undefined, roundTime: undefined, breakTime: undefined }, c => c.rounds === 10 && c.roundTime === 30 && c.breakTime === 10],
+    ['no cost -> 0, no market size -> 100', {}, c => c.marginalCost === 0 && c.marketSize === 100],
+    ["cost '2.5' as a string, market size 10000", { marginalCost: '2.5', marketSize: 10000 }, c => c.marginalCost === 2.5 && c.marketSize === 10000],
+    ['gas defaults: cost 2.5, V 5, t 0.01, $0-$10', { marginalCost: 2.5, consumerValue: 5, travelCost: 0.01, priceBounds: { min: 0, max: 10 }, marketSize: 10000 }, c => c.marginalCost === 2.5 && c.consumerValue === 5 && c.priceBounds.max === 10]
   ];
   for (const [label, patch, ok] of odd) {
     const r = await api('/session', { method: 'POST', body: JSON.stringify({ instructorName: 'Fuzz', sessionName: 'fuzz odd', config: { ...base, ...patch } }) });

@@ -676,11 +676,13 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
     console.log(`[Session ${session.code}] Round ${session.currentRound} timer expired - finalizing round`);
     const seenPairs = new Set();
     
-    // A whole-dollar random price inside the game's price bounds for anyone who did not submit (clamped at both
-    // ends: with a min price of, say, $0.50 the floor used to land below it, 2026-11-08 fuzz test)
+    // A random price inside the game's price bounds for anyone who did not submit: whole dollars on a wide range,
+    // cents on a narrow one such as gas prices from $0 to $10 (2026-11-10); clamped at both ends (with a min price
+    // of, say, $0.50 the floor used to land below it, 2026-11-08 fuzz test)
     const getRandomPrice = () => {
       const { min, max } = session.config.priceBounds;
-      return Math.max(min, Math.min(max, Math.floor(min + Math.random() * (max - min + 1))));
+      const r = max - min > 50 ? Math.floor(min + Math.random() * (max - min + 1)) : Math.round((min + Math.random() * (max - min)) * 100) / 100;
+      return Math.max(min, Math.min(max, r));
     };
       
     // An AI decision still in flight gets a short grace period, then a random price like anyone else
@@ -884,8 +886,10 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
         demandA = Number.isFinite(demandA) ? demandA : 0; demandB = Number.isFinite(demandB) ? demandB : 0;
         shareA = Number.isFinite(shareA) ? shareA : 0; shareB = Number.isFinite(shareB) ? shareB : 0;
       }
-      const profitA = priceA * demandA;
-      const profitB = priceB * demandB;
+      // profit = (price - wholesale cost) x gallons sold (2026-11-10; the cost was zero before)
+      const unitCost = Number(session.config.marginalCost) || 0;
+      const profitA = (priceA - unitCost) * demandA;
+      const profitB = (priceB - unitCost) * demandB;
       const playerResultA = {
         round: roundNumber,
         price: priceA,

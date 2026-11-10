@@ -27,9 +27,11 @@ export function computeLogitDemand({
   };
 }
 
-// Consumers live along a street from 0 to 100, one per unit of length. A consumer at x gets V - price - t|x - spot|
-// from a seller, buys from the seller that leaves them the most, and buys nothing if both leave them less than zero.
-// Equal offers are split in half.
+// Drivers live along a road from 0 to 100, one per unit of length (the 2026-11-10 gas-station framing; the code says
+// consumers and sellers). A consumer at x gets V - price - t|x - spot| from a seller, buys from the seller that leaves
+// them the most, and buys nothing if both leave them less than zero. Equal offers are split in half. The demand
+// returned is in units of config.marketSize (gallons sold on the whole road when every driver buys; 100 = one per
+// driver, the pre-2026-11-10 behaviour); the shares are the fraction of the road served.
 //
 // Rewritten 2026-11-08 (teaching23-games) after a brute-force check of the earlier closed form: that version gave the
 // right numbers when the sellers stand at the two ends of the street (every 2026 default game: spots 0 and 100) but
@@ -78,9 +80,10 @@ export function computeHotellingDemand({
 
   demandA = Math.max(0, Math.min(100, demandA));
   demandB = Math.max(0, Math.min(100, demandB));
+  const M = Number(config.marketSize) > 0 ? Number(config.marketSize) : 100;
   return {
-    demandA,
-    demandB,
+    demandA: demandA * (M / 100),
+    demandB: demandB * (M / 100),
     shareA: demandA / 100,
     shareB: demandB / 100
   };

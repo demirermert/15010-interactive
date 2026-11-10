@@ -37,7 +37,8 @@ function hotellingDemand(pA, pB, c) {
     else if (a > b) dA += length;
     else dB += length;
   }
-  return [Math.max(0, Math.min(100, dA)), Math.max(0, Math.min(100, dB))];
+  const M = Number(c.marketSize) > 0 ? Number(c.marketSize) : 100; // gallons on the road when every driver buys
+  return [Math.max(0, Math.min(100, dA)) * (M / 100), Math.max(0, Math.min(100, dB)) * (M / 100)];
 }
 
 export function demand(pA, pB, config) {
@@ -45,35 +46,51 @@ export function demand(pA, pB, config) {
 }
 
 // The one-shot Nash price (both firms best-respond to each other) and the price that maximizes the
-// two firms' joint profit, both on a grid of half-dollars inside the price bounds. Cost is zero.
+// two firms' joint profit, both on a grid inside the price bounds. Profit is (price - wholesale cost) x quantity.
 export function referencePrices(config) {
   if (!config) return null;
   const lo = config.priceBounds?.min ?? 0, hi = config.priceBounds?.max ?? 100;
   if (!(hi > lo)) return null;
-  const step = Math.max(0.5, (hi - lo) / 600); // at most ~600 grid points, whatever the price range
+  const c = Number(config.marginalCost) || 0;
+  const step = Math.max(hi - lo > 50 ? 0.5 : 0.01, (hi - lo) / 600); // at most ~600 grid points, whatever the price range
   const grid = [];
   for (let p = lo; p <= hi + 1e-9; p += step) grid.push(Math.min(hi, Math.max(lo, Math.round(p * 100) / 100)));
   const best = rival => {
-    let bp = lo, bv = -1;
-    grid.forEach(p => { const v = p * demand(p, rival, config)[0]; if (v > bv + 1e-9) { bv = v; bp = p; } });
+    let bp = lo, bv = -Infinity;
+    grid.forEach(p => { const v = (p - c) * demand(p, rival, config)[0]; if (v > bv + 1e-9) { bv = v; bp = p; } });
     return bp;
   };
-  // Same spot or no walking cost is pure price competition: the Nash price is the lowest allowed, not a grid artefact
+  // Same spot or no driving cost is pure price competition: the Nash price is the wholesale cost (or the lowest allowed
+  // price above it), not a grid artefact
   const bertrand = config.modelType === 'hotelling' && (config.x1 === config.x2 || !(config.travelCost > 0));
-  let p = bertrand ? lo : (lo + hi) / 2;
+  let p = bertrand ? Math.min(hi, Math.max(lo, c)) : (lo + hi) / 2;
   for (let i = 0; i < (bertrand ? 0 : 200); i += 1) {
     const n = best(p);
     if (Math.abs(n - p) < step / 2) { p = n; break; }
     p = n;
   }
-  let coll = lo, cv = -1;
-  grid.forEach(q => { const v = q * demand(q, q, config)[0]; if (v > cv + 1e-9) { cv = v; coll = q; } });
+  let coll = lo, cv = -Infinity;
+  grid.forEach(q => { const v = (q - c) * demand(q, q, config)[0]; if (v > cv + 1e-9) { cv = v; coll = q; } });
   return {
     nash: p,
-    nashProfit: p * demand(p, p, config)[0],
+    nashProfit: (p - c) * demand(p, p, config)[0],
     collusion: coll,
     collusionProfit: cv
   };
+}
+
+// A price as shown on the pages: to the cent when the game's prices are small (gas prices, a max price of $50 or less),
+// otherwise whole dollars unless it has cents (2026-11-10)
+export function priceFmt(v, config) {
+  if (!Number.isFinite(v)) return '–';
+  const small = (config?.priceBounds?.max ?? 100) <= 50;
+  return money(v, small || !Number.isInteger(v) ? 2 : 0);
+}
+
+// A quantity (gallons sold) as shown on the pages: whole numbers with thousands separators
+export function qty(v) {
+  if (!Number.isFinite(v)) return '–';
+  return Math.round(v).toLocaleString('en-US');
 }
 
 // What a student typed, read as a price (2026-11-08): a number box on an English keyboard silently drops a comma

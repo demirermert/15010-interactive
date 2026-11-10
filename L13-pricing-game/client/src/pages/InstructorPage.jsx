@@ -13,26 +13,27 @@ function buildApiUrl(path) {
   return `${normalizedBase}${path}`;
 }
 
-// Defaults are the games as played in 2025 (slides, speaker notes and the Nov 20, 2025 Section A transcript; set 2026-11-02):
-// 100 consumers on a street from 0 to 100, each worth $200, $1 per unit walked, zero cost; 10 rounds, 60 s in round 1,
-// then 50, 40 and 30 s; a 10 s break; prices 0 to 250.
-// The games of the class (Mert, 2026-11-07/08), in the order of the 2025 class (both sections, from the recordings):
-//  - demo: Mert plus a student volunteer against the ChatGPT seat, on his phone on the projector; 2025 settings read off
-//    the screen capture: 3 rounds of 40 s, prices 0 to 250, very low differentiation (t = $0.10: a $50 vs $47.50 round
-//    split 37.5/62.5), "average willingness to pay $100" on the slide (V = 100);
-//  - three real games: same street, sellers at 0 and 100, walking gets cheaper each game ($1, 30¢, free; Nash prices
-//    $100, $30, $0). 2025 moved the sellers instead (0/100, 35/65, 50/50), but with this demand formula 35/65 is identical
-//    to 0/100, and a correct straight-line model has no stable price off the ends. 10 rounds, more time in the first rounds;
-//  - a bonus game with chat on the second market (2025: 35/65, "you have more time in this game to chat", about 5 rounds
-//    of 60 s, names hidden until the end).
+// The game since 2026-11-10 (Mert): two GAS STATIONS on a road from 0 to 100, prices per gallon, a wholesale cost per
+// gallon that students are told (profit = (price - cost) x gallons). Defaults: wholesale cost $2.50, a gallon worth $5.00
+// to a driver, 10,000 gallons sold on the road per round when everyone buys, prices $0 to $10, driving cost t per unit
+// of road; the Nash price is cost + 100 t and the collusive price V - 50 t. The timing is the 2025 class's: 10 rounds,
+// 60 s in round 1, then 50, 40 and 30 s; a 10 s break.
+// (Until 2026-11-10 the game was the 2025 drinks game: 100 customers worth $200, $1 per unit walked, zero cost, prices
+// 0 to 250, t = 1 / 0.3 / 0; see the README. The margins are the same divided by 100.)
+// The games of the class, in the order of the 2025 class (both sections, from the recordings):
+//  - demo: Mert plus a student volunteer against the ChatGPT seat, on his phone on the projector; 3 rounds of 40 s,
+//    very low differentiation (t = 0.001: Nash $2.60);
+//  - three real games: stations at 0 and 100, driving gets cheaper each game (t = 0.01, 0.003, 0: Nash $3.50, $2.80,
+//    $2.50, i.e. margins $1.00, $0.30, $0; collusive $4.50, $4.85, $5.00). 10 rounds, more time in the first rounds;
+//  - a bonus game with chat on the second market (about 5 rounds of 60 s, names hidden until the end).
 // Every game uses per-round times (Mert, 2026-11-08: the demo and the bonus game too). Each entry patches DEFAULT_CONFIG;
 // `base` 'default' is numbered default-1, -2, -3 (continuing past existing ones); the others are default-demo, default-chat.
 export const DEFAULT_GAMES = [
-  { base: 'default-demo', label: 'Demo', cfg: { rounds: 3, differentTimePerRound: true, roundTime: 40, roundTimes: [40, 40, 40], travelCost: 0.1, consumerValue: 100 } },
-  { base: 'default', label: 'Game 1', cfg: { travelCost: 1 } },
-  { base: 'default', label: 'Game 2', cfg: { travelCost: 0.3 } },
+  { base: 'default-demo', label: 'Demo', cfg: { rounds: 3, differentTimePerRound: true, roundTime: 40, roundTimes: [40, 40, 40], travelCost: 0.001 } },
+  { base: 'default', label: 'Game 1', cfg: { travelCost: 0.01 } },
+  { base: 'default', label: 'Game 2', cfg: { travelCost: 0.003 } },
   { base: 'default', label: 'Game 3', cfg: { travelCost: 0 } },
-  { base: 'default-chat', label: 'Bonus game with chat', cfg: { travelCost: 0.3, enableChat: true, rounds: 5, differentTimePerRound: true, roundTime: 60, roundTimes: [60, 60, 60, 60, 60] } }
+  { base: 'default-chat', label: 'Bonus game with chat', cfg: { travelCost: 0.003, enableChat: true, rounds: 5, differentTimePerRound: true, roundTime: 60, roundTimes: [60, 60, 60, 60, 60] } }
 ];
 
 const DEFAULT_CONFIG = {
@@ -41,19 +42,20 @@ const DEFAULT_CONFIG = {
   breakTime: 10,
   differentTimePerRound: true,
   roundTimes: [60, 50, 40, 30, 30, 30, 30, 30, 30, 30],
-  marketSize: 100,
+  marketSize: 10000, // gallons sold on the road per round when every driver buys
+  marginalCost: 2.5, // the wholesale cost of a gallon, shown to students
   modelType: 'hotelling', // 'logit' or 'hotelling'
   // Logit model parameters
   alpha: 1,
   sigma: 5,
   // Hotelling model parameters
-  travelCost: 1,
-  consumerValue: 200,
+  travelCost: 0.01,
+  consumerValue: 5,
   x1: 0,
   x2: 100,
   priceMin: 0,
-  priceMax: 250,
-  defaultPrice: 10,
+  priceMax: 10,
+  defaultPrice: 3,
   enableChat: false,
   hideRoundCount: false,
   showOpponentName: false,
@@ -161,8 +163,12 @@ function GameFields({ cfg, setCfg, compact = false }) {
         <input type="number" min="0" step="1" {...numField('breakTime', 0)} />
       </div>
       <div className="input-row">
-        <label>Market size</label>
+        <label>{cfg.modelType === 'hotelling' ? 'Gallons sold on the road per round (market size)' : 'Market size'}</label>
         <input type="number" min="1" step="1" {...numField('marketSize', 1)} />
+      </div>
+      <div className="input-row">
+        <label>Wholesale cost per gallon (marginal cost, shown to students)</label>
+        <input type="number" step="any" min="0" {...numField('marginalCost', 0)} />
       </div>
 
       <div className="input-row">
@@ -193,20 +199,20 @@ function GameFields({ cfg, setCfg, compact = false }) {
       {cfg.modelType === 'hotelling' && (
         <>
           <div className="input-row">
-            <label>Travel cost (t)</label>
+            <label>Driving cost per unit of road (t); Nash price = cost + 100 t</label>
             <input type="number" step="any" min="0" {...numField('travelCost', 0)} />
           </div>
           <div className="input-row">
-            <label>Consumer valuation (V)</label>
+            <label>Value of a gallon to a driver (V); collusive price = V − 50 t</label>
             <input type="number" step="any" min="0" {...numField('consumerValue', 0)} />
           </div>
           <div style={pair}>
             <div className="input-row">
-              <label>Firm 1 location (x₁)</label>
+              <label>Station 1 location (x₁)</label>
               <input type="number" step="any" min="0" max="100" {...numField('x1', 0)} />
             </div>
             <div className="input-row">
-              <label>Firm 2 location (x₂)</label>
+              <label>Station 2 location (x₂)</label>
               <input type="number" step="any" min="0" max="100" {...numField('x2', 0)} />
             </div>
           </div>
@@ -215,11 +221,11 @@ function GameFields({ cfg, setCfg, compact = false }) {
 
       <div style={pair}>
         <div className="input-row">
-          <label>Min price</label>
+          <label>Min price per gallon</label>
           <input type="number" step="any" {...numField('priceMin', 0)} />
         </div>
         <div className="input-row">
-          <label>Max price</label>
+          <label>Max price per gallon</label>
           <input type="number" step="any" {...numField('priceMax', 100)} />
         </div>
       </div>
@@ -231,7 +237,7 @@ function GameFields({ cfg, setCfg, compact = false }) {
           ['enableChat', 'Enable chat between paired students', 'Students matched together can chat during the game'],
           ['hideRoundCount', 'Hide the total number of rounds', 'Students see "Round 3" instead of "Round 3 of 10"'],
           ['showOpponentName', 'Show opponent names', 'Students see who they are paired with'],
-          ['showModelParameters', 'Show model parameters', 'Students see the walking cost and the customer value']
+          ['showModelParameters', 'Show model parameters', 'Students see the driving cost and the value of a gallon (the wholesale cost is always shown)']
         ].map(([key, title, help]) => (
           <label key={key} className="opt">
             <input type="checkbox" checked={Boolean(cfg[key])}
@@ -291,6 +297,7 @@ export default function InstructorPage() {
     roundTime: cfg.differentTimePerRound ? cfg.roundTimes.map(t => Number(t)) : Number(cfg.roundTime),
     breakTime: Number(cfg.breakTime),
     marketSize: Number(cfg.marketSize),
+    marginalCost: Number(cfg.marginalCost),
     modelType: cfg.modelType,
     // Logit parameters
     alpha: Number(cfg.alpha),
@@ -386,15 +393,19 @@ export default function InstructorPage() {
       setAddingDefaults(false);
     }
   };
-  // What the instructor sees at the top of each default game's column: how differentiated the sellers are and the
-  // one-shot Nash price of the game as set (t x 100 with sellers apart; $0 when walking is free or they share a spot)
+  // What the instructor sees at the top of each default game's column: how differentiated the stations are and the
+  // one-shot Nash price of the game as set (cost + t x 100 with the stations apart; the cost alone when driving is free
+  // or they share a spot). The level of differentiation is the Nash margin (100 t) against what a driver has to spend
+  // on, V - cost: under 8% very low, under 25% less, otherwise full.
   const describe = cfg => {
     if (cfg.modelType !== 'hotelling') return 'logit model';
     const t = Number(cfg.travelCost) || 0;
+    const c = Number(cfg.marginalCost) || 0;
     const apart = Number(cfg.x1) !== Number(cfg.x2);
-    const nash = t > 0 && apart ? t * 100 : 0;
-    const what = !apart || t === 0 ? 'no differentiation' : t < 0.2 ? 'very low differentiation' : t < 1 ? 'less differentiation' : 'full differentiation';
-    return `${what} · Nash price $${Math.round(nash * 100) / 100}${cfg.enableChat ? ' · chat on' : ''}`;
+    const margin = t > 0 && apart ? t * 100 : 0;
+    const room = Math.max(1e-9, (Number(cfg.consumerValue) || 0) - c);
+    const what = margin === 0 ? 'no differentiation' : margin / room < 0.08 ? 'very low differentiation' : margin / room < 0.25 ? 'less differentiation' : 'full differentiation';
+    return `${what} · Nash price $${(c + margin).toFixed(2)}${cfg.enableChat ? ' · chat on' : ''}`;
   };
 
   const handleDownload = (code, event) => {
@@ -548,7 +559,7 @@ export default function InstructorPage() {
               ) : (
                 <>
                   <button className="primary" type="button" onClick={() => openForm('defaults')}
-                    title="Opens the games of the class as played in 2025 (demo, three games, bonus game with chat), each with its own settings, to look over and confirm">
+                    title="Opens the games of the class (demo, three gas-station games, bonus game with chat), each with its own settings, to look over and confirm">
                     Add the default games
                   </button>
                   <button type="button" onClick={() => openForm('custom')}>New Game</button>
@@ -578,7 +589,7 @@ export default function InstructorPage() {
 
           {showCreateForm && formMode === 'defaults' && (
             <form onSubmit={e => { e.preventDefault(); handleAddDefaults(); }} className="setup-form three">
-              <p className="small">The games of the class as played in 2025, side by side, each with its own settings: the demo (you and a volunteer against ChatGPT, 3 rounds of 40 s), the three games, and the bonus game with chat. Remove any you do not want, change what you like, then confirm; they appear in the list below, ready to open one at a time.</p>
+              <p className="small">The games of the class, side by side, each with its own settings: the demo (you and a volunteer against ChatGPT, 3 rounds of 40 s), the three gas-station games (wholesale cost $2.50 a gallon; driving gets cheaper each game, so the Nash price falls from $3.50 to $2.80 to $2.50), and the bonus game with chat. Remove any you do not want, change what you like, then confirm; they appear in the list below, ready to open one at a time.</p>
               {defaultGames.map((g, i) => (
                 <div key={`${g.label}-${g.name}`} className="gcol">
                   <div className="ghead">

@@ -1,6 +1,6 @@
 # Price Competition Classroom Game
 
-Interactive web application that lets MBA students play a repeated differentiated price competition in real time. The instructor spins up a session, students join, set prices each round, and immediately see demand and profit based on a logit model.
+Interactive web application that lets MBA students play a repeated differentiated price competition in real time: two gas stations on a road (since 2026-11-10; a drinks game before), a wholesale cost per gallon that students are told, prices per gallon. The instructor spins up a session, students join in pairs, set prices each round, and immediately see gallons sold, market share and profit from the road (Hotelling) model.
 
 ## Stack
 
@@ -169,6 +169,24 @@ Environment variables (set in the Render dashboard):
   its personal code). Deployed with Mert's OK the same evening as commit 8edb766 to the six section services (all
   live in about a minute; every host serves the new bundle, checked by the `pageshow` listener and the seat key
   pattern in the served JavaScript).
+- 2026-11-10 (Mert: "we want this to be a competition between gas stations ... students will get a marginal cost
+  which is the wholesale price of gas"): the game is now two GAS STATIONS on a road. New settings: `marginalCost`
+  (the wholesale cost per gallon, 0 to 1e9, must be below the max price and below V; default 0) and, for the road
+  model, `marketSize` (gallons sold on the road per round when every driver buys; default 100 = the old one-per-
+  driver numbers). Profit = (price − cost) × gallons; the demand model is unchanged, its quantity scaled by
+  marketSize/100 (`server/demandModel.js`, `client/src/econ.js`). Nash price = cost + 100 t (the AI seat's price,
+  the instructor hints), collusive price V − 50 t. Defaults (instructor form and the five default games): cost
+  $2.50, a gallon worth $5.00 to a driver, 10,000 gallons, prices $0 to $10, t = 0.01 / 0.003 / 0 for games 1-3
+  (Nash $3.50 / $2.80 / $2.50, profit per round $5,000 / $1,500 / $0 each; collusive $4.50 / $4.85 / $5.00, profit
+  $10,000 / $11,750 / $12,500 each), demo t = 0.001 (Nash $2.60), chat game t = 0.003; the same margins as the
+  drinks game divided by 100, on top of the cost. Students are told the wholesale cost (rules, the round card, the
+  "How it works" box) and see gallons sold next to the market share; prices show cents whenever the max price is
+  $50 or less (`priceFmt`); the forced random price is to the cent on such a range; the CSV column "Demand" is now
+  "Quantity"; the dashboard's settings line names the road, the cost, the gallons and the Nash price; the ChatGPT
+  prompt has the cost and the gallons and is told never to price below cost. Tests: `test/fuzz_prices.mjs` has two
+  gas games and settings checks for the cost and the market size (318 checks), `sim_class.mjs` and the brute-force
+  demand check updated; a game played in Chrome ($3.49 vs the AI seat's $3.50: 5,050 gallons, $4,999).
+  `how-the-game-computes-prices.html` still describes the drinks game.
 
 ## Where things stand (2026-11-07)
 
@@ -239,7 +257,9 @@ then poll the deploy status until `live` and grep each host's served bundle for 
 - Next lab on the six: repoint rootDir and restore that lab's build and start commands (L1-demand/server used
   `npm install` / `npm start`, no health check), and run `set_l13_redirects.sh --remove`.
 
-The three games (Mert, 2026-11-07): sellers stay at 0 and 100 in all three; the walking cost falls, $1, $0.30, $0. Nash
+The three games (Mert, 2026-11-07, in the drinks version; since 2026-11-10 gas stations with a $2.50 wholesale cost and
+the same margins divided by 100: Nash $3.50 / $2.80 / $2.50, collusive $4.50 / $4.85 / $5.00, see the change log):
+sellers stay at 0 and 100 in all three; the walking cost falls, $1, $0.30, $0. Nash
 prices $100, $30, $0 (profit each $5,000, $1,500, $0); collusive prices $150, $185, $200 (profit each $7,500, $9,250,
 $10,000). Instructor page (Mert, 2026-11-07/08): "Add the default games" shows one complete settings form per game of the
 2025 class side by side (demo, Game 1, Game 2, Game 3, bonus game with chat), each prefilled and edited on its own (its

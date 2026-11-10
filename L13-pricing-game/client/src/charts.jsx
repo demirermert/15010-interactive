@@ -24,7 +24,7 @@ export function RoundsChart({ rounds, series, lines = [], height = 260, yLabel =
       {ticks.map(t => (
         <g key={t}>
           <line x1={L} x2={W - R} y1={y(t)} y2={y(t)} stroke="#eef0f3" />
-          <text x={L - 8} y={y(t) + 4} textAnchor="end" fontSize="12" fill="#6b7280">{Math.round(t)}</text>
+          <text x={L - 8} y={y(t) + 4} textAnchor="end" fontSize="12" fill="#6b7280">{yMax < 20 ? t.toFixed(2) : Math.round(t)}</text>
         </g>
       ))}
       {Array.from({ length: rounds }, (_, i) => (
@@ -136,7 +136,8 @@ export function PairBars({ rows, split = false, rowHeight = 26, selected = null,
   );
 }
 
-// The street of the linear-city model: where I stand (x1) and where my rival stands (x2), each in 0..100.
+// The road of the linear-city model (a street until 2026-11-10): where my station stands (x1) and where my rival's
+// stands (x2), each in 0..100.
 export function Street({ x1 = 0, x2 = 100 }) {
   const W = 640, H = 96, L = 30, R = 30;
   const x = v => L + (W - L - R) * (Math.max(0, Math.min(100, v)) / 100);

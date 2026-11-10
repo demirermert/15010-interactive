@@ -255,9 +255,9 @@ try {
       const r = res[i];
       const side = (c.got.roundStarted || []).map(x => x.p).reverse().find(p => p.round === round)?.side;
       const [pa, pb] = side === 'A' ? [r.price, r.opponentPrice] : [r.opponentPrice, r.price];
-      const d = computeDemand({ priceA: pa, priceB: pb, config: { ...config, marketSize: 100 } });
+      const d = computeDemand({ priceA: pa, priceB: pb, config: { ...config, marketSize: config.marketSize || 100 } });
       const myDemand = side === 'A' ? d.demandA : d.demandB;
-      if (Math.abs(myDemand - r.demand) > 1e-6 || Math.abs(myDemand * r.price - r.profit) > 1e-6) modelMismatches++;
+      if (Math.abs(myDemand - r.demand) > 1e-6 || Math.abs(myDemand * (r.price - (config.marginalCost || 0)) - r.profit) > 1e-6) modelMismatches++;
       if (r.price !== chosen[i]) modelMismatches++;
       // the opponent's price must be what the opponent chose (or the AI's / a forced one for a non-sim opponent)
       const opp = students.find(o => o.name === r.opponentName);

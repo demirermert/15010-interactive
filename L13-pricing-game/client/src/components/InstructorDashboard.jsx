@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { RoundsChart, PairBars } from '../charts.jsx';
-import { money } from '../econ.js';
+import { money, priceFmt } from '../econ.js';
 import { withKey } from '../auth.js';
 
 // The instructor's projector page in the 2026 lab look (2026-11-02; the 2025 page is in git history),
@@ -39,14 +39,20 @@ function asPairs(results) {
 
 const STATUS_WORD = { setup: 'Not open yet', lobby: 'Lobby open', running: 'Playing', complete: 'Game over' };
 
+const fmtSmall = v => '$' + Number(v).toLocaleString('en-US', { maximumFractionDigits: 3 });
+
+// The settings line under the title: the road, the stations, and the numbers behind the Nash price (cost + 100 t)
 function modelLine(config) {
   if (!config) return '';
+  const c = Number(config.marginalCost) || 0;
   if (config.modelType === 'hotelling') {
-    const d = Math.abs(config.x2 - config.x1);
-    const level = d >= 100 ? 'full differentiation' : d === 0 ? 'no differentiation' : 'some differentiation';
-    return `Linear city, sellers at ${config.x1} and ${config.x2} (${level}) · worth ${money(config.consumerValue)} · walking cost ${money(config.travelCost)} per unit`;
+    const t = Number(config.travelCost) || 0;
+    const apart = config.x1 !== config.x2;
+    const margin = t > 0 && apart ? 100 * t : 0;
+    const level = margin === 0 ? 'no differentiation' : margin / Math.max(1e-9, config.consumerValue - c) < 0.08 ? 'very low differentiation' : margin / Math.max(1e-9, config.consumerValue - c) < 0.25 ? 'less differentiation' : 'full differentiation';
+    return `Road, stations at ${config.x1} and ${config.x2} (${level}) · wholesale cost ${priceFmt(c, config)} · a gallon is worth ${priceFmt(config.consumerValue, config)} to a driver · driving cost ${fmtSmall(t)} per unit of road · ${Number(config.marketSize || 100).toLocaleString('en-US')} gallons a round · Nash price ${priceFmt(c + margin, config)}`;
   }
-  return `Logit demand · market ${config.marketSize} · price sensitivity ${config.alpha} · differentiation ${config.sigma}`;
+  return `Logit demand · market ${config.marketSize} · unit cost ${priceFmt(c, config)} · price sensitivity ${config.alpha} · differentiation ${config.sigma}`;
 }
 
 export function InstructorDashboard({
@@ -224,7 +230,7 @@ export function InstructorDashboard({
               <div className="section-label">Total profit by pair</div>
               <input className="search" placeholder="Find a name" value={pairSearch} onChange={e => setPairSearch(e.target.value)} />
             </div>
-            <div className="qtext">Both sellers' profit added up over the rounds played so far, best market first. Click a market to see its prices.</div>
+            <div className="qtext">Both stations' profit added up over the rounds played so far, best market first. Click a market to see its prices.</div>
             {pairTotals.length === 0 ? <div className="empty-note">Appears after the first round.</div> : (
               <div className="scroll" style={{ maxHeight: 520, maxWidth: 700 }}><PairBars rows={shownPairs} selected={detail?.key} onSelect={setSelectedPair} /></div>
             )}
@@ -254,7 +260,7 @@ export function InstructorDashboard({
           {detail && (
             <section className="panel wide">
               <div className="section-label">One market: {detail.label}</div>
-              <div className="qtext">The two sellers' prices round by round; totals {money(detail.a)} and {money(detail.b)}.</div>
+              <div className="qtext">The two stations' prices round by round; totals {money(detail.a)} and {money(detail.b)}.</div>
               <div style={{ maxWidth: 820 }}>
                 <RoundsChart rounds={nRounds} height={220} series={[
                   { label: detail.aName, color: '#1F2E5C', values: Array.from({ length: nRounds }, (_, i) => detail.pricesA[i] ?? null) },
@@ -271,12 +277,12 @@ export function InstructorDashboard({
             {pairs.length === 0 ? <div className="empty-note">Pairs are made when the game starts; their prices appear after the first round.</div> : (
               <div className="scroll">
                 <table className="res">
-                  <thead><tr><th>Seller A</th><th className="r">Price</th><th className="r">Profit</th><th>Seller B</th><th className="r">Price</th><th className="r">Profit</th></tr></thead>
+                  <thead><tr><th>Station A</th><th className="r">Price</th><th className="r">Profit</th><th>Station B</th><th className="r">Price</th><th className="r">Profit</th></tr></thead>
                   <tbody>
                     {pairs.map(p => (
                       <tr key={p.pairId} onClick={() => setSelectedPair(p.pairId)} style={{ cursor: 'pointer', background: detail?.key === p.pairId ? '#f3f5fa' : undefined }}>
-                        <td>{p.playerA?.name}</td><td className="r">{money(p.playerA?.price, 0)}</td><td className="r">{money(p.playerA?.profit)}</td>
-                        <td>{p.playerB?.name}</td><td className="r">{money(p.playerB?.price, 0)}</td><td className="r">{money(p.playerB?.profit)}</td>
+                        <td>{p.playerA?.name}</td><td className="r">{priceFmt(p.playerA?.price, config)}</td><td className="r">{money(p.playerA?.profit)}</td>
+                        <td>{p.playerB?.name}</td><td className="r">{priceFmt(p.playerB?.price, config)}</td><td className="r">{money(p.playerB?.profit)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -287,7 +293,7 @@ export function InstructorDashboard({
 
           <section className="panel">
             <div className="section-label">Individual profits by pair</div>
-            <div className="qtext">Each seller's own total within the market, best market first.</div>
+            <div className="qtext">Each station's own total within the market, best market first.</div>
             {pairTotals.length === 0 ? <div className="empty-note">Appears after the first round.</div> : (
               <div className="scroll" style={{ maxHeight: 520, maxWidth: 700 }}><PairBars rows={shownPairs} split selected={detail?.key} onSelect={setSelectedPair} /></div>
             )}

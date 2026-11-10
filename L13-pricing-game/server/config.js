@@ -33,18 +33,23 @@ export function validateConfig(raw) {
   const max = num(pb.max, 'Max price', 0, 1e6, { fallback: 100 });
   if (max <= min) throw new Error('Max price must be higher than min price.');
   out.priceBounds = { min, max };
+  // The wholesale cost of a gallon (2026-11-10, Mert: gas stations with a marginal cost): profit is (price - cost) x gallons
+  out.marginalCost = num(c.marginalCost, 'Wholesale cost (marginal cost)', 0, 1e9, { fallback: 0 });
+  if (out.marginalCost >= max) throw new Error('Max price must be above the wholesale cost, or no price can ever earn anything.');
   out.modelType = c.modelType === 'logit' ? 'logit' : 'hotelling';
   if (out.modelType === 'logit') {
     out.marketSize = num(c.marketSize, 'Market size', 1, 1e9, { fallback: 1000 });
     out.alpha = num(c.alpha, 'Price sensitivity (alpha)', 0, 1e6, { fallback: 1 });
     out.sigma = num(c.sigma, 'Differentiation (sigma)', 0.01, 1e6, { fallback: 5 });
   } else {
-    out.marketSize = 100;
-    out.travelCost = num(c.travelCost, 'Travel cost (t)', 0, 1e6, { fallback: 1 });
-    out.consumerValue = num(c.consumerValue, 'Consumer valuation (V)', 0.01, 1e9, { fallback: 100 });
-    out.x1 = num(c.x1, 'Firm 1 location', 0, 100, { fallback: 0 });
-    out.x2 = num(c.x2, 'Firm 2 location', 0, 100, { fallback: 100 });
-    if (out.consumerValue <= out.priceBounds.min) throw new Error('Consumer valuation must be above the min price, or nobody can ever buy.');
+    // gallons sold on the whole road in a round when every driver buys (100 drivers; 100 = one gallon each, as before)
+    out.marketSize = num(c.marketSize, 'Market size (gallons per round)', 1, 1e9, { fallback: 100 });
+    out.travelCost = num(c.travelCost, 'Driving cost (t)', 0, 1e6, { fallback: 1 });
+    out.consumerValue = num(c.consumerValue, 'Value of a gallon to a driver (V)', 0.01, 1e9, { fallback: 100 });
+    out.x1 = num(c.x1, 'Station 1 location', 0, 100, { fallback: 0 });
+    out.x2 = num(c.x2, 'Station 2 location', 0, 100, { fallback: 100 });
+    if (out.consumerValue <= out.priceBounds.min) throw new Error('The value of a gallon (V) must be above the min price, or nobody can ever buy.');
+    if (out.consumerValue <= out.marginalCost) throw new Error('The value of a gallon (V) must be above the wholesale cost, or no sale can ever pay.');
   }
   out.enableChat = Boolean(c.enableChat);
   out.hideRoundCount = Boolean(c.hideRoundCount);

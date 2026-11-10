@@ -124,7 +124,7 @@ app.get('/session/:code/export', requireKey, (req, res) => {
     }
 
     // Generate CSV
-    let csv = 'Round,Player Name,Price,Opponent Name,Opponent Price,Demand,Profit,Market Share\n';
+    let csv = 'Round,Player Name,Price,Opponent Name,Opponent Price,Quantity,Profit,Market Share\n';
     sessionData.rounds.forEach(round => {
       round.results.forEach(result => {
         csv += `${round.round},${csvCell(result.playerName)},${result.price},${csvCell(result.opponentName)},${result.opponentPrice},${Number(result.demand).toFixed(2)},${Number(result.profit).toFixed(2)},${(Number(result.marketShare) * 100).toFixed(2)}%\n`;

@@ -20,17 +20,19 @@ export function isOpenAIInitialized() {
   return openai !== null;
 }
 
-// The one-shot Nash price of the demand the server computes (2026-11-07). Street model with the market covered:
-// t x 100 (every $1 below the rival wins 1/(2t) customers), $0 when walking is free or both sellers stand on the same
-// spot; logit: no closed form, so the midpoint of the range. Used in the prompt and whenever the model cannot answer.
+// The one-shot Nash price of the demand the server computes (2026-11-07). Road model with the market covered:
+// wholesale cost + t x 100 (every $1 below the rival wins 1/(2t) drivers), the wholesale cost alone when driving is
+// free or both stations stand on the same spot (2026-11-10: the cost used to be zero); logit: no closed form, so the
+// midpoint of the range, at least the cost. Used in the prompt and whenever the model cannot answer.
 export function nashPrice(config) {
   const { min, max } = config.priceBounds;
+  const c = Number(config.marginalCost) || 0;
   const clamp = p => Math.max(min, Math.min(max, Math.round(p * 100) / 100));
   if (config.modelType === 'hotelling') {
     const t = Number(config.travelCost) || 0;
-    return clamp(t > 0 && config.x1 !== config.x2 ? t * 100 : 0);
+    return clamp(c + (t > 0 && config.x1 !== config.x2 ? t * 100 : 0));
   }
-  return clamp((min + max) / 2);
+  return clamp(Math.max(c, (min + max) / 2));
 }
 
 export async function getAIPriceDecision(config, history = [], opponentHistory = []) {
@@ -100,67 +102,54 @@ function buildGamePrompt(config, history, opponentHistory) {
     const V = config.consumerValue;
     const t = config.travelCost;
     const x1 = config.x1;
-    
-    let monopolyPrice;
-    // t = 0 would divide by zero (2026-11-02 audit): with no travel cost a lone seller reaches the whole street
-    const leftReach = t > 0 ? (V/2) / t : Infinity;
-    const rightReach = t > 0 ? (V/2) / t : Infinity;
-    
-    if (leftReach >= x1 && rightReach >= (100 - x1)) {
-      // Hits both boundaries
-      monopolyPrice = V/2;
-    } else if (leftReach < x1 && rightReach < (100 - x1)) {
-      // Interior solution
-      monopolyPrice = V/2;
-    } else if (leftReach >= x1) {
-      // Hits left boundary
-      monopolyPrice = (V + t * x1) / 2;
-    } else {
-      // Hits right boundary
-      monopolyPrice = (V + t * (100 - x1)) / 2;
-    }
-    
-    // Reference prices for THIS walking cost (2026-11-07): the model used to anchor on the $100 monopoly price and play
+    const c = Number(config.marginalCost) || 0;          // wholesale cost per gallon (2026-11-10)
+    const M = Number(config.marketSize) > 0 ? Number(config.marketSize) : 100; // gallons on the road when everyone buys
+
+    // Reference prices for THIS driving cost (2026-11-07): the model used to anchor on the $100 monopoly price and play
     // $100 whatever t was, so with t = 0.30 (Nash $30) or t = 0 (Nash $0) it was far off. The one-shot Nash price of the
-    // demand the server computes is t x 100 with the market covered (every $1 below the rival wins 1/(2t) customers), or
-    // $0 when walking is free (pure price competition); the collusive price is the highest common price at which the
-    // farthest customer still buys.
+    // demand the server computes is cost + t x 100 with the market covered (every $1 below the rival wins 1/(2t) drivers),
+    // or the cost alone when driving is free (pure price competition); the collusive price is the highest common price at
+    // which the farthest driver still buys. The monopoly hint is the interior monopoly price (V + c)/2.
     const { min: pMin, max: pMax } = config.priceBounds;
     const clamp = p => Math.max(pMin, Math.min(pMax, p));
     const x2 = config.x2;
     const farthest = Math.max(x1, 100 - x2, Math.abs(x2 - x1) / 2);
-    const nashPrice = clamp(t > 0 && x1 !== x2 ? t * 100 : 0);
+    const monopolyPrice = clamp((V + c) / 2);
+    const nashPrice = clamp(c + (t > 0 && x1 !== x2 ? t * 100 : 0));
     const collusivePrice = clamp(V - t * farthest);
-    const perDollar = t > 0 && x1 !== x2 ? (1 / (2 * t)).toFixed(2) : null;
+    const perDollar = t > 0 && x1 !== x2 ? (M / 100 / (2 * t)).toFixed(2) : null;
+    const half = M / 2;
 
     // Hotelling model prompt
-    prompt = `You are playing a competitive pricing game using the Hotelling location model. Here are the rules:
+    prompt = `You are playing a competitive pricing game: two gas stations on a road (the Hotelling location model). Here are the rules:
 
 GAME RULES:
-- Consumer locations: uniformly distributed on [0, 100]
+- Driver locations: uniformly distributed on [0, 100]; when every driver buys, ${M} gallons are sold on the road per round
 - Your location: ${config.x1}
 - Opponent location: ${config.x2}
-- Travel cost (t): $${config.travelCost} per unit distance${t > 0 ? '' : ' (no travel cost: the two sellers are identical to every consumer)'}
-- Consumer valuation (V): $${config.consumerValue}
-- Price range: $${pMin} to $${pMax}
+- Driving cost (t): $${config.travelCost} per unit distance${t > 0 ? '' : ' (no driving cost: the two stations are identical to every driver)'}
+- Value of a gallon to a driver (V): $${config.consumerValue}
+- Your wholesale cost (marginal cost): $${c.toFixed(2)} per gallon, the same for your opponent
+- Price range: $${pMin} to $${pMax} per gallon
 - Total rounds: ${config.rounds}
 - Current round: ${currentRound}
 - Monopoly price (if you were alone): $${monopolyPrice.toFixed(2)}
-- One-shot Nash equilibrium price for this travel cost: $${nashPrice.toFixed(2)} (profit $${(nashPrice * 50).toFixed(0)} each)
-- Joint-profit (collusive) price for this travel cost: $${collusivePrice.toFixed(2)} (profit $${(collusivePrice * 50).toFixed(0)} each if both charge it)
+- One-shot Nash equilibrium price for this driving cost: $${nashPrice.toFixed(2)} (profit $${((nashPrice - c) * half).toFixed(0)} each)
+- Joint-profit (collusive) price for this driving cost: $${collusivePrice.toFixed(2)} (profit $${((collusivePrice - c) * half).toFixed(0)} each if both charge it)
 
 HOW DEMAND WORKS:
-- Consumers buy from whoever offers the lowest total cost (price + travel cost)
-- A consumer only buys if their utility (V - price - travel_cost) is non-negative
-- Your demand = number of consumers closer to you after accounting for price difference
+- Drivers buy from whoever offers the lowest total cost (price + driving cost)
+- A driver only buys if their utility (V - price - driving_cost) is non-negative
+- Your demand (gallons) = the share of the road closer to you after accounting for the price difference, times ${M}
 - If prices are equal, demand splits based on locations
-- Your profit = YourPrice × YourDemand
+- Your profit = (YourPrice - ${c.toFixed(2)}) × YourDemand
 
 KEY INSIGHTS:
 ${perDollar
-  ? `- Every $1 you price below your opponent wins you ${perDollar} customers (and every $1 above loses ${perDollar}); the indifferent consumer is at x* = (x1 + x2)/2 + (OpponentPrice - YourPrice)/(2×${config.travelCost})`
-  : '- The cheaper seller gets ALL 100 consumers; equal prices split them 50/50. Any price above your opponent sells nothing.'}
-- But consumers only buy if they get non-negative utility
+  ? `- Every $1 you price below your opponent wins you ${perDollar} gallons (and every $1 above loses ${perDollar}); the indifferent driver is at x* = (x1 + x2)/2 + (OpponentPrice - YourPrice)/(2×${config.travelCost})`
+  : `- The cheaper station gets ALL ${M} gallons; equal prices split them 50/50. Any price above your opponent sells nothing.`}
+- But drivers only buy if they get non-negative utility
+- Never price below your wholesale cost of $${c.toFixed(2)}: every gallon would lose money
 - The monopoly price maximizes profit when there's no competition
 - In round 1, charge the one-shot Nash price above. In later rounds, best-respond to what the opponent actually did: if the opponent
   has kept prices well above the Nash price in the last rounds, you may raise yours toward theirs (never above the collusive price);
@@ -173,10 +162,12 @@ Maximize your total profit across all rounds.
     // Logit model prompt (default)
     const monopolyPrice = config.alpha > 0 ? 10 / config.alpha : config.priceBounds.max; // alpha = 0: no price sensitivity, so the top of the range
     
+    const c = Number(config.marginalCost) || 0;
     prompt = `You are playing a competitive pricing game. Here are the rules:
 
 GAME RULES:
 - Market size: ${config.marketSize} units
+- Your unit cost (marginal cost): $${c.toFixed(2)}, the same for your opponent
 - Price range: $${config.priceBounds.min} to $${config.priceBounds.max}
 - Total rounds: ${config.rounds}
 - Current round: ${currentRound}
@@ -185,7 +176,7 @@ GAME RULES:
 KEY INSIGHTS:
 - If you set a LOWER price than your opponent, you get MORE market share
 - If you set a HIGHER price than your opponent, you get LESS market share
-- Your profit = YourPrice × YourDemand
+- Your profit = (YourPrice - ${c.toFixed(2)}) × YourDemand; never price below your unit cost
 - The monopoly price maximizes profit when there's no competition
 
 OBJECTIVE:
