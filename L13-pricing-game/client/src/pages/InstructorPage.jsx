@@ -199,7 +199,7 @@ function GameFields({ cfg, setCfg, compact = false }) {
       {cfg.modelType === 'hotelling' && (
         <>
           <div className="input-row">
-            <label>Driving cost per unit of road (t); Nash price = cost + 100 t</label>
+            <label>Driving cost per mile (t), told to students; Nash price = cost + 100 t</label>
             <input type="number" step="any" min="0" {...numField('travelCost', 0)} />
           </div>
           <div className="input-row">
@@ -237,7 +237,7 @@ function GameFields({ cfg, setCfg, compact = false }) {
           ['enableChat', 'Enable chat between paired students', 'Students matched together can chat during the game'],
           ['hideRoundCount', 'Hide the total number of rounds', 'Students see "Round 3" instead of "Round 3 of 10"'],
           ['showOpponentName', 'Show opponent names', 'Students see who they are paired with'],
-          ['showModelParameters', 'Show model parameters', 'Students see the driving cost and the value of a gallon (the wholesale cost is always shown)']
+          ['showModelParameters', 'Also tell students the value of a gallon (V)', 'The wholesale cost and the driving cost are always in the instructions; this adds what a gallon is worth to a driver']
         ].map(([key, title, help]) => (
           <label key={key} className="opt">
             <input type="checkbox" checked={Boolean(cfg[key])}

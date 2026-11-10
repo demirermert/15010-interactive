@@ -226,6 +226,12 @@ Environment variables (set in the Render dashboard):
   shrinking bar, like the round clock; both clocks turn red under 10 s (was 5 s for the round clock); the two profit
   boxes carry the name on its own line ("You" / "Bot Ben") above "Profit this round" or "Total profit", so a long
   rival name no longer squeezes the figures.
+  Then (Mert: "we should tell them the travel cost in the instructions"): the rules now say, for every road game,
+  that the road is 100 miles long, where the two stations stand (its two ends, or mile x and mile y, or the same
+  spot) and what driving costs a driver per mile in words (`perMile`: $0.01 is "1¢ a mile", $0.003 "0.3¢ a mile",
+  0 "nothing, so they all go to the cheaper station"); the market card's hint repeats the per-mile cost. The value of
+  a gallon (V) is still shown only with the option, now labelled "Also tell students the value of a gallon (V)".
+  This reverses the 2026-11-07 choice of showing no model number (that was the drinks game).
 
 ## Where things stand (2026-11-07)
 

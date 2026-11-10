@@ -50,7 +50,7 @@ function modelLine(config) {
     const apart = config.x1 !== config.x2;
     const margin = t > 0 && apart ? 100 * t : 0;
     const level = margin === 0 ? 'no differentiation' : margin / Math.max(1e-9, config.consumerValue - c) < 0.08 ? 'very low differentiation' : margin / Math.max(1e-9, config.consumerValue - c) < 0.25 ? 'less differentiation' : 'full differentiation';
-    return `Road, stations at ${config.x1} and ${config.x2} (${level}) · wholesale cost ${priceFmt(c, config)} · a gallon is worth ${priceFmt(config.consumerValue, config)} to a driver · driving cost ${fmtSmall(t)} per unit of road · ${Number(config.marketSize || 100).toLocaleString('en-US')} gallons a round · Nash price ${priceFmt(c + margin, config)}`;
+    return `Road, stations at ${config.x1} and ${config.x2} (${level}) · wholesale cost ${priceFmt(c, config)} · a gallon is worth ${priceFmt(config.consumerValue, config)} to a driver · driving cost ${fmtSmall(t)} a mile (told to students) · ${Number(config.marketSize || 100).toLocaleString('en-US')} gallons a round · Nash price ${priceFmt(c + margin, config)}`;
   }
   return `Logit demand · market ${config.marketSize} · unit cost ${priceFmt(c, config)} · price sensitivity ${config.alpha} · differentiation ${config.sigma}`;
 }

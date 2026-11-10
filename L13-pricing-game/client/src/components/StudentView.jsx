@@ -20,7 +20,22 @@ function useNarrow(px = 560) {
 // players run gas stations on a road and pay a wholesale cost per gallon (Mert).
 // Left: this round (the price box, then the round's result). Right: the market and every round so far.
 
-const fmtSmall = v => '$' + Number(v).toLocaleString('en-US', { maximumFractionDigits: 3 });
+// The driving cost in words (Mert, 2026-11-10: "we should tell them in the instructions"): the road is 100 miles long and
+// t is the cost of one mile to a driver, so $0.01 reads "1¢ a mile", $0.003 "0.3¢ a mile", $1 "$1 a mile", 0 "nothing"
+export function perMile(t) {
+  const v = Number(t) || 0;
+  if (v <= 0) return 'nothing';
+  if (v < 1) return `${(v * 100).toLocaleString('en-US', { maximumFractionDigits: 2 })}¢ a mile`;
+  return `$${v.toLocaleString('en-US', { maximumFractionDigits: 2 })} a mile`;
+}
+// where the two stations stand on the 100-mile road
+function spotsText(config) {
+  const a = Number(config?.x1), b = Number(config?.x2);
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return '';
+  if (a === b) return `both stations stand at the same spot, mile ${a}`;
+  if (Math.min(a, b) === 0 && Math.max(a, b) === 100) return 'the two stations stand at its two ends';
+  return `the two stations stand at mile ${a} and mile ${b}`;
+}
 
 function Rules({ config }) {
   const hot = config?.modelType === 'hotelling';
@@ -30,20 +45,25 @@ function Rules({ config }) {
   const t = config?.roundTime;
   const secs = Array.isArray(t) ? null : t;
   const cost = Number(config?.marginalCost) || 0;
+  const drive = Number(config?.travelCost) || 0;
   return (
     <div className="story">
       <p>You and another student each run a gas station on the same road. {rounds}</p>
       <p>Each round, you and your rival <b>set your price per gallon at the same time</b>{secs ? <>, within <b>{secs} seconds</b></> : null}.
         Drivers along the road fill up where it is cheapest for them, counting the price at the pump and the drive to get
         there: a lower price wins more drivers, but you earn less on each gallon.</p>
+      {hot && (
+        <p>The road is <b>100 miles</b> long and {spotsText(config)}. Drivers live all along it.
+          {drive > 0
+            ? <> Driving costs a driver <b>{perMile(drive)}</b>, so a station can charge a little more than its rival and still keep the drivers near it.</>
+            : <> Driving costs drivers <b>nothing</b>, so they all go to the cheaper station.</>}
+          {config?.showModelParameters && <> A gallon is worth <b>{priceFmt(config.consumerValue, config)}</b> to each driver; nobody pays more than that, drive included.</>}
+        </p>
+      )}
       <p><b>Your wholesale cost is {priceFmt(cost, config)} per gallon</b>, the same for your rival: every gallon you sell costs
         you that much, so profit = (your price − {priceFmt(cost, config)}) × gallons sold.</p>
       <p><b>Your goal:</b> the most total profit over all rounds, not the most gallons.</p>
       <p>After each round you see your rival's price, both market shares and both profits.</p>
-      {hot && config?.showModelParameters && (
-        <p>Drivers live along a road from 0 to 100. A gallon is worth <b>{priceFmt(config.consumerValue, config)}</b> to each of them,
-          and driving costs <b>{fmtSmall(config.travelCost)}</b> per unit of road.</p>
-      )}
       <p style={{ color: '#8a1c2c' }}><b>No communication with your rival.</b></p>
     </div>
   );
@@ -321,8 +341,8 @@ export function StudentView({
         <div className="card">
           <div className="gname">Your market</div>
           <Street x1={myX} x2={rivalX} />
-          <div className="hint">Drivers live along the road and fill up at the station that leaves them the most: what a
-            gallon is worth to them, minus its price, minus the drive. If both are too costly, they don't buy.</div>
+          <div className="hint">Drivers live along the 100-mile road and fill up at the station that leaves them the most: what a
+            gallon is worth to them, minus its price, minus the drive ({perMile(config.travelCost)}). If both are too costly, they don't buy.</div>
         </div>
       )}
       <div className="card">
