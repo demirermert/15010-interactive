@@ -165,6 +165,7 @@ const GAMES = [
   { name: 'game1 t=1', students: 8, rounds: 3, config: H(1) },
   { name: 'game2 t=0.3 cost 40', students: 8, rounds: 3, config: H(0.3, { marginalCost: 40 }) },
   { name: 'gas stations: cost 2.50, V 5, t 0.01, 10,000 gallons, $0-$10', students: 8, rounds: 3, config: H(0.01, { consumerValue: 5, marginalCost: 2.5, marketSize: 10000, priceBounds: { min: 0, max: 10 } }) },
+  { name: 'gas stations: prices 2.50-10, random price 2.50-6', students: 6, rounds: 2, config: H(0.01, { consumerValue: 5, marginalCost: 2.5, marketSize: 10000, priceBounds: { min: 2.5, max: 10 }, randomPriceMax: 6 }) },
   { name: 'gas stations: no driving cost', students: 6, rounds: 2, config: H(0, { consumerValue: 5, marginalCost: 2.5, marketSize: 10000, priceBounds: { min: 0, max: 10 } }) },
   { name: 'game3 t=0', students: 8, rounds: 3, config: H(0) },
   { name: 'demo t=0.1 V=100', students: 6, rounds: 3, config: H(0.1, { consumerValue: 100 }) },
@@ -274,7 +275,7 @@ async function runGame(g, seed) {
       seen.push({ round, name: c.name, price: r.price, profit: r.profit });
       if (c.lastAccepted !== null) {
         if (Math.abs(r.price - c.lastAccepted) > 1e-9) mismatches.push(`round ${round} ${c.name}: result price ${r.price}, last accepted ${c.lastAccepted}`);
-      } else if (!(r.price >= lo && r.price <= hi) || (hi - lo > 50 ? Number.isInteger(lo) && !Number.isInteger(r.price) : Math.abs(r.price * 100 - Math.round(r.price * 100)) > 1e-6)) forcedBad.push(`round ${round} ${c.name}: forced price ${r.price} (bounds ${lo}-${hi})`);
+      } else if (!(r.price >= Math.max(lo, serverConfig.marginalCost || 0) && r.price <= Math.min(hi, serverConfig.randomPriceMax ?? hi)) || (hi - lo > 50 ? Number.isInteger(lo) && !Number.isInteger(r.price) : Math.abs(r.price * 100 - Math.round(r.price * 100)) > 1e-6)) forcedBad.push(`round ${round} ${c.name}: forced price ${r.price} (bounds ${lo}-${hi})`);
       const [pa, pb] = side === 'A' ? [r.price, r.opponentPrice] : [r.opponentPrice, r.price];
       const t = truth(pa, pb, serverConfig);
       const my = side === 'A' ? t.dA : t.dB, theirs = side === 'A' ? t.dB : t.dA;

@@ -239,6 +239,9 @@ Environment variables (set in the Render dashboard):
   while a game is in the lobby or running (the server speaks every few seconds then), and the server pings every
   10 s with a 10 s grace (`pingInterval`/`pingTimeout` in server.js), so a dead phone connection is seen and replaced
   within about 20 s in every case and at once when the phone wakes.
+  Then (Mert): a student who sends no price gets a random price uniform between the wholesale cost and the new
+  setting "random price up to" (`randomPriceMax`, $6 in the form and in `setup_test.mjs`), to the cent, inside the
+  price bounds; without the setting it is the cost to the max price. Before, it was uniform over the whole $2.50-$10.
 
 ## Where things stand (2026-11-07)
 

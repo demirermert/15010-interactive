@@ -35,6 +35,7 @@ const config = {
   x1: 0,
   x2: 100,
   priceBounds: { min: n(args.min, 2.5), max: n(args.max, 10) },
+  randomPriceMax: n(args['random-max'], 6),
   enableChat: Boolean(args.chat),
   hideRoundCount: Boolean(args.hide),
   showOpponentName: !args['no-names']

@@ -679,10 +679,15 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
     // A random price inside the game's price bounds for anyone who did not submit: whole dollars on a wide range,
     // cents on a narrow one such as gas prices from $0 to $10 (2026-11-10); clamped at both ends (with a min price
     // of, say, $0.50 the floor used to land below it, 2026-11-08 fuzz test)
+    // Since 2026-11-10 (Mert): uniform between the wholesale cost and the game's "random price up to" setting ($6 in
+    // the gas games), never outside the price bounds; without that setting, the whole price range as before.
     const getRandomPrice = () => {
       const { min, max } = session.config.priceBounds;
-      const r = max - min > 50 ? Math.floor(min + Math.random() * (max - min + 1)) : Math.round((min + Math.random() * (max - min)) * 100) / 100;
-      return Math.max(min, Math.min(max, r));
+      const lo = Math.max(min, Number(session.config.marginalCost) || 0);
+      const cap = Number(session.config.randomPriceMax);
+      const hi = Math.min(max, Number.isFinite(cap) && cap > lo ? cap : max);
+      const r = hi - lo > 50 ? Math.floor(lo + Math.random() * (hi - lo + 1)) : Math.round((lo + Math.random() * (hi - lo)) * 100) / 100;
+      return Math.max(lo, Math.min(hi, r));
     };
       
     // An AI decision still in flight gets a short grace period, then a random price like anyone else

@@ -44,6 +44,7 @@ const DEFAULT_CONFIG = {
   roundTimes: [60, 50, 40, 30, 30, 30, 30, 30, 30, 30],
   marketSize: 10000, // gallons sold on the road per round when every driver buys
   marginalCost: 2.5, // the wholesale cost of a gallon, shown to students
+  randomPriceMax: 6, // no price in time: a random price from the wholesale cost up to this (Mert, 2026-11-10)
   modelType: 'hotelling', // 'logit' or 'hotelling'
   // Logit model parameters
   alpha: 1,
@@ -169,6 +170,10 @@ function GameFields({ cfg, setCfg, compact = false }) {
       <div className="input-row">
         <label>Wholesale cost per gallon (marginal cost, shown to students)</label>
         <input type="number" step="any" min="0" {...numField('marginalCost', 0)} />
+      </div>
+      <div className="input-row">
+        <label>No price in time: random price from the wholesale cost up to</label>
+        <input type="number" step="any" min="0" {...numField('randomPriceMax', 6)} />
       </div>
 
       <div className="input-row">
@@ -298,6 +303,7 @@ export default function InstructorPage() {
     breakTime: Number(cfg.breakTime),
     marketSize: Number(cfg.marketSize),
     marginalCost: Number(cfg.marginalCost),
+    randomPriceMax: cfg.randomPriceMax === '' || cfg.randomPriceMax == null ? undefined : Number(cfg.randomPriceMax),
     modelType: cfg.modelType,
     // Logit parameters
     alpha: Number(cfg.alpha),

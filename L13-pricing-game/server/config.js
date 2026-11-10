@@ -36,6 +36,11 @@ export function validateConfig(raw) {
   // The wholesale cost of a gallon (2026-11-10, Mert: gas stations with a marginal cost): profit is (price - cost) x gallons
   out.marginalCost = num(c.marginalCost, 'Wholesale cost (marginal cost)', 0, 1e9, { fallback: 0 });
   if (out.marginalCost >= max) throw new Error('Max price must be above the wholesale cost, or no price can ever earn anything.');
+  // the top of the random price given to anyone who does not submit (the bottom is the wholesale cost); optional
+  if (c.randomPriceMax !== undefined && c.randomPriceMax !== null && c.randomPriceMax !== '') {
+    out.randomPriceMax = num(c.randomPriceMax, 'Random price up to', 0, 1e9);
+    if (out.randomPriceMax <= Math.max(min, out.marginalCost)) throw new Error('"Random price up to" must be above the wholesale cost and the min price.');
+  }
   out.modelType = c.modelType === 'logit' ? 'logit' : 'hotelling';
   if (out.modelType === 'logit') {
     out.marketSize = num(c.marketSize, 'Market size', 1, 1e9, { fallback: 1000 });
