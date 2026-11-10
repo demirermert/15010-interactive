@@ -14,8 +14,8 @@ if (!args.host || !args.key) { console.log('usage: node screens.mjs --host <url>
 const BASE = /^https?:\/\//.test(args.host) ? args.host.replace(/\/$/, '') : `https://${args.host}`;
 const KEY = String(args.key);
 const config = {
-  rounds: 2, roundTime: [15, 60], breakTime: Number(args.break || 90), modelType: 'hotelling', travelCost: 0.01, consumerValue: 5,
-  marginalCost: 2.5, marketSize: 10000, x1: 0, x2: 100, priceBounds: { min: 2.5, max: 10 }, showOpponentName: true
+  rounds: 2, roundTime: [15, 60], breakTime: Number(args.break || 90), modelType: 'hotelling', travelCost: 0.004, consumerValue: 4.5,
+  marginalCost: 3.3, marketSize: 10000, x1: 0, x2: 100, priceBounds: { min: 3.3, max: 6 }, randomPriceMax: 5, showOpponentName: true
 };
 const res = await fetch(BASE + '/api/session', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-instructor-key': KEY },
   body: JSON.stringify({ instructorName: 'Screens', sessionName: 'screens', config }) });
@@ -37,8 +37,8 @@ inst.on('sessionUpdate', p => {
 stu.on('errorMessage', m => bail('student error: ' + m));
 stu.on('joinedSession', j => { studentCode = j.studentCode; setTimeout(() => inst.emit('startSession', { sessionCode: code }), 500); });
 stu.on('roundStarted', p => {
-  if (p.round === 1) setTimeout(() => stu.emit('submitPrice', { sessionCode: code, price: 3.49 }), 1000);
-  if (p.round === 2 && args.finish) setTimeout(() => stu.emit('submitPrice', { sessionCode: code, price: 4 }), 1000);
+  if (p.round === 1) setTimeout(() => stu.emit('submitPrice', { sessionCode: code, price: 3.69 }), 1000);
+  if (p.round === 2 && args.finish) setTimeout(() => stu.emit('submitPrice', { sessionCode: code, price: 4.1 }), 1000);
 });
 stu.on('roundResults', p => {
   if (p.round !== 1) return;

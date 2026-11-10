@@ -242,6 +242,13 @@ Environment variables (set in the Render dashboard):
   Then (Mert): a student who sends no price gets a random price uniform between the wholesale cost and the new
   setting "random price up to" (`randomPriceMax`, $6 in the form and in `setup_test.mjs`), to the cent, inside the
   price bounds; without the setting it is the cost to the max price. Before, it was uniform over the whole $2.50-$10.
+  Then (Mert: "more realistic"): the defaults are this week's Massachusetts numbers from teaching19-misc2 (Nov 9-10
+  2026): a station's marginal cost about $3.30 a gallon (Boston rack about $2.65 + 46 cents of federal and MA tax +
+  freight + about 10 cents of card fees; range $3.25-$3.50) against a $4.08 MA pump average; normal margin 35-40 cents.
+  Cost $3.30, V $4.50, prices $3.30-$6, random no-submit price $3.30-$5, 10,000 gallons; t = 0.0005 (demo) /
+  0.004 / 0.0015 / 0 (chat game 0.0015): Nash $3.35 / $3.70 / $3.45 / $3.30, collusive $4.48 / $4.30 / $4.43 / $4.50;
+  profit per round each at Nash $250 / $2,000 / $750 / $0, at collusion $5,875 / $5,000 / $5,625 / $6,000. Students
+  read "Your cost is $3.30 per gallon (the wholesale price plus taxes, delivery and card fees)".
 
 ## Where things stand (2026-11-07)
 

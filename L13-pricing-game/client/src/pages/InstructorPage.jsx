@@ -13,27 +13,28 @@ function buildApiUrl(path) {
   return `${normalizedBase}${path}`;
 }
 
-// The game since 2026-11-10 (Mert): two GAS STATIONS on a road from 0 to 100, prices per gallon, a wholesale cost per
-// gallon that students are told (profit = (price - cost) x gallons). Defaults: wholesale cost $2.50, a gallon worth $5.00
-// to a driver, 10,000 gallons sold on the road per round when everyone buys, prices $2.50 to $10, driving cost t per unit
-// of road; the Nash price is cost + 100 t and the collusive price V - 50 t. The timing is the 2025 class's: 10 rounds,
-// 60 s in round 1, then 50, 40 and 30 s; a 10 s break.
-// (Until 2026-11-10 the game was the 2025 drinks game: 100 customers worth $200, $1 per unit walked, zero cost, prices
-// 0 to 250, t = 1 / 0.3 / 0; see the README. The margins are the same divided by 100.)
-// The games of the class, in the order of the 2025 class (both sections, from the recordings):
-//  - demo: Mert plus a student volunteer against the ChatGPT seat, on his phone on the projector; 3 rounds of 40 s,
-//    very low differentiation (t = 0.001: Nash $2.60);
-//  - three real games: stations at 0 and 100, driving gets cheaper each game (t = 0.01, 0.003, 0: Nash $3.50, $2.80,
-//    $2.50, i.e. margins $1.00, $0.30, $0; collusive $4.50, $4.85, $5.00). 10 rounds, more time in the first rounds;
-//  - a bonus game with chat on the second market (about 5 rounds of 60 s, names hidden until the end).
-// Every game uses per-round times (Mert, 2026-11-08: the demo and the bonus game too). Each entry patches DEFAULT_CONFIG;
-// `base` 'default' is numbered default-1, -2, -3 (continuing past existing ones); the others are default-demo, default-chat.
+// The game since 2026-11-10 (Mert): two GAS STATIONS on a 100-mile road, prices per gallon, a cost per gallon that
+// students are told (profit = (price - cost) x gallons). The numbers since the evening of 2026-11-10 are this week's
+// Massachusetts figures worked out by teaching19-misc2: a station's marginal cost is about $3.30 a gallon (Boston rack
+// about $2.65, federal and MA taxes 46 cents, freight, card fees) against a $4.08 MA pump average (AAA, Nov 9); the
+// normal retail margin is 35-40 cents (NACS 2025: 39.7). Defaults: cost $3.30, a gallon worth $4.50 to a driver,
+// 10,000 gallons on the road per round when everyone buys, prices $3.30 to $6, no-submit price random from the cost up
+// to $5. Nash price = cost + 100 t, collusive = V - 50 t:
+//  - demo: 3 rounds of 40 s, t = 0.0005 (0.05 cents a mile): Nash $3.35;
+//  - three real games, driving gets cheaper each game: t = 0.004 / 0.0015 / 0 (0.4, 0.15, 0 cents a mile), Nash $3.70 /
+//    $3.45 / $3.30 (a 40-cent margin, as in a normal week, then 15, then 0), collusive $4.30 / $4.43 / $4.50, so the
+//    real $4.08 sits between Nash and collusion. 10 rounds, more time in the first rounds;
+//  - a bonus game with chat on the second market (about 5 rounds of 60 s).
+// (Earlier the same day: cost $2.50, V $5, prices $2.50-$10, t 0.01/0.003/0. Before 2026-11-10: the 2025 drinks game,
+// 100 customers worth $200, $1 per unit walked, zero cost, prices 0 to 250.)
+// Every game uses per-round times (Mert, 2026-11-08). Each entry patches DEFAULT_CONFIG; `base` 'default' is numbered
+// default-1, -2, -3 (continuing past existing ones); the others are default-demo, default-chat.
 export const DEFAULT_GAMES = [
-  { base: 'default-demo', label: 'Demo', cfg: { rounds: 3, differentTimePerRound: true, roundTime: 40, roundTimes: [40, 40, 40], travelCost: 0.001 } },
-  { base: 'default', label: 'Game 1', cfg: { travelCost: 0.01 } },
-  { base: 'default', label: 'Game 2', cfg: { travelCost: 0.003 } },
+  { base: 'default-demo', label: 'Demo', cfg: { rounds: 3, differentTimePerRound: true, roundTime: 40, roundTimes: [40, 40, 40], travelCost: 0.0005 } },
+  { base: 'default', label: 'Game 1', cfg: { travelCost: 0.004 } },
+  { base: 'default', label: 'Game 2', cfg: { travelCost: 0.0015 } },
   { base: 'default', label: 'Game 3', cfg: { travelCost: 0 } },
-  { base: 'default-chat', label: 'Bonus game with chat', cfg: { travelCost: 0.003, enableChat: true, rounds: 5, differentTimePerRound: true, roundTime: 60, roundTimes: [60, 60, 60, 60, 60] } }
+  { base: 'default-chat', label: 'Bonus game with chat', cfg: { travelCost: 0.0015, enableChat: true, rounds: 5, differentTimePerRound: true, roundTime: 60, roundTimes: [60, 60, 60, 60, 60] } }
 ];
 
 const DEFAULT_CONFIG = {
@@ -43,19 +44,19 @@ const DEFAULT_CONFIG = {
   differentTimePerRound: true,
   roundTimes: [60, 50, 40, 30, 30, 30, 30, 30, 30, 30],
   marketSize: 10000, // gallons sold on the road per round when every driver buys
-  marginalCost: 2.5, // the wholesale cost of a gallon, shown to students
-  randomPriceMax: 6, // no price in time: a random price from the wholesale cost up to this (Mert, 2026-11-10)
+  marginalCost: 3.3, // a Massachusetts station's cost of a gallon, Nov 2026 (rack + taxes + freight + card fees; teaching19-misc2), shown to students
+  randomPriceMax: 5, // no price in time: a random price from the wholesale cost up to this (Mert, 2026-11-10)
   modelType: 'hotelling', // 'logit' or 'hotelling'
   // Logit model parameters
   alpha: 1,
   sigma: 5,
   // Hotelling model parameters
-  travelCost: 0.01,
-  consumerValue: 5,
+  travelCost: 0.004,
+  consumerValue: 4.5,
   x1: 0,
   x2: 100,
-  priceMin: 2.5, // prices from the wholesale cost up (Mert, 2026-11-10: "between 2.50 and 10")
-  priceMax: 10,
+  priceMin: 3.3, // prices from the wholesale cost up (Mert, 2026-11-10: "between 2.50 and 10")
+  priceMax: 6,
   defaultPrice: 3,
   enableChat: false,
   hideRoundCount: false,
@@ -595,7 +596,7 @@ export default function InstructorPage() {
 
           {showCreateForm && formMode === 'defaults' && (
             <form onSubmit={e => { e.preventDefault(); handleAddDefaults(); }} className="setup-form three">
-              <p className="small">The games of the class, side by side, each with its own settings: the demo (you and a volunteer against ChatGPT, 3 rounds of 40 s), the three gas-station games (wholesale cost $2.50 a gallon; driving gets cheaper each game, so the Nash price falls from $3.50 to $2.80 to $2.50), and the bonus game with chat. Remove any you do not want, change what you like, then confirm; they appear in the list below, ready to open one at a time.</p>
+              <p className="small">The games of the class, side by side, each with its own settings: the demo (you and a volunteer against ChatGPT, 3 rounds of 40 s), the three gas-station games (cost $3.30 a gallon, this week's Massachusetts figure; driving gets cheaper each game, so the Nash price falls from $3.70 to $3.45 to $3.30, against a $4.08 MA pump average), and the bonus game with chat. Remove any you do not want, change what you like, then confirm; they appear in the list below, ready to open one at a time.</p>
               {defaultGames.map((g, i) => (
                 <div key={`${g.label}-${g.name}`} className="gcol">
                   <div className="ghead">

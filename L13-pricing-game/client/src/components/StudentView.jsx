@@ -60,8 +60,8 @@ function Rules({ config }) {
           {config?.showModelParameters && <> A gallon is worth <b>{priceFmt(config.consumerValue, config)}</b> to each driver; nobody pays more than that, drive included.</>}
         </p>
       )}
-      <p><b>Your wholesale cost is {priceFmt(cost, config)} per gallon</b>, the same for your rival: every gallon you sell costs
-        you that much, so profit = (your price − {priceFmt(cost, config)}) × gallons sold.</p>
+      <p><b>Your cost is {priceFmt(cost, config)} per gallon</b> (the wholesale price plus taxes, delivery and card fees), the same
+        for your rival: every gallon you sell costs you that much, so profit = (your price − {priceFmt(cost, config)}) × gallons sold.</p>
       <p><b>Your goal:</b> the most total profit over all rounds, not the most gallons.</p>
       <p>After each round you see your rival's price, both market shares and both profits.</p>
       <p style={{ color: '#8a1c2c' }}><b>No communication with your rival.</b></p>
@@ -281,7 +281,7 @@ export function StudentView({
           </div>
           <div className="hint">Price per gallon, between {priceFmt(priceBounds.min, config)} and {priceFmt(priceBounds.max, config)}.
  If you don't submit in time, the game picks a random price for you.</div>
-          <div className="fb info">Your wholesale cost is <b>{priceFmt(Number(config?.marginalCost) || 0, config)}</b> per gallon.
+          <div className="fb info">Your cost is <b>{priceFmt(Number(config?.marginalCost) || 0, config)}</b> per gallon.
  Profit = (price − {priceFmt(Number(config?.marginalCost) || 0, config)}) × gallons sold.</div>
           {!done && <button className="go" type="submit">Submit price</button>}
         </form>
