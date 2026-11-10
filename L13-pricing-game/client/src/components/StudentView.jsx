@@ -121,19 +121,17 @@ export function StudentView({
     </div>
   ) : null;
 
+  // compact header (Mert, 2026-11-10): the title and the class on the left, the logo top right, the round dots on
+  // their own line on a phone; the name and the session code sit in the subtitle
   const header = (
     <header className="lab-head">
-      <div className="hin">
-        <img src="/course-logo.png" alt="15.010" />
-        <div>
+      <div className="hin compact">
+        <div className="ttl">
           <h1>Pricing Game</h1>
-          <div className="sub">15.010 Class 13 &middot; price competition, round after round</div>
+          <div className="sub">15.010 &middot; Class 13 &middot; session <b>{sessionCode}</b> &middot; {me || 'Student'}</div>
         </div>
         {steps}
-        <div className="who">
-          <div className="names">{me || 'Student'}</div>
-          <div>session <b>{sessionCode}</b></div>
-        </div>
+        <img className="logo" src="/course-logo.png" alt="15.010" />
       </div>
     </header>
   );
@@ -194,27 +192,33 @@ export function StudentView({
       </div>
     );
   } else if (between) {
+    // the round's result (Mert, 2026-11-10: "more organized and visible"): the two profits large, a market-share bar,
+    // then one table with both stations side by side and the totals so far
     const r = latestResult;
+    const win = r.profit > r.opponentProfit, lose = r.profit < r.opponentProfit;
+    const myShare = Math.max(0, Math.min(1, r.share || 0)), rivalShare = Math.max(0, Math.min(1, r.opponentShare || 0));
     left = (
       <div className="card">
         <div className="case">Round {r.round} result</div>
-        <div className="qt">{r.profit > r.opponentProfit ? 'You out-earned your rival this round' : r.profit < r.opponentProfit ? 'Your rival earned more this round' : 'You and your rival earned the same'}</div>
-        <div className="vs">
-          <div className="side you">
-            <div className="who2">You</div>
-            <div className="k">Price</div><div className="v">{priceFmt(r.price, config)}</div>
-            <div className="k">Gallons sold</div><div className="v">{qty(r.demand)}</div>
-            <div className="k">Market share</div><div className="v">{pct(r.share)}</div>
-            <div className="k">Profit</div><div className="v big" style={{ color: r.profit < 0 ? 'var(--no, #A31F34)' : 'var(--ok)' }}>{money(r.profit)}</div>
-          </div>
-          <div className="side rival">
-            <div className="who2">{rivalLabel}</div>
-            <div className="k">Price</div><div className="v">{priceFmt(r.opponentPrice, config)}</div>
-            <div className="k">Gallons sold</div><div className="v">{qty(r.opponentDemand)}</div>
-            <div className="k">Market share</div><div className="v">{pct(r.opponentShare)}</div>
-            <div className="k">Profit</div><div className="v big">{money(r.opponentProfit)}</div>
-          </div>
+        <div className="qt">{win ? 'You out-earned your rival this round' : lose ? 'Your rival earned more this round' : 'You and your rival earned the same'}</div>
+        <div className="res2">
+          <div className="box you"><div className="lbl">Your profit</div><div className="num" style={r.profit < 0 ? { color: 'var(--rival)' } : undefined}>{money(r.profit)}</div></div>
+          <div className="box rival"><div className="lbl">{rivalLabel}'s profit</div><div className="num">{money(r.opponentProfit)}</div></div>
         </div>
+        <div className="sharebar" role="img" aria-label={`market shares: you ${pct(r.share)}, rival ${pct(r.opponentShare)}`}>
+          <i className="you" style={{ width: `${myShare * 100}%` }} /><i className="rival" style={{ width: `${rivalShare * 100}%` }} />
+        </div>
+        <div className="sharelbl"><span className="you">You {pct(r.share)}</span><span className="rival">{rivalLabel} {pct(r.opponentShare)}</span></div>
+        <table className="hist res" style={{ marginTop: 10 }}>
+          <thead><tr><th /><th className="you">You</th><th className="rival">{rivalLabel}</th></tr></thead>
+          <tbody>
+            <tr><td>Price per gallon</td><td className="you">{priceFmt(r.price, config)}</td><td className="rival">{priceFmt(r.opponentPrice, config)}</td></tr>
+            <tr><td>Gallons sold</td><td>{qty(r.demand)}</td><td>{qty(r.opponentDemand)}</td></tr>
+            <tr><td>Market share</td><td>{pct(r.share)}</td><td>{pct(r.opponentShare)}</td></tr>
+            <tr><td>Profit this round</td><td className="you">{money(r.profit)}</td><td className="rival">{money(r.opponentProfit)}</td></tr>
+            <tr className="tot"><td>Total so far</td><td>{money(total)}</td><td>{money(rivalTotal)}</td></tr>
+          </tbody>
+        </table>
         {nextRoundCountdown != null && nextRoundCountdown > 0 && (
           <div className="fb info">Next round in <b>{nextRoundCountdown}s</b>.</div>
         )}

@@ -15,7 +15,7 @@ function buildApiUrl(path) {
 
 // The game since 2026-11-10 (Mert): two GAS STATIONS on a road from 0 to 100, prices per gallon, a wholesale cost per
 // gallon that students are told (profit = (price - cost) x gallons). Defaults: wholesale cost $2.50, a gallon worth $5.00
-// to a driver, 10,000 gallons sold on the road per round when everyone buys, prices $0 to $10, driving cost t per unit
+// to a driver, 10,000 gallons sold on the road per round when everyone buys, prices $2.50 to $10, driving cost t per unit
 // of road; the Nash price is cost + 100 t and the collusive price V - 50 t. The timing is the 2025 class's: 10 rounds,
 // 60 s in round 1, then 50, 40 and 30 s; a 10 s break.
 // (Until 2026-11-10 the game was the 2025 drinks game: 100 customers worth $200, $1 per unit walked, zero cost, prices
@@ -53,7 +53,7 @@ const DEFAULT_CONFIG = {
   consumerValue: 5,
   x1: 0,
   x2: 100,
-  priceMin: 0,
+  priceMin: 2.5, // prices from the wholesale cost up (Mert, 2026-11-10: "between 2.50 and 10")
   priceMax: 10,
   defaultPrice: 3,
   enableChat: false,

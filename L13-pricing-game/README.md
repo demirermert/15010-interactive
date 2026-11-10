@@ -186,7 +186,15 @@ Environment variables (set in the Render dashboard):
   prompt has the cost and the gallons and is told never to price below cost. Tests: `test/fuzz_prices.mjs` has two
   gas games and settings checks for the cost and the market size (318 checks), `sim_class.mjs` and the brute-force
   demand check updated; a game played in Chrome ($3.49 vs the AI seat's $3.50: 5,050 gallons, $4,999).
-  `how-the-game-computes-prices.html` still describes the drinks game.
+  `how-the-game-computes-prices.html` still describes the drinks game. Deployed to lab-a only the same afternoon for
+  Mert's phone test (the other five stayed on the drinks version until his OK).
+  Same evening, after his phone test: the default price range is $2.50 to $10 (from the wholesale cost up); the
+  student header is compact (title, "15.010 · Class 13 · session · name", the round dots, the course logo top right);
+  the round-result card shows the two profits large, a market-share bar and one table (price, gallons, share, profit,
+  total so far) for both stations; grid items may shrink on a phone (`min-width:0`; the widest table used to push the
+  page wider than the screen). Checked with headless Chrome at 520 px (its minimum window width; narrower
+  `--window-size` values are clamped, so a 390 px shot is just a crop) using `test/screens.mjs`, which plays round 1
+  of a quick game by script and prints the student's link for the camera.
 
 ## Where things stand (2026-11-07)
 

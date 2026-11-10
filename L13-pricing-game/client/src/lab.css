@@ -155,3 +155,27 @@ body{margin:0;font:16px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,s
 @media (max-width:800px){.portal .setup-form .options{grid-template-columns:1fr}}
 @media (max-width:800px){.portal .setup-form,.portal .setup-form.three{grid-template-columns:1fr}}
 @media (max-width:560px){.lab .vs .v{font-size:19px}.lab .vs .v.big{font-size:21px}.lab table.hist{font-size:13px}.lab table.hist th,.lab table.hist td{padding:6px 5px}.lab .steps span{width:24px;height:24px;font-size:12px}}
+
+/* compact student header and the round-result card (Mert, 2026-11-10) */
+.lab .hin.compact{padding:10px 16px;gap:8px 14px}
+.lab .hin.compact .ttl{min-width:0}
+.lab .hin.compact h1{font-size:18px;margin:0;line-height:1.2}
+.lab .hin.compact .sub{font-size:12px;color:#777;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lab .hin.compact img.logo{height:30px;margin-left:auto}
+.lab .res2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.lab .res2 .box{border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.lab .res2 .box.you{border-top:4px solid var(--you)}.lab .res2 .box.rival{border-top:4px solid var(--rival)}
+.lab .res2 .lbl{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.lab .res2 .you .lbl{color:var(--you)}.lab .res2 .rival .lbl{color:var(--rival)}
+.lab .res2 .num{font:700 30px/1.15 ui-monospace,Menlo,monospace;margin-top:4px;color:var(--ink,#222)}
+.lab .res2 .you .num{color:var(--ok)}
+.lab .sharebar{display:flex;height:14px;border-radius:7px;overflow:hidden;background:#e8ebef}
+.lab .sharebar i{display:block;height:100%}.lab .sharebar i.you{background:var(--you)}.lab .sharebar i.rival{background:var(--rival)}
+.lab .sharelbl{display:flex;justify-content:space-between;font-size:12.5px;font-weight:600;margin-top:4px}
+.lab .sharelbl .you{color:var(--you)}.lab .sharelbl .rival{color:var(--rival)}
+.lab table.hist th.you{color:var(--you)}.lab table.hist th.rival{color:var(--rival)}
+.lab table.hist.res td:first-child{color:var(--muted)}
+@media (max-width:560px){.lab .hin.compact{padding:8px 12px}.lab .hin.compact img.logo{height:26px}.lab .hin.compact .steps{order:3;width:100%}.lab .res2 .num{font-size:24px}}
+/* a phone must not be forced wider than its screen by the widest table: grid and flex items may shrink (2026-11-10) */
+.lab main>*{min-width:0}
+.lab .stack>*{min-width:0}

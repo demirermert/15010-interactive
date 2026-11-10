@@ -8,7 +8,7 @@
 //        [--min 0] [--max 10] [--chat] [--hide] [--no-names]
 //
 // Defaults are Game 1 of the class (gas stations: wholesale cost $2.50, a gallon worth $5.00, 10,000 gallons a round,
-// prices $0 to $10, driving cost 0.01, so the Nash price is $3.50 and the collusive price $4.50), cut to 3 rounds of
+// prices $2.50 to $10, driving cost 0.01, so the Nash price is $3.50 and the collusive price $4.50), cut to 3 rounds of
 // 45 s with 12 s breaks, rival's name shown. The key is never printed.
 
 import { io } from 'socket.io-client';
@@ -34,7 +34,7 @@ const config = {
   marketSize: n(args.gallons, 10000),
   x1: 0,
   x2: 100,
-  priceBounds: { min: n(args.min, 0), max: n(args.max, 10) },
+  priceBounds: { min: n(args.min, 2.5), max: n(args.max, 10) },
   enableChat: Boolean(args.chat),
   hideRoundCount: Boolean(args.hide),
   showOpponentName: !args['no-names']
