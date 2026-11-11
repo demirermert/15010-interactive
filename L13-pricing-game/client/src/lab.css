@@ -61,7 +61,10 @@ body{margin:0;font:16px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,s
 .lab .legend i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:6px}
 .lab .total{font:700 40px/1.1 ui-monospace,Menlo,monospace;color:var(--ok);margin:4px 0}
 .lab .chat{display:flex;flex-direction:column;gap:6px;max-height:220px;overflow:auto;font-size:14px;margin-bottom:8px}
-.lab .chat .m{background:var(--bg);border-radius:8px;padding:6px 10px}.lab .chat .m.me{background:#eef3fa;align-self:flex-end}
+.lab .chat .m{max-width:85%;border-radius:12px;padding:6px 11px;line-height:1.35}
+.lab .chat .m .who{display:block;font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;margin-bottom:1px}
+.lab .chat .m.them{align-self:flex-start;background:#fbecee;color:var(--ink);border-left:3px solid var(--red);border-bottom-left-radius:4px}.lab .chat .m.them .who{color:var(--red)}
+.lab .chat .m.me{align-self:flex-end;background:var(--navy);color:#fff;border-bottom-right-radius:4px}.lab .chat .m.me .who{color:#c9d3ee}
 .lab .chatrow{display:flex;gap:8px}.lab .chatrow input{flex:1;font:inherit;border:1.5px solid #cfd4da;border-radius:8px;padding:8px 10px}
 .lab .chatrow button{font:inherit;font-weight:600;border:0;border-radius:8px;padding:8px 14px;background:var(--navy);color:#fff;cursor:pointer}
 @media (max-width:900px){.lab main{grid-template-columns:1fr;padding:14px}.lab #qcard{position:static}.lab header.lab-head{padding:0}.lab .hin{border-radius:0}.lab .who{margin-left:0;text-align:left}}

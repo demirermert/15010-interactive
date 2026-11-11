@@ -116,6 +116,9 @@ export function StudentView({
   const [chatInput, setChatInput] = useState('');
   const inputRef = useRef(null);
   const centsRef = useRef(null);
+  const chatRef = useRef(null);
+  // the newest message stays in view (2026-11-11)
+  useEffect(() => { const el = chatRef.current; if (el) el.scrollTop = el.scrollHeight; }, [chatMessages?.length]);
   const config = session?.config;
   const maxDollars = Math.floor(priceBounds?.max ?? 100);
   const maxDollarDigits = String(maxDollars).length;
@@ -352,9 +355,10 @@ export function StudentView({
       {config?.enableChat && (
         <div className="card">
           <div className="gname">Chat with your rival</div>
-          <div className="chat">
+          <div className="chat" ref={chatRef}>
             {(chatMessages || []).map((m, i) => (
-              <div key={i} className={`m${m.fromSocketId === currentSocketId ? ' me' : ''}`}>{m.message}</div>
+              // mine by socket or by name (names are unique in a game), so a reconnect keeps my messages mine
+              (mine => <div key={i} className={`m${mine ? ' me' : ' them'}`}><span className="who">{mine ? 'You' : 'Rival'}</span>{m.message}</div>)(m.fromSocketId === currentSocketId || (!!me && m.from === me))
             ))}
           </div>
           <form className="chatrow" onSubmit={e => { e.preventDefault(); if (chatInput.trim()) { onSendChatMessage(chatInput.trim()); setChatInput(''); } }}>
