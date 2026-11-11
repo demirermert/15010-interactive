@@ -64,7 +64,9 @@ function Rules({ config }) {
         for your rival.</p>
       <p><b>Your goal:</b> the most total profit over all rounds, not the most gallons.</p>
       <p>After each round you see your rival's price, both market shares and both profits.</p>
-      <p style={{ color: '#8a1c2c' }}><b>No communication with your rival.</b></p>
+      {config?.enableChat
+        ? <p><b>In this game you can chat with your rival</b> in the chat box. What you write is saved with the results.</p>
+        : <p style={{ color: '#8a1c2c' }}><b>No communication with your rival.</b></p>}
     </div>
   );
 }
