@@ -257,6 +257,21 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
       }
     }
 
+    // The student page sends its join twice on the same socket. The second one used to register a second student with a
+    // second personal code over the first (same socket), so the phone kept two codes, one dead, and a student who closed
+    // the tab and typed the code again on the join page was sent to the dead one about half the time: "You were not part
+    // of this game" (75-student final test, 2026-11-11). The repeated join now gets the seat it already has.
+    if (role === 'student') {
+      const same = session.players.get(socket.id);
+      if (same && same.role === 'student' && same.studentCode) {
+        socket.join(session.code);
+        socket.data.sessionCode = session.code;
+        socket.data.role = 'student';
+        socket.data.studentCode = same.studentCode;
+        return same.studentCode;
+      }
+    }
+
     // For new players, name is required
     playerName = cleanName(playerName);
     if (!playerName) {

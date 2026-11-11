@@ -281,6 +281,13 @@ Environment variables (set in the Render dashboard):
   cheating student or odd settings: seat takeover via another's code, pasted prices, 40-character twin names, twin
   names reconnecting before Start, Nash for custom settings, rounds under 5 s. review_fixes 17 of 17, refresh 50 of 50,
   fuzz_prices 335 of 335, chat_csv 8 of 8, classroom 21 of 21.
+- 2026-11-11 late, found by the 75-student final test (`test/final.mjs`: 75 real pages play Game 1-3 and the chat game
+  back to back on a section, joining later games with "Join the next game", every CSV row recomputed): the student page
+  sends its join twice, and the second one registered a second student with a second personal code on the same socket,
+  so every phone stored two codes, one dead. A student who closed the tab and typed the code again on the join page was
+  sent to the dead one about half the time ("You were not part of this game") and was out for the rest of the class.
+  The repeated join now gets the seat it already has (gameLogic.js registerPlayer). review_fixes 19 of 19 (one code per
+  phone; 6 of 6 back after closing the tab), refresh 50 of 50, fuzz_prices 335 of 335, chat_csv 8 of 8, classroom 21 of 21.
 
 ## Where things stand (2026-11-07)
 

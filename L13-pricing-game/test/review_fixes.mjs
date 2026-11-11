@@ -124,6 +124,33 @@ try {
     await p.close();
   }
 
+  // the final test (2026-11-11): one join = one personal code, and closing the tab and typing the code again on the join
+  // page gets the seat back (two codes used to be stored, one dead)
+  {
+    const g = await game({ rounds: 2, roundTime: 30 });
+    bot(g.code, 'Rival');
+    const ctxs = [], pages = [];
+    for (let k = 0; k < 6; k++) { const ctx = await browser.createBrowserContext(); ctxs.push(ctx); const p = await ctx.newPage(); await p.goto(BASE + '/', { waitUntil: 'networkidle2' }); await p.type('#student-name', `Pat ${k}`); await p.type('#session-code', g.code); await p.click('button[type=submit]'); pages.push(p); }
+    await sleep(2000);
+    const keys = await Promise.all(pages.map(p => p.evaluate(() => Object.keys(localStorage).filter(k => k.startsWith('student_')).length)));
+    check('each phone keeps one personal code, not two', keys.every(n => n === 1), JSON.stringify(keys));
+    g.start();
+    await pages[0].waitForSelector('.pin2 .dollars', { timeout: 20000 });
+    let back = 0;
+    for (let k = 0; k < 6; k++) {
+      const link = pages[k].url();
+      await pages[k].close();
+      const p = await ctxs[k].newPage();
+      await p.goto(BASE + '/', { waitUntil: 'networkidle2' });
+      if (!(await p.$eval('#student-name', e => e.value))) await p.type('#student-name', `Pat ${k}`);
+      await p.type('#session-code', g.code); await p.click('button[type=submit]');
+      const ok = await p.waitForSelector('.pin2 .dollars', { timeout: 15000 }).then(() => true).catch(() => false);
+      if (ok && p.url() === link) back++;
+      await p.close(); await ctxs[k].close();
+    }
+    check('closing the tab mid-game and typing the code again gets the seat back (6 of 6)', back === 6, `${back} of 6`);
+  }
+
   // 4. personal link of a game that is gone
   {
     const p = await browser.newPage();
