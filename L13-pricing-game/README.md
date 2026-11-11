@@ -264,6 +264,14 @@ Environment variables (set in the Render dashboard):
   round); a repeated name becomes "Sam Lee (2)" (other online phones only; pairing compares names without the suffix,
   so a dead seat still retires); and after a server restart students see "This game has stopped" with a button to the
   join page (it was "Please create a new session"). 21 of 21; refresh 50 of 50; fuzz 334 of 334.
+- 2026-11-11 evening, fixes from a Codex review (`test/review_fixes.mjs`, 12 checks, own server on 4995): a price
+  carries its round and the server refuses one for an earlier round (a phone reconnecting used to land it in the next
+  round); the page says "Sending" until the server confirms, with "Send again" after 6 s; a fresh load of a personal
+  link whose game is gone shows the stopped-game card (it hung on the loading screen); the student facing the AI seat
+  in a chat game sees "Your rival this game is a computer, so there is no chat"; the pair's chat comes back after a
+  refresh or reconnect (`chatHistory`); profits are compared to the cent, so equal profits are a tie, and equal totals
+  share a place in the class (the AI seat still counts, Mert). Chat bubbles: navy "You" on the right, crimson "Rival"
+  on the left, scrolling to the newest. fuzz_prices 335 of 335, refresh 50 of 50, chat_csv 8 of 8, classroom 21 of 21.
 
 ## Where things stand (2026-11-07)
 

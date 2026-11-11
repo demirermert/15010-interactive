@@ -133,6 +133,13 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
   }
 
   // Which end of the street a student is on: seller A stands at x1, seller B at x2
+  // whether this student's rival is the AI seat: the chat game turns the chat off for them (Codex review, 2026-11-11)
+  function rivalIsAI(session, socketId) {
+    const pair = session.pairs.find(p => p.playerA === socketId || p.playerB === socketId);
+    if (!pair) return false;
+    return !!session.players.get(pair.playerA === socketId ? pair.playerB : pair.playerA)?.isAI;
+  }
+
   function sideOf(session, socketId) {
     const pair = session.pairs.find(p => p.playerA === socketId || p.playerB === socketId);
     return pair ? (pair.playerA === socketId ? 'A' : 'B') : null;
@@ -146,7 +153,7 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
       cur.totalProfit += e.profit;
       totals.set(e.playerId, cur);
     })));
-    return [...totals.values()].sort((a, b) => b.totalProfit - a.totalProfit);
+    return [...totals.values()].sort((a, b) => Math.round(b.totalProfit * 100) - Math.round(a.totalProfit * 100));
   }
 
   function roundIsOpen(session) {
@@ -373,6 +380,7 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
         playerLink: finalStudentCode ? `/session/${code}/${finalStudentCode}` : null,
         playerName: actualPlayerName,
         side: sideOf(session, socket.id),
+        rivalIsAI: rivalIsAI(session, socket.id),
         leaderboard: leaderboardOf(session),
         // a student who was offline when the game started has no pair and sits this game out
         spectator: socket.data.role === 'student' && session.status !== STATUS.LOBBY && session.status !== STATUS.SETUP && !actualPlayer?.pairId
@@ -439,12 +447,19 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
             fullTime,
             hasSubmitted: !!hasSubmitted,
             submittedPrice: hasSubmitted ? hasSubmitted.price : null,
-            side: sideOf(session, socket.id)
+            side: sideOf(session, socket.id),
+            rivalIsAI: rivalIsAI(session, socket.id)
           });
         }
       }
       
       socket.emit('joinedSession', joinResponse);
+      // the pair's chat so far comes back after a refresh or a reconnect (Codex review, 2026-11-11)
+      if (socket.data.role === 'student' && session.config.enableChat && session.chatLog) {
+        const me = session.players.get(socket.id);
+        const log = me?.pairId ? session.chatLog.get(me.pairId) : null;
+        if (log?.length) socket.emit('chatHistory', { messages: log });
+      }
       broadcastSession(session);
       if (session.status === STATUS.RUNNING) emitSubmissionProgress(session);
       console.log(`${actualPlayerName} joined session ${code}${finalStudentCode ? ` (${finalStudentCode})` : ''}`);
@@ -603,8 +618,8 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
     
     // Send round started to every seat (with which end of the street it is) and to the instructor
     session.pairs.forEach(pair => {
-      io.to(pair.playerA).emit('roundStarted', { round: session.currentRound, roundTime, fullTime: roundTime, side: 'A' });
-      io.to(pair.playerB).emit('roundStarted', { round: session.currentRound, roundTime, fullTime: roundTime, side: 'B' });
+      io.to(pair.playerA).emit('roundStarted', { round: session.currentRound, roundTime, fullTime: roundTime, side: 'A', rivalIsAI: rivalIsAI(session, pair.playerA) });
+      io.to(pair.playerB).emit('roundStarted', { round: session.currentRound, roundTime, fullTime: roundTime, side: 'B', rivalIsAI: rivalIsAI(session, pair.playerB) });
     });
     instructorSockets(session).forEach(id => io.to(id).emit('roundStarted', { round: session.currentRound, roundTime, fullTime: roundTime }));
 
@@ -763,6 +778,12 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
       }
       if (!roundIsOpen(session)) {
         throw new Error('This round is over. Your price goes in when the next round starts.');
+      }
+      // a price sent in an earlier round and delivered late (a phone reconnecting) is not this round's price
+      // (Codex review, 2026-11-11); pages loaded before this change send no round and are taken as before
+      const sentFor = Number(payload?.round);
+      if (Number.isFinite(sentFor) && sentFor > 0 && sentFor !== session.currentRound) {
+        throw new Error(`That price was for round ${sentFor}, which is over. Enter your price for round ${session.currentRound}.`);
       }
       const player = session.players.get(socket.id);
       if (!player || player.role !== 'student') {
@@ -1152,6 +1173,9 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
       // Find the opponent
       const opponentId = pair.playerA === socket.id ? pair.playerB : pair.playerA;
       const opponent = session.players.get(opponentId);
+      if (opponent?.isAI) {
+        throw new Error('Your rival this game is a computer, so there is no chat.');
+      }
       
       if (!opponent) {
         throw new Error('Opponent not found');
@@ -1174,6 +1198,9 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
       }
 
       // Send to opponent
+      if (!session.chatLog) session.chatLog = new Map();
+      if (!session.chatLog.has(pair.id)) session.chatLog.set(pair.id, []);
+      session.chatLog.get(pair.id).push(chatPayload);
       io.to(opponentId).emit('chatMessage', chatPayload);
       
       // Send back to sender (for confirmation)

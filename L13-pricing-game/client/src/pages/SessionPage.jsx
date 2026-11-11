@@ -66,7 +66,7 @@ export default function SessionPage() {
   });
   // The socket handlers are registered once, so they read the current values through this ref (2026-11-02 audit)
   const latest = useRef({});
-  latest.current = { joinInfo, sessionCode, studentCodeFromUrl, hasAttemptedJoin, userName, isManagePage, sessionStatus: session?.status };
+  latest.current = { round: roundInfo?.round, joinInfo, sessionCode, studentCodeFromUrl, hasAttemptedJoin, userName, isManagePage, sessionStatus: session?.status };
 
   // Clear all state when session code changes (navigating to a new session)
   useEffect(() => {
@@ -320,7 +320,7 @@ export default function SessionPage() {
       // If session not found in memory, try fetching from database (completed sessions)
       // But only if we're not currently joining for the first time (which might be a timing issue)
       const { isManagePage: onManage, hasAttemptedJoin: attempted, userName: nameNow } = latest.current;
-      if (!onManage && latest.current.studentCodeFromUrl && String(message).includes('session not found')) { setGameGone(true); return; }
+      if (!onManage && latest.current.studentCodeFromUrl && String(message).includes('session not found')) { setGameGone(true); setIsJoining(false); return; }
       if (onManage && (message.includes('Session not found') || message.includes('has ended')) && attempted) {
         try {
           const response = await fetch(buildApiUrl(`/session/${sessionCode}`), { headers: keyHeaders() });
@@ -398,6 +398,7 @@ export default function SessionPage() {
     };
 
     const handlePriceAccepted = payload => {
+      if (latest.current.round && payload.round && payload.round !== latest.current.round) return;
       setHasSubmitted(true);
       setAcceptedPrice(payload.price);
       setErrorMessage('');
@@ -405,6 +406,9 @@ export default function SessionPage() {
 
     const handleChatMessage = (payload) => {
       setChatMessages(prev => [...prev, payload]);
+    };
+    const handleChatHistory = payload => {
+      if (Array.isArray(payload?.messages)) setChatMessages(payload.messages);
     };
 
     const handleOpponentInfo = (payload) => {
@@ -424,6 +428,7 @@ export default function SessionPage() {
     socket.on('opponentInfo', handleOpponentInfo);
     socket.on('submissionProgress', setSubmissionProgress);
     socket.on('priceAccepted', handlePriceAccepted);
+    socket.on('chatHistory', handleChatHistory);
     const handleSeatMoved = () => setSeatMoved(true);
     const handleJoinedAgain = () => setSeatMoved(false);
     socket.on('seatMoved', handleSeatMoved);
@@ -443,6 +448,7 @@ export default function SessionPage() {
       socket.off('opponentInfo', handleOpponentInfo);
       socket.off('submissionProgress', setSubmissionProgress);
       socket.off('priceAccepted', handlePriceAccepted);
+      socket.off('chatHistory', handleChatHistory);
       socket.off('seatMoved', handleSeatMoved);
       socket.off('joinedSession', handleJoinedAgain);
     };
@@ -656,8 +662,11 @@ export default function SessionPage() {
 
   const handleSubmitPrice = price => {
     if (!sessionCode) return;
-    socket.emit('submitPrice', { sessionCode, price });
-    setHasSubmitted(true); // Immediately show "waiting for others" message
+    // the round goes with the price, so a price held back by a dropped connection cannot land in a later round; the
+    // page says "Sending" until the server answers (Codex review, 2026-11-11)
+    socket.emit('submitPrice', { sessionCode, price, round: roundInfo?.round });
+    setAcceptedPrice(null);
+    setHasSubmitted(true);
   };
 
   const priceBounds = useMemo(() => {
@@ -696,6 +705,34 @@ export default function SessionPage() {
     });
   };
 
+  // the stopped-game and seat-moved cards come before the loading screen: a fresh load of a personal link whose game
+  // is gone used to sit on "Joining..." for ever (Codex review, 2026-11-11)
+  if (gameGone && studentCodeFromUrl) {
+    return (
+      <div className="lab"><main>
+        <div className="card" id="game-gone" style={{ padding: 20 }}>
+          <div className="qt" style={{ marginBottom: 10 }}>This game has stopped.</div>
+          <p style={{ marginBottom: 16 }}>Wait for the new code on the screen, then join the new game.</p>
+          <button className="go" type="button" onClick={() => goToJoinPage(userName)}>Join the new game</button>
+        </div>
+      </main></div>
+    );
+  }
+
+  if (seatMoved && studentCodeFromUrl) {
+    return (
+      <div className="lab"><main>
+        <div className="card" id="seat-moved" style={{ padding: 20 }}>
+          <div className="qt" style={{ marginBottom: 10 }}>Your game is open in another tab or on another device.</div>
+          <p style={{ marginBottom: 16 }}>Play there, or tap below to play on this screen instead.</p>
+          <button className="go" type="button" onClick={() => {
+            setSeatMoved(false);
+            socket.emit('joinSession', { sessionCode, playerName: '', studentCode: studentCodeFromUrl, role: 'student' });
+          }}>Play on this screen</button>
+        </div>
+      </main></div>
+    );
+  }
   // If not joined yet, show join form or loading
   if (!joinInfo) {
     // If on /manage/ route, show instructor join form or loading
@@ -931,32 +968,7 @@ export default function SessionPage() {
   // Only use session data if it matches the current sessionCode (prevents flickering from old session)
   const validSession = session && session.code === sessionCode ? session : null;
   
-  if (gameGone && studentCodeFromUrl) {
-    return (
-      <div className="lab"><main>
-        <div className="card" id="game-gone" style={{ padding: 20 }}>
-          <div className="qt" style={{ marginBottom: 10 }}>This game has stopped.</div>
-          <p style={{ marginBottom: 16 }}>Wait for the new code on the screen, then join the new game.</p>
-          <button className="go" type="button" onClick={() => goToJoinPage(userName)}>Join the new game</button>
-        </div>
-      </main></div>
-    );
-  }
 
-  if (seatMoved && studentCodeFromUrl) {
-    return (
-      <div className="lab"><main>
-        <div className="card" id="seat-moved" style={{ padding: 20 }}>
-          <div className="qt" style={{ marginBottom: 10 }}>Your game is open in another tab or on another device.</div>
-          <p style={{ marginBottom: 16 }}>Play there, or tap below to play on this screen instead.</p>
-          <button className="go" type="button" onClick={() => {
-            setSeatMoved(false);
-            socket.emit('joinSession', { sessionCode, playerName: '', studentCode: studentCodeFromUrl, role: 'student' });
-          }}>Play on this screen</button>
-        </div>
-      </main></div>
-    );
-  }
 
   return (
     <div>
@@ -983,6 +995,7 @@ export default function SessionPage() {
         playerName={userName}
         playerId={joinInfo?.playerId || joinInfo?.studentCode || null}
         side={roundInfo?.side || joinInfo?.side || null}
+        rivalIsAI={!!(roundInfo?.rivalIsAI ?? joinInfo?.rivalIsAI)}
         roundTime={roundInfo?.fullTime ?? roundInfo?.roundTime ?? null}
         spectator={!!joinInfo?.spectator}
         acceptedPrice={acceptedPrice}

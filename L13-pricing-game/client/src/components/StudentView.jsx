@@ -73,6 +73,8 @@ function Rules({ config }) {
 
 // back to the join page for the next game, with the name filled in (Mert, 2026-11-11: "a button after the game ends so
 // people can enter the new code"); the " (2)" a repeated name got is left off
+const toCents = x => Math.round((Number(x) || 0) * 100);
+
 export function goToJoinPage(name) {
   try { if (name) localStorage.setItem('l13_name', String(name).replace(/ \(\d+\)$/, '')); } catch { /* storage blocked */ }
   window.location.href = '/';
@@ -99,6 +101,7 @@ export function StudentView({
   playerName,
   playerId,
   side,
+  rivalIsAI,
   roundTime,
   spectator,
   acceptedPrice,
@@ -117,6 +120,9 @@ export function StudentView({
   const inputRef = useRef(null);
   const centsRef = useRef(null);
   const chatRef = useRef(null);
+  // a price the server has not confirmed after 6 s gets a "Send again" button (Codex review, 2026-11-11)
+  const [slow, setSlow] = useState(false);
+  useEffect(() => { setSlow(false); if (!hasSubmitted || acceptedPrice != null || !roundActive) return; const t = setTimeout(() => setSlow(true), 6000); return () => clearTimeout(t); }, [hasSubmitted, acceptedPrice, roundActive]);
   // the newest message stays in view (2026-11-11)
   useEffect(() => { const el = chatRef.current; if (el) el.scrollTop = el.scrollHeight; }, [chatMessages?.length]);
   const config = session?.config;
@@ -182,9 +188,13 @@ export function StudentView({
   const myGallons = played.reduce((s, h) => s + (h.demand || 0), 0), rivalGallons = played.reduce((s, h) => s + (h.opponentDemand || 0), 0);
   const myAvgShare = avg(played.map(h => h.share || 0)), rivalAvgShare = avg(played.map(h => h.opponentShare || 0));
   const myAvgPrice = avg(played.map(h => h.price)), rivalAvgPrice = avg(played.map(h => h.opponentPrice));
-  const roundsWon = played.filter(h => h.profit > h.opponentProfit).length, roundsLost = played.filter(h => h.profit < h.opponentProfit).length;
+  // profits compared to the cent, so equal profits are a tie and not a win by a rounding hair (Codex review, 2026-11-11)
+  const roundsWon = played.filter(h => toCents(h.profit) > toCents(h.opponentProfit)).length, roundsLost = played.filter(h => toCents(h.profit) < toCents(h.opponentProfit)).length;
   const me = playerName || history?.[0]?.name;
-  const rank = leaderboard?.length ? leaderboard.findIndex(r => (playerId ? r.playerId === playerId : r.name === me)) + 1 : 0;
+  // equal totals share a place: 1 + the number of players with a higher total (the AI seat counts, Mert 2026-11-11)
+  const mine = leaderboard?.length ? leaderboard.find(r => (playerId ? r.playerId === playerId : r.name === me)) : null;
+  const rank = mine ? 1 + leaderboard.filter(r => toCents(r.totalProfit) > toCents(mine.totalProfit)).length : 0;
+  const tiedWith = mine ? leaderboard.filter(r => r !== mine && toCents(r.totalProfit) === toCents(mine.totalProfit)).length : 0;
   const rivalLabel = config?.showOpponentName && opponentName ? opponentName : 'Rival';
   // Seller A stands at x1 and seller B at x2; the server says which seat I have
   const iAmB = side === 'B';
@@ -258,7 +268,7 @@ export function StudentView({
             </table>
           </>
         )}
-        {rank > 0 && <div className="fb info">You placed <b>{rank}</b> of {leaderboard.length} in the class by total profit.</div>}
+        {rank > 0 && <div className="fb info">You placed <b>{rank}</b> of {leaderboard.length} in the class by total profit{tiedWith ? `, tied with ${tiedWith} other${tiedWith > 1 ? 's' : ''}` : ''}.</div>}
         <button className="go" type="button" id="next-game" style={{ marginTop: 14 }} onClick={() => goToJoinPage(playerName)}>Join the next game</button>
         <div className="hint">Then type the new code from the screen.</div>
       </div>
@@ -278,7 +288,7 @@ export function StudentView({
     left = (
       <div className="card">
         <div className="case">Round {currentRound}{!hide && rounds ? ` of ${rounds}` : ''}</div>
-        <div className="qt">{done ? 'Your price is in' : 'Set your price'}</div>
+        <div className="qt">{done ? (acceptedPrice != null ? 'Your price is in' : 'Sending your price') : 'Set your price'}</div>
         <div className="clock"><span className={`s${low ? ' low' : ''}`}>{Math.max(0, timer)}s</span><span className="l">left in this round</span></div>
         <div className={`bar${low ? ' low' : ''}`}><i style={{ width: `${Math.max(0, Math.min(100, (timer / (fullTime || 1)) * 100))}%` }} /></div>
         <form onSubmit={handleSubmit}>
@@ -301,14 +311,16 @@ export function StudentView({
         {error && <div className="fb no">{error}</div>}
         {errorMessage && <div className="fb no" onClick={onDismissError}>{errorMessage}</div>}
         {/* the server's figure (kept to the cent) once it has answered, the typed one until then */}
-        {done && !errorMessage && <div className="fb ok">Submitted{(acceptedPrice ?? sent) != null ? <> at <b>{priceFmt(acceptedPrice ?? sent, config)}</b> per gallon</> : null}. Results appear when the clock runs out.</div>}
+        {done && !errorMessage && acceptedPrice != null && <div className="fb ok" id="price-ok">Submitted at <b>{priceFmt(acceptedPrice, config)}</b> per gallon. Results appear when the clock runs out.</div>}
+        {done && !errorMessage && acceptedPrice == null && <div className="fb info" id="price-sending">Sending{sent != null ? <> <b>{priceFmt(sent, config)}</b></> : null}...{slow ? ' Not confirmed yet: check your connection.' : ''}</div>}
+        {done && !errorMessage && acceptedPrice == null && slow && sent != null && <button className="go" type="button" id="send-again" onClick={() => onSubmitPrice(sent)}>Send again</button>}
       </div>
     );
   } else if (between) {
     // the round's result (Mert, 2026-11-10: "more organized and visible"): the two profits large, a market-share bar,
     // then one table with both stations side by side and the totals so far
     const r = latestResult;
-    const win = r.profit > r.opponentProfit, lose = r.profit < r.opponentProfit;
+    const win = toCents(r.profit) > toCents(r.opponentProfit), lose = toCents(r.profit) < toCents(r.opponentProfit);
     const myShare = Math.max(0, Math.min(1, r.share || 0)), rivalShare = Math.max(0, Math.min(1, r.opponentShare || 0));
     left = (
       <div className="card">
@@ -355,6 +367,7 @@ export function StudentView({
       {config?.enableChat && (
         <div className="card">
           <div className="gname">Chat with your rival</div>
+          {rivalIsAI ? <div className="hint" id="chat-off">Your rival this game is a computer, so there is no chat.</div> : <>
           <div className="chat" ref={chatRef}>
             {(chatMessages || []).map((m, i) => (
               // mine by socket or by name (names are unique in a game), so a reconnect keeps my messages mine
@@ -364,7 +377,7 @@ export function StudentView({
           <form className="chatrow" onSubmit={e => { e.preventDefault(); if (chatInput.trim()) { onSendChatMessage(chatInput.trim()); setChatInput(''); } }}>
             <input value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="Message" />
             <button type="submit">Send</button>
-          </form>
+          </form></>}
         </div>
       )}
       <div className="card">

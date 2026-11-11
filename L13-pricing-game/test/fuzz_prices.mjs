@@ -260,12 +260,22 @@ async function runGame(g, seed) {
     }));
     if (chat) {
       // a chat line reaches the rival only
+      // (the student facing the AI seat has no chat since 2026-11-11, so the sender is one with a human rival)
+      const vsAI = c => !!(c.got.roundStarted || []).slice(-1)[0]?.p?.rivalIsAI;
+      const sender = students.find(c => !vsAI(c)) || students[1];
       const before = students.map(c => (c.got.chatMessage || []).length);
-      students[1].s.emit('chatMessage', { sessionCode: code, message: 'hello rival' });
+      sender.s.emit('chatMessage', { sessionCode: code, message: 'hello rival' });
       await sleep(400);
       const after = students.map(c => (c.got.chatMessage || []).length);
       const receivers = students.filter((c, i) => after[i] > before[i]).map(c => c.name);
-      check(`${tag} chat line reaches the sender and the rival only`, receivers.length <= 2 && receivers.length >= 1, receivers.join(', '));
+      check(`${tag} chat line reaches the sender and the rival only`, receivers.length === 2, receivers.join(', '));
+      const solo = students.find(vsAI);
+      if (solo) {
+        const errsBefore = (solo.got.errorMessage || []).length;
+        solo.s.emit('chatMessage', { sessionCode: code, message: 'hello computer' });
+        await sleep(400);
+        check(`${tag} the student facing the AI seat is told there is no chat`, (solo.got.errorMessage || []).slice(errsBefore).some(m => /computer/.test(String(m.p))));
+      }
     }
 
     const res = await Promise.all(students.map(c => c.until('roundResults', p => p.round === round, (ROUND_TIME + BREAK + 25) * 1000)));
