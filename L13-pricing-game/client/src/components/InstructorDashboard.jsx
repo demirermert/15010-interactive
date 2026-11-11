@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { RoundsChart, PairBars } from '../charts.jsx';
+import { RoundsChart, PairBars, PairDots } from '../charts.jsx';
 import { money, priceFmt } from '../econ.js';
 import { withKey } from '../auth.js';
 
@@ -116,7 +116,19 @@ export function InstructorDashboard({
     return [...m.values()].sort((x, y) => (y.a + y.b) - (x.a + x.b));
   }, [byRound]);
   const shownPairs = pairTotals.filter(r => !pairSearch || r.label.toLowerCase().includes(pairSearch.toLowerCase()));
-  const detail = pairTotals.find(r => r.key === selectedPair) || pairTotals[0] || null;
+  // the market chart shows only a market the instructor picked, by typing a name or clicking a market (Mert, 2026-11-11:
+  // it used to show the best market by default)
+  const detail = pairTotals.find(r => r.key === selectedPair) || null;
+  const [marketQuery, setMarketQuery] = useState('');
+  const marketMatches = marketQuery.trim().length < 1 ? [] : pairTotals.filter(r => r.label.toLowerCase().includes(marketQuery.trim().toLowerCase()));
+  const studentNames = useMemo(() => [...new Set(pairTotals.flatMap(r => [r.aName, r.bName]).filter(Boolean))].sort(), [pairTotals]);
+  const onMarketQuery = v => {
+    setMarketQuery(v);
+    const q = v.trim().toLowerCase();
+    const exact = pairTotals.filter(r => [r.aName, r.bName].some(nm => (nm || '').toLowerCase() === q));
+    const some = pairTotals.filter(r => r.label.toLowerCase().includes(q));
+    if (q && (exact.length === 1 || some.length === 1)) setSelectedPair((exact[0] || some[0]).key);
+  };
   const hoverRow = hover ? pairTotals.find(r => r.key === hover.key) : null;
   const priceLabel = 'Price ($ per gallon)';
   const vw = typeof window !== 'undefined' ? window.innerWidth : 1200, vh = typeof window !== 'undefined' ? window.innerHeight : 800;
@@ -259,27 +271,43 @@ export function InstructorDashboard({
             )}
           </section>
 
-          {detail && (
-            <section className="panel wide">
-              <div className="section-label">One market: {detail.label}</div>
-              <div className="qtext">The two stations' prices round by round; totals {money(detail.a)} and {money(detail.b)}.</div>
-              <div style={{ maxWidth: 820 }}>
-                <RoundsChart rounds={nRounds} height={220} yLabel={priceLabel} series={[
-                  { label: detail.aName, color: '#1F2E5C', values: Array.from({ length: nRounds }, (_, i) => detail.pricesA[i] ?? null) },
-                  { label: detail.bName, color: '#A31F34', values: Array.from({ length: nRounds }, (_, i) => detail.pricesB[i] ?? null), width: 2 }
-                ]} />
-                <div className="legend"><span><i style={{ background: '#1F2E5C' }} />{detail.aName}</span><span><i style={{ background: '#A31F34' }} />{detail.bName}</span></div>
-              </div>
-            </section>
-          )}
-
-          {/* the "Pairs · round N" table of the last round went on 2026-11-10 (Mert): the 2025 page had the five panels
-              that remain (state, average price, total profit by pair, leaderboard, individual profits, students) */}
-          <section className="panel">
+          {/* the 2025 shape (Mert, 2026-11-11): markets along the bottom, best total first, one dot per station */}
+          <section className="panel wide">
             <div className="section-label">Individual profits by pair</div>
-            <div className="qtext">Each station's own total within the market, best market first. Hover a market for its whole history.</div>
+            <div className="qtext">Each market's two stations, highest total profit first: navy is station A, red station B. Hover a market for the names and its whole history; click to show its prices below.</div>
             {pairTotals.length === 0 ? <div className="empty-note">Appears after the first round.</div> : (
-              <div className="scroll" style={{ maxHeight: 520, maxWidth: 700 }}><PairBars rows={shownPairs} split selected={detail?.key} onSelect={setSelectedPair} onHover={onHover} /></div>
+              <PairDots rows={pairTotals} selected={detail?.key} onSelect={k => { setSelectedPair(k); setMarketQuery(''); }} onHover={onHover} />
+            )}
+          </section>
+
+          {/* one market, chosen by name (Mert, 2026-11-11) */}
+          <section className="panel wide">
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div className="section-label">{detail ? `One market: ${detail.label}` : 'One market'}</div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input className="search" list="market-names" placeholder="Type a student's name" value={marketQuery} onChange={e => onMarketQuery(e.target.value)} />
+                <datalist id="market-names">{studentNames.map(nm => <option key={nm} value={nm} />)}</datalist>
+                {detail && <button className="btn" onClick={() => { setSelectedPair(null); setMarketQuery(''); }}>Clear</button>}
+              </div>
+            </div>
+            {!detail && marketMatches.length > 1 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, margin: '8px 0' }}>
+                {marketMatches.slice(0, 12).map(r => <button key={r.key} className="btn" onClick={() => { setSelectedPair(r.key); setMarketQuery(''); }}>{r.label}</button>)}
+              </div>
+            )}
+            {!detail ? (
+              <div className="empty-note">{pairTotals.length === 0 ? 'Appears after the first round.' : marketQuery && marketMatches.length === 0 ? 'No student by that name.' : 'Type a name, or click a market above, to see that market\'s prices round by round.'}</div>
+            ) : (
+              <>
+                <div className="qtext">The two stations' prices round by round; totals {money(detail.a)} and {money(detail.b)}.</div>
+                <div style={{ maxWidth: 820 }}>
+                  <RoundsChart rounds={nRounds} height={220} yLabel={priceLabel} series={[
+                    { label: detail.aName, color: '#1F2E5C', values: Array.from({ length: nRounds }, (_, i) => detail.pricesA[i] ?? null) },
+                    { label: detail.bName, color: '#A31F34', values: Array.from({ length: nRounds }, (_, i) => detail.pricesB[i] ?? null), width: 2 }
+                  ]} />
+                  <div className="legend"><span><i style={{ background: '#1F2E5C' }} />{detail.aName}</span><span><i style={{ background: '#A31F34' }} />{detail.bName}</span></div>
+                </div>
+              </>
             )}
           </section>
 

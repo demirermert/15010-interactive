@@ -97,6 +97,49 @@ export function PriceBars({ values, lo = 0, hi = 100, bins = 10, marks = [], hei
   );
 }
 
+// Each station's profit in its market, the 2025 shape (Mert, 2026-11-11): the markets along the x axis, best total first
+// (labelled 1, 2, 3, ...), profit on the y axis, one dot per station (navy for station A, red for station B) joined by a
+// dashed line. rows: [{ key, aName, bName, a, b }]; onHover(key, event) / onHover(null), onSelect(key) as in PairBars.
+export function PairDots({ rows, height = 340, selected = null, onSelect = null, onHover = null }) {
+  const W = 1000, H = height, L = 70, R = 20, T = 16, B = 40;
+  const vals = rows.flatMap(r => [r.a, r.b]).filter(Number.isFinite);
+  const vMin = Math.min(0, ...vals), vMax = niceMax(Math.max(1, ...vals) * 1.05);
+  const n = Math.max(rows.length, 1);
+  const step = (W - L - R) / n;
+  const x = i => L + step * (i + 0.5);
+  const y = v => T + (H - T - B) * (1 - (v - vMin) / (vMax - vMin || 1));
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map(f => vMin + f * (vMax - vMin));
+  const fmt = v => '$' + Math.round(v).toLocaleString('en-US');
+  const r0 = Math.max(3, Math.min(8, step / 3.2));
+  const every = Math.max(1, Math.ceil(n / 25)); // label at most ~25 markets
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }} role="img">
+      {ticks.map(t => (
+        <g key={t}>
+          <line x1={L} x2={W - R} y1={y(t)} y2={y(t)} stroke="#eef0f3" />
+          <text x={L - 8} y={y(t) + 4} textAnchor="end" fontSize="13" fill="#6b7280">{fmt(t)}</text>
+        </g>
+      ))}
+      <text x={(L + W - R) / 2} y={H - 4} textAnchor="middle" fontSize="12" fill="#9aa1ab">Markets, highest total profit first (hover for names and history)</text>
+      {rows.map((r, i) => {
+        const pick = {
+          ...(onSelect ? { onClick: () => onSelect(r.key), style: { cursor: 'pointer' } } : {}),
+          ...(onHover ? { onMouseEnter: e => onHover(r.key, e), onMouseMove: e => onHover(r.key, e), onMouseLeave: () => onHover(null) } : {})
+        };
+        return (
+          <g key={r.key} {...pick}>
+            <rect x={x(i) - step / 2} y={T} width={step} height={H - T - B} fill={selected === r.key ? '#1F2E5C' : 'transparent'} opacity={selected === r.key ? 0.08 : 1} />
+            <line x1={x(i)} x2={x(i)} y1={y(r.a)} y2={y(r.b)} stroke="#cbd5e1" strokeWidth="2" strokeDasharray="4 4" />
+            <circle cx={x(i)} cy={y(r.a)} r={r0} fill="#1F2E5C" stroke="#fff" strokeWidth="1.5" />
+            <circle cx={x(i)} cy={y(r.b)} r={r0} fill="#A31F34" stroke="#fff" strokeWidth="1.5" />
+            {i % every === 0 && <text x={x(i)} y={H - B + 16} textAnchor="middle" fontSize="12" fill="#6b7280">{i + 1}</text>}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
 // Horizontal bars, one row per pair, best first. rows: [{ label, a, b, aName, bName }]; split: two bars (A and B) per row.
 // onSelect(key) on a click; onHover(key, event) while the mouse is over a row and onHover(null) when it leaves (the
 // dashboard shows the pair's whole history in a floating box, as the 2025 page did; 2026-11-10)
