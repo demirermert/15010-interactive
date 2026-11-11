@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { RoundsChart, Street } from '../charts.jsx';
+import { RoundsChart } from '../charts.jsx';
 import { money, pct, roundTimeFor, priceFmt, qty, kfmt, moneyK } from '../econ.js';
 
 // true on a phone-width screen (the rounds table then uses short figures and short headings so it needs no sideways scroll)
@@ -61,7 +61,7 @@ function Rules({ config }) {
         </p>
       )}
       <p><b>Your cost is {priceFmt(cost, config)} per gallon</b> (the wholesale price plus taxes, delivery and card fees), the same
-        for your rival: every gallon you sell costs you that much, so profit = (your price − {priceFmt(cost, config)}) × gallons sold.</p>
+        for your rival.</p>
       <p><b>Your goal:</b> the most total profit over all rounds, not the most gallons.</p>
       <p>After each round you see your rival's price, both market shares and both profits.</p>
       <p style={{ color: '#8a1c2c' }}><b>No communication with your rival.</b></p>
@@ -279,10 +279,9 @@ export function StudentView({
               onChange={onCents} onKeyDown={onCentsKey} disabled={done} placeholder="00" aria-label="Cents" />
             <span className="unit">per gallon</span>
           </div>
-          <div className="hint">Price per gallon, between {priceFmt(priceBounds.min, config)} and {priceFmt(priceBounds.max, config)}.
- If you don't submit in time, the game picks a random price for you.</div>
-          <div className="fb info">Your cost is <b>{priceFmt(Number(config?.marginalCost) || 0, config)}</b> per gallon.
- Profit = (price − {priceFmt(Number(config?.marginalCost) || 0, config)}) × gallons sold.</div>
+          {/* the random-price line and the profit formula went on 2026-11-11 (Mert) */}
+          <div className="hint">Price per gallon, between {priceFmt(priceBounds.min, config)} and {priceFmt(priceBounds.max, config)}.</div>
+          <div className="fb info">Your cost is <b>{priceFmt(Number(config?.marginalCost) || 0, config)}</b> per gallon.</div>
           {!done && <button className="go" type="submit">Submit price</button>}
         </form>
         {error && <div className="fb no">{error}</div>}
@@ -337,14 +336,7 @@ export function StudentView({
   const nShown = Math.max(hist.length, hide ? hist.length : rounds, 1);
   const right = (
     <div className="stack">
-      {config?.modelType === 'hotelling' && (
-        <div className="card">
-          <div className="gname">Your market</div>
-          <Street x1={myX} x2={rivalX} />
-          <div className="hint">Drivers live along the 100-mile road and fill up at the station that leaves them the most: what a
-            gallon is worth to them, minus its price, minus the drive ({perMile(config.travelCost)}). If both are too costly, they don't buy.</div>
-        </div>
-      )}
+      {/* the "Your market" road card went on 2026-11-11 (Mert); the rules still describe the road */}
       <div className="card">
         <div className="gname">Your rounds</div>
         {hist.length === 0 ? (
