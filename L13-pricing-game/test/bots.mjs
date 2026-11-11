@@ -6,6 +6,7 @@
 //   node test/bots.mjs --host https://lab-a.onrender.com --code XXXX [--n 2] [--price 3.49] [--names "Ann,Bob"]
 //        [--join-over S]  arrive one by one over S seconds (a class walking in), not all at once
 //        [--realistic]    submit like a class: most spread over the round, some in the last seconds, about 1 in 20 never
+//        [--chat]         in a chat game: says something at the start of each round and answers each message from its rival
 
 import { io } from 'socket.io-client';
 
@@ -48,6 +49,13 @@ function startBot(i, name) {
     setTimeout(() => s.emit('submitPrice', { sessionCode: code, price }), at);
     log(`${name} round ${p.round}: $${price.toFixed(2)}`);
   });
+  if (args.chat) {
+    const opener = ['Hi! Want to both price high this round? $6.50?', 'Same again? I stayed at my price.', 'Last round. Let us not undercut each other.'];
+    const replies = ['Deal, $6.50 it is.', 'OK, I will stay high if you do.', 'Sounds good to me.', 'Hmm, I might go a bit lower... just kidding.'];
+    let k = 0;
+    s.on('roundStarted', p => setTimeout(() => s.emit('chatMessage', { sessionCode: code, message: opener[(p.round - 1) % opener.length] }), 3000));
+    s.on('chatMessage', m => { if (m.from !== name) setTimeout(() => s.emit('chatMessage', { sessionCode: code, message: replies[k++ % replies.length] }), 2500); });
+  }
   s.on('roundResults', r => log(`${name} round ${r.round}: $${r.price} vs ${r.opponentName} $${r.opponentPrice} -> ${Math.round(r.demand)} gal, profit $${r.profit.toFixed(0)}`));
   s.on('sessionComplete', p => {
     const me = (p.leaderboard || []).find(x => x.name === name);

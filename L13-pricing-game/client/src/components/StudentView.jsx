@@ -348,6 +348,21 @@ export function StudentView({
   const right = (
     <div className="stack">
       {/* the "Your market" road card went on 2026-11-11 (Mert); the rules still describe the road */}
+      {/* the chat sits above the rounds (Mert, 2026-11-11) */}
+      {config?.enableChat && (
+        <div className="card">
+          <div className="gname">Chat with your rival</div>
+          <div className="chat">
+            {(chatMessages || []).map((m, i) => (
+              <div key={i} className={`m${m.fromSocketId === currentSocketId ? ' me' : ''}`}>{m.message}</div>
+            ))}
+          </div>
+          <form className="chatrow" onSubmit={e => { e.preventDefault(); if (chatInput.trim()) { onSendChatMessage(chatInput.trim()); setChatInput(''); } }}>
+            <input value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="Message" />
+            <button type="submit">Send</button>
+          </form>
+        </div>
+      )}
       <div className="card">
         <div className="gname">Your rounds</div>
         {hist.length === 0 ? (
@@ -384,20 +399,6 @@ export function StudentView({
           </>
         )}
       </div>
-      {config?.enableChat && (
-        <div className="card">
-          <div className="gname">Chat with your rival</div>
-          <div className="chat">
-            {(chatMessages || []).map((m, i) => (
-              <div key={i} className={`m${m.fromSocketId === currentSocketId ? ' me' : ''}`}>{m.message}</div>
-            ))}
-          </div>
-          <form className="chatrow" onSubmit={e => { e.preventDefault(); if (chatInput.trim()) { onSendChatMessage(chatInput.trim()); setChatInput(''); } }}>
-            <input value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="Message" />
-            <button type="submit">Send</button>
-          </form>
-        </div>
-      )}
       {sessionStatus !== 'running' && sessionStatus !== 'complete' ? null : (
         <div className="card">
           <div className="gname">How it works</div>
