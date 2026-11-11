@@ -4,6 +4,8 @@
 // cent) and leaves when the game is over. For testing a game on a service next to a real phone.
 //
 //   node test/bots.mjs --host https://lab-a.onrender.com --code XXXX [--n 2] [--price 3.49] [--names "Ann,Bob"]
+//        [--join-over S]  arrive one by one over S seconds (a class walking in), not all at once
+//        [--realistic]    submit like a class: most spread over the round, some in the last seconds, about 1 in 20 never
 
 import { io } from 'socket.io-client';
 
@@ -17,8 +19,15 @@ const names = args.names && args.names !== true ? String(args.names).split(',').
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
 let left = n;
 
+const joinOver = Number(args['join-over'] || 0) * 1000;
+const realistic = Boolean(args.realistic);
 for (let i = 0; i < n; i++) {
   const name = names[i % names.length] + (i >= names.length ? ` ${i + 1}` : '');
+  // arrival: early ones quickly, a tail of stragglers (square of a uniform draw)
+  const arrive = joinOver ? joinOver * Math.random() ** 1.6 : 0;
+  setTimeout(() => startBot(i, name), arrive);
+}
+function startBot(i, name) {
   const s = io(BASE, { transports: ['websocket'] });
   let bounds = { min: 0, max: 100 }, cost = 0;
   s.on('connect', () => s.emit('joinSession', { sessionCode: code, playerName: name, role: 'student' }));
@@ -30,7 +39,13 @@ for (let i = 0; i < n; i++) {
   s.on('roundStarted', p => {
     const lo = Math.max(bounds.min, cost), hi = bounds.max;
     const price = args.price && args.price !== true ? Number(args.price) : Math.round((lo + Math.random() * (hi - lo) * 0.5) * 100) / 100;
-    setTimeout(() => s.emit('submitPrice', { sessionCode: code, price }), 500 + Math.random() * 1500);
+    const len = (Number(p.roundTime) || 30) * 1000;
+    if (realistic && Math.random() < 0.05) return; // never submits: the random price
+    const u = Math.random();
+    const at = !realistic ? 500 + Math.random() * 1500
+      : u < 0.15 ? len * (0.88 + Math.random() * 0.1)            // last seconds
+      : len * (0.12 + 0.7 * Math.random() ** 1.3);               // most: spread, more of them early
+    setTimeout(() => s.emit('submitPrice', { sessionCode: code, price }), at);
     log(`${name} round ${p.round}: $${price.toFixed(2)}`);
   });
   s.on('roundResults', r => log(`${name} round ${r.round}: $${r.price} vs ${r.opponentName} $${r.opponentPrice} -> ${Math.round(r.demand)} gal, profit $${r.profit.toFixed(0)}`));

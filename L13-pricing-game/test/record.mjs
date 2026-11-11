@@ -40,10 +40,15 @@ const ictx = await browser.createBrowserContext();
 const dash = await ictx.newPage();
 await dash.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 });
 await dash.goto(`${BASE}/instructor?key=${encodeURIComponent(KEY)}`, { waitUntil: 'networkidle2' });
-await dash.goto(`${BASE}/manage/${code}`, { waitUntil: 'networkidle2' });
+// end to end (Mert, 2026-11-11): the film starts on the sessions page, the game is opened from the list
+await dash.goto(`${BASE}/instructor`, { waitUntil: 'networkidle2' });
 const dashRec = await dash.screencast({ path: path.join(OUT, 'instructor.webm') });
 const dashT0 = Date.now(); // the instructor video's time zero; the phone frames are placed on the same clock
 await sleep(2500);
+const link = await dash.evaluate(c => { const a = [...document.querySelectorAll('a')].find(x => x.getAttribute('href') === `/manage/${c}`); if (!a) return null; a.scrollIntoView({ block: 'center' }); const b = a.getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; }, code);
+if (link) { await sleep(800); await dash.mouse.move(link.x - 200, link.y + 120, { steps: 8 }); await dash.mouse.move(link.x, link.y, { steps: 12 }); await sleep(500); await dash.mouse.click(link.x, link.y); }
+else await dash.goto(`${BASE}/manage/${code}`, { waitUntil: 'networkidle2' });
+await sleep(3500);
 const clickButton = async (page, text) => {
   const ok = await page.evaluate(t => { const b = [...document.querySelectorAll('button')].find(x => x.textContent.trim() === t && !x.disabled); if (b) b.click(); return !!b; }, text);
   if (!ok) console.log('no button:', text);
@@ -69,9 +74,13 @@ await sleep(600);
 await phone.click('button[type=submit]');
 await sleep(1500);
 
-// the rest of the class
-const bots = spawn(process.execPath, [path.join(HERE, 'bots.mjs'), '--host', BASE, '--code', code, '--n', String(args.bots || 7)], { stdio: 'ignore' });
-await sleep(5000);
+// the rest of the class walks in over a minute; start once everyone is in the lobby
+const nBots = Number(args.bots || 7);
+const bots = spawn(process.execPath, [path.join(HERE, 'bots.mjs'), '--host', BASE, '--code', code, '--n', String(nBots), '--join-over', String(args['join-over'] || 60), '--realistic'], { stdio: 'ignore' });
+const inLobby = () => dash.evaluate(() => { const n = [...document.querySelectorAll('.k')].find(k => /Students in/i.test(k.textContent))?.nextElementSibling?.textContent; return Number(n) || 0; }).catch(() => 0);
+const waitFrom = Date.now();
+while ((await inLobby()) < nBots + 1 && Date.now() - waitFrom < 150000) await sleep(500);
+await sleep(3000);
 await clickButton(dash, 'Start the game');
 
 // the student plays: a price a few seconds into each round
@@ -79,7 +88,7 @@ const readCase = () => phone.evaluate(() => document.querySelector('#qcard .case
 const prices = [4.29, 4.55, 3.95, 4.4, 4.1];
 for (let r = 1; r <= rounds; r++) {
   while (!new RegExp(`^Round ${r} of`).test(await readCase())) await sleep(300);
-  await sleep(4000);
+  await sleep(r === 1 ? 9000 : 6000); // a student thinks first
   const p = prices[(r - 1) % prices.length];
   await phone.click('.pin2 .dollars');
   await phone.keyboard.type(String(Math.floor(p)), { delay: 250 });
