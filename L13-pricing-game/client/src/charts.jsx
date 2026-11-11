@@ -126,12 +126,17 @@ export function PairDots({ rows, height = 340, selected = null, onSelect = null,
           ...(onSelect ? { onClick: () => onSelect(r.key), style: { cursor: 'pointer' } } : {}),
           ...(onHover ? { onMouseEnter: e => onHover(r.key, e), onMouseMove: e => onHover(r.key, e), onMouseLeave: () => onHover(null) } : {})
         };
+        // only the two dots and the line between them answer the mouse, not the whole column (Mert, 2026-11-11: the chart
+        // popped up wherever the mouse crossed the panel); the invisible hit area is a little wider than the dots
+        const top = Math.min(y(r.a), y(r.b)), bot = Math.max(y(r.a), y(r.b));
+        const hitW = Math.max(10, Math.min(step * 0.6, 16));
         return (
-          <g key={r.key} {...pick}>
-            <rect x={x(i) - step / 2} y={T} width={step} height={H - T - B} fill={selected === r.key ? '#1F2E5C' : 'transparent'} opacity={selected === r.key ? 0.08 : 1} />
+          <g key={r.key}>
+            {selected === r.key && <rect x={x(i) - step / 2} y={T} width={step} height={H - T - B} fill="#1F2E5C" opacity="0.08" />}
             <line x1={x(i)} x2={x(i)} y1={y(r.a)} y2={y(r.b)} stroke="#cbd5e1" strokeWidth="2" strokeDasharray="4 4" />
             <circle cx={x(i)} cy={y(r.a)} r={r0} fill="#1F2E5C" stroke="#fff" strokeWidth="1.5" />
             <circle cx={x(i)} cy={y(r.b)} r={r0} fill="#A31F34" stroke="#fff" strokeWidth="1.5" />
+            <rect x={x(i) - hitW / 2} y={top - r0 - 3} width={hitW} height={bot - top + 2 * r0 + 6} rx={hitW / 2} fill="transparent" {...pick} />
             {i % every === 0 && <text x={x(i)} y={H - B + 16} textAnchor="middle" fontSize="12" fill="#6b7280">{i + 1}</text>}
           </g>
         );
