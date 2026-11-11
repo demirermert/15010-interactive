@@ -32,6 +32,31 @@ const res = await fetch(BASE + '/api/session', { method: 'POST', headers: { 'Con
 const { code } = await res.json();
 console.log('session', code);
 
+// A visible pointer in the films (Mert, 2026-11-11): headless Chrome draws no cursor, so the page gets one that follows the
+// mouse (an arrow on the laptop, a fingertip on the phone) and a ring on every click or tap
+const pointer = kind => `(() => {
+  const add = () => {
+    if (document.getElementById('rec-ptr')) return;
+    const p = document.createElement('div'); p.id = 'rec-ptr';
+    p.style.cssText = 'position:fixed;left:-100px;top:-100px;z-index:2147483647;pointer-events:none;transition:left .05s linear,top .05s linear;';
+    p.innerHTML = '${kind}' === 'arrow'
+      ? '<svg width="36" height="42" viewBox="0 0 26 30" style="filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))"><path d="M2 2 L2 24 L8 18 L12.5 28 L16.5 26.2 L12 16.5 L20.5 16.5 Z" fill="#E8A317" stroke="#111" stroke-width="1.8" stroke-linejoin="round"/></svg>'
+      : '<div style="width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;background:rgba(31,46,92,.28);border:2px solid rgba(31,46,92,.6)"></div>';
+    document.documentElement.appendChild(p);
+    const move = e => { p.style.left = e.clientX + 'px'; p.style.top = e.clientY + 'px'; };
+    addEventListener('mousemove', move, true); addEventListener('pointermove', move, true);
+    addEventListener('mousedown', e => {
+      move(e);
+      const r = document.createElement('div');
+      r.style.cssText = 'position:fixed;z-index:2147483646;pointer-events:none;border-radius:50%;border:3px solid #A31F34;width:14px;height:14px;left:' + (e.clientX - 10) + 'px;top:' + (e.clientY - 10) + 'px;transition:all .45s ease-out;opacity:1';
+      document.documentElement.appendChild(r);
+      requestAnimationFrame(() => { r.style.width = r.style.height = '44px'; r.style.left = (e.clientX - 25) + 'px'; r.style.top = (e.clientY - 25) + 'px'; r.style.opacity = '0'; });
+      setTimeout(() => r.remove(), 600);
+    }, true);
+  };
+  if (document.readyState === 'loading') addEventListener('DOMContentLoaded', add); else add();
+})()`;
+
 const browser = await puppeteer.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true,
   args: ['--no-first-run', '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows'] });
 
@@ -39,6 +64,7 @@ const browser = await puppeteer.launch({ executablePath: '/Applications/Google C
 const ictx = await browser.createBrowserContext();
 const dash = await ictx.newPage();
 await dash.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 });
+await dash.evaluateOnNewDocument(pointer('arrow'));
 await dash.goto(`${BASE}/instructor?key=${encodeURIComponent(KEY)}`, { waitUntil: 'networkidle2' });
 // end to end (Mert, 2026-11-11): the film starts on the sessions page, the game is opened from the list
 await dash.goto(`${BASE}/instructor`, { waitUntil: 'networkidle2' });
@@ -49,9 +75,13 @@ const link = await dash.evaluate(c => { const a = [...document.querySelectorAll(
 if (link) { await sleep(800); await dash.mouse.move(link.x - 200, link.y + 120, { steps: 8 }); await dash.mouse.move(link.x, link.y, { steps: 12 }); await sleep(500); await dash.mouse.click(link.x, link.y); }
 else await dash.goto(`${BASE}/manage/${code}`, { waitUntil: 'networkidle2' });
 await sleep(3500);
+// buttons are clicked with the mouse, so the pointer travels to them in the film
 const clickButton = async (page, text) => {
-  const ok = await page.evaluate(t => { const b = [...document.querySelectorAll('button')].find(x => x.textContent.trim() === t && !x.disabled); if (b) b.click(); return !!b; }, text);
-  if (!ok) console.log('no button:', text);
+  const at = await page.evaluate(t => { const b = [...document.querySelectorAll('button')].find(x => x.textContent.trim() === t && !x.disabled); if (!b) return null; const r = b.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; }, text);
+  if (!at) { console.log('no button:', text); return; }
+  await page.mouse.move(at.x, at.y, { steps: 18 });
+  await sleep(400);
+  await page.mouse.click(at.x, at.y);
 };
 await clickButton(dash, 'Open the lobby');
 await sleep(2000);
@@ -59,6 +89,7 @@ await sleep(2000);
 // the student, on a phone
 const sctx = await browser.createBrowserContext();
 const phone = await sctx.newPage();
+await phone.evaluateOnNewDocument(pointer('finger'));
 await phone.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
 // Chrome's screencast draws an emulated phone in a corner of the frame, so the phone is filmed as screenshots, 5 a second
 const frames = path.join(OUT, 'frames'); fs.mkdirSync(frames, { recursive: true });
@@ -68,8 +99,13 @@ const film = (async () => { while (filming) { const t = Date.now(); const f = pa
 const phoneRec = { stop: async () => { filming = false; await film; } };
 await phone.goto(BASE + '/', { waitUntil: 'networkidle2' });
 await sleep(1200);
+await phone.click('#student-name'); await sleep(300);
 await phone.type('#student-name', 'Mert', { delay: 90 });
+await sleep(400); await phone.click('#session-code'); await sleep(300);
 await phone.type('#session-code', code, { delay: 120 });
+await sleep(300);
+const typed = await phone.evaluate(() => document.querySelector('#student-name').value);
+if (typed !== 'Mert') console.log('name box holds', JSON.stringify(typed));
 await sleep(600);
 await phone.click('button[type=submit]');
 await sleep(1500);
@@ -118,7 +154,7 @@ const dot = await dash.evaluate(() => {
 if (dot) { await dash.mouse.move(dot.x - 120, dot.y + 60, { steps: 10 }); await dash.mouse.move(dot.x, dot.y, { steps: 15 }); await sleep(3500); await dash.mouse.move(dot.x + 300, dot.y + 300, { steps: 10 }); }
 await dash.evaluate(() => [...document.querySelectorAll('.section-label')].find(e => e.textContent.startsWith('One market'))?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
 await sleep(1500);
-await dash.click('input[placeholder="Type a student\'s name"]');
+{ const box = await dash.$('input[placeholder="Type a student\'s name"]'); const b = await box.boundingBox(); await dash.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 15 }); await sleep(300); await dash.mouse.click(b.x + b.width / 2, b.y + b.height / 2); }
 await dash.keyboard.type('Mert', { delay: 150 });
 await sleep(3500);
 await dashRec.stop();
