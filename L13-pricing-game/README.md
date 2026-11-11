@@ -249,6 +249,10 @@ Environment variables (set in the Render dashboard):
   0.004 / 0.0015 / 0 (chat game 0.0015): Nash $3.35 / $3.70 / $3.45 / $3.30, collusive $4.48 / $4.30 / $4.43 / $4.50;
   profit per round each at Nash $250 / $2,000 / $750 / $0, at collusion $5,875 / $5,000 / $5,625 / $6,000. Students
   read "Your cost is $3.30 per gallon (the wholesale price plus taxes, delivery and card fees)".
+  Then option C (Mert): V $7 (a driver would pay well above today's $4.08), t = 0.001 (demo) / 0.01 / 0.004 / 0 (chat
+  game 0.004), i.e. 0.1 cent, 1 cent, 0.4 cent, nothing a mile: Nash $3.40 / $4.30 / $3.70 / $3.30, collusive $6.95 /
+  $6.50 / $6.80 / $7.00; profit per round each at Nash $500 / $5,000 / $2,000 / $0, at collusion $18,250 / $16,000 /
+  $17,500 / $18,500. (Supersedes the V $4.50 table above.)
   Round times (Mert, 2026-11-10): Game 1 60, 50, 40, then 30 s; Games 2 and 3 45 s, then 30 s; demo 40 s x 3 and the
   chat game 60 s x 5 unchanged.
 

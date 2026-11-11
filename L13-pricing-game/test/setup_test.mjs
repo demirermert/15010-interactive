@@ -7,8 +7,8 @@
 //        [--rounds 3] [--round-time 45] [--break 12] [--t 0.01] [--cost 2.5] [--value 5] [--gallons 10000]
 //        [--min 0] [--max 10] [--chat] [--hide] [--no-names]
 //
-// Defaults are Game 1 of the class (gas stations, Massachusetts Nov 2026: cost $3.30 a gallon, a gallon worth $4.50, 10,000 gallons a
-// round, prices $3.30 to $10, random price up to $6, driving cost 0.004, so the Nash price is $3.70 and the collusive $4.30), cut to 3 rounds of
+// Defaults are Game 1 of the class (gas stations, Massachusetts Nov 2026: cost $3.30 a gallon, a gallon worth $7, 10,000 gallons a
+// round, prices $3.30 to $10, random price up to $6, driving cost 0.01, so the Nash price is $4.30 and the collusive $6.50), cut to 3 rounds of
 // 45 s with 12 s breaks, rival's name shown. The key is never printed.
 
 import { io } from 'socket.io-client';
@@ -28,8 +28,8 @@ const config = {
   roundTime: Array(rounds).fill(n(args['round-time'], 45)),
   breakTime: n(args.break, 12),
   modelType: 'hotelling',
-  travelCost: n(args.t, 0.004),
-  consumerValue: n(args.value, 4.5),
+  travelCost: n(args.t, 0.01),
+  consumerValue: n(args.value, 7),
   marginalCost: n(args.cost, 3.3),
   marketSize: n(args.gallons, 10000),
   x1: 0,
