@@ -163,7 +163,7 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
 
   function ensureSession(code) {
     const session = sessions.get(code);
-    if (!session) throw new Error('Session not found or has ended. Please create a new session.');
+    if (!session) throw new Error('This game has ended or was stopped (session not found).');
     return session;
   }
 
@@ -221,6 +221,12 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
         socket.data.sessionCode = session.code;
         socket.data.role = existingPlayer.role;
         socket.data.studentCode = studentCode;
+        // the same seat opened on a second tab or device (2026-11-11 classroom test): the older screen is told, so it
+        // stops showing a frozen round and offers to take the seat back, instead of looking alive and doing nothing
+        if (oldSocketId && oldSocketId !== socket.id) {
+          io.to(oldSocketId).emit('seatMoved');
+          io.sockets.sockets.get(oldSocketId)?.leave(session.code);
+        }
         console.log(`${nameToUse} rejoined session ${session.code} with code ${studentCode}`);
         return existingPlayer.studentCode; // Return existing code
       }
@@ -248,6 +254,18 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
     playerName = cleanName(playerName);
     if (!playerName) {
       throw new Error('Name is required');
+    }
+    // two students typing the same name get "Sam Lee" and "Sam Lee (2)", so the leaderboard, the market search and the
+    // CSV can tell them apart (2026-11-11 classroom test: two identical rows on the dashboard). Only other phones that
+    // are online count: the page's own repeated join comes on the same socket, and a dropped seat with this name must
+    // keep it, since pairing leaves out an offline seat whose name a connected seat also holds
+    if (role === 'student') {
+      const taken = new Set(Array.from(session.players.values()).filter(p => p.role === 'student' && p.connected && p.socketId !== socket.id).map(p => p.name.toLowerCase()));
+      if (taken.has(playerName.toLowerCase())) {
+        let k = 2;
+        while (taken.has(`${playerName} (${k})`.toLowerCase())) k++;
+        playerName = `${playerName} (${k})`;
+      }
     }
     
     // New player joining - generate unique student code
@@ -477,8 +495,11 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
       // ghost we can recognise is dropped: an offline seat whose name is also held by a connected seat, which is a
       // student who joined twice (a browser that forgot its seat and came back through the join page).
       const all = Array.from(session.players.values()).filter(p => p.role === 'student');
-      const liveNames = new Set(all.filter(p => p.connected).map(p => p.name.trim().toLowerCase()));
-      const students = all.filter(p => p.connected || !liveNames.has(p.name.trim().toLowerCase()));
+      // names compared without the " (2)" a repeated name gets on joining (2026-11-11), so a phone that died and came
+      // back on another device as "Fay (2)" still retires the dead "Fay"
+      const base = n => n.trim().toLowerCase().replace(/ \(\d+\)$/, '');
+      const liveNames = new Set(all.filter(p => p.connected).map(p => base(p.name)));
+      const students = all.filter(p => p.connected || !liveNames.has(base(p.name)));
       if (students.length < 1) {
         throw new Error('Need at least one student to start');
       }

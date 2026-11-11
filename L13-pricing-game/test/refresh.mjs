@@ -212,20 +212,20 @@ async function game2() {
   const T = '[game2]';
   const { code, inst } = await newSession('refresh 2', { rounds: 2, showOpponentName: true });
   const A = { ...await joinNew(code, 'Eve'), code }, B = { ...await joinNew(code, 'Fay'), code }, C = { ...await joinNew(code, 'Gus'), code };
-  // Fay's browser forgot her seat and she joined again from the join page: two seats named Fay, the old one offline
+  // Fay's browser forgot her seat and she joined again from the join page: a second seat, "Fay (2)" since 2026-11-11, the old one offline
   const Bdup = { ...await joinNew(code, 'Fay'), code };
   B.close();
   // Gus's phone is locked when the instructor presses start
   C.close();
   await sleep(400);
   const roster = studentsIn(inst.last('sessionUpdate'));
-  check(`${T} the instructor's lobby shows the offline phones`, roster.find(p => p.name === 'Gus')?.connected === false && roster.filter(p => p.name === 'Fay').length === 2, JSON.stringify(roster.map(p => [p.name, p.connectionStatus])));
+  check(`${T} the instructor's lobby shows the offline phones`, roster.find(p => p.name === 'Gus')?.connected === false && roster.filter(p => /^Fay( \(2\))?$/.test(p.name)).length === 2, JSON.stringify(roster.map(p => [p.name, p.connectionStatus])));
   inst.s.emit('startSession', { sessionCode: code });
   const started = await Promise.all([A, Bdup].map(x => x.until('roundStarted', p => p.round === 1)));
   check(`${T} the connected phones get round 1`, started.every(p => p.round === 1));
   await sleep(300);
   const roster2 = studentsIn(inst.last('sessionUpdate'));
-  check(`${T} the dark phone is paired; the offline duplicate seat is not`, roster2.find(p => p.name === 'Gus')?.pairId && roster2.filter(p => p.name === 'Fay').length === 2 && roster2.filter(p => p.name === 'Fay' && p.pairId).length === 1 && roster2.find(p => p.name === 'Fay' && p.connected)?.pairId, JSON.stringify(roster2.map(p => [p.name, p.connectionStatus, !!p.pairId])));
+  check(`${T} the dark phone is paired; the offline duplicate seat is not`, roster2.find(p => p.name === 'Gus')?.pairId && roster2.filter(p => /^Fay( \(2\))?$/.test(p.name)).length === 2 && roster2.filter(p => /^Fay( \(2\))?$/.test(p.name) && p.pairId).length === 1 && roster2.find(p => p.name === 'Fay (2)' && p.connected)?.pairId, JSON.stringify(roster2.map(p => [p.name, p.connectionStatus, !!p.pairId])));
   // Gus unlocks his phone during round 1: he is in the game, with the round open
   const C2 = await refresh(C, { closeOld: false });
   const rsC = await C2.until('roundStarted', p => p.round === 1, 3000).catch(() => null);

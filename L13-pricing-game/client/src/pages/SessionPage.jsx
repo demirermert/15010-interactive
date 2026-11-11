@@ -58,6 +58,8 @@ export default function SessionPage() {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [isPageReady, setIsPageReady] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [gameGone, setGameGone] = useState(false); // the server no longer has this game (a restart in class, 2026-11-11)
+  const [seatMoved, setSeatMoved] = useState(false); // this seat was opened on another tab or device (2026-11-11)
   const [receivedEvents, setReceivedEvents] = useState({
     sessionUpdate: false,
     gameState: false
@@ -318,6 +320,7 @@ export default function SessionPage() {
       // If session not found in memory, try fetching from database (completed sessions)
       // But only if we're not currently joining for the first time (which might be a timing issue)
       const { isManagePage: onManage, hasAttemptedJoin: attempted, userName: nameNow } = latest.current;
+      if (!onManage && latest.current.studentCodeFromUrl && String(message).includes('session not found')) { setGameGone(true); return; }
       if (onManage && (message.includes('Session not found') || message.includes('has ended')) && attempted) {
         try {
           const response = await fetch(buildApiUrl(`/session/${sessionCode}`), { headers: keyHeaders() });
@@ -421,6 +424,10 @@ export default function SessionPage() {
     socket.on('opponentInfo', handleOpponentInfo);
     socket.on('submissionProgress', setSubmissionProgress);
     socket.on('priceAccepted', handlePriceAccepted);
+    const handleSeatMoved = () => setSeatMoved(true);
+    const handleJoinedAgain = () => setSeatMoved(false);
+    socket.on('seatMoved', handleSeatMoved);
+    socket.on('joinedSession', handleJoinedAgain);
 
     return () => {
       socket.off('joinedSession', handleJoinedSession);
@@ -436,6 +443,8 @@ export default function SessionPage() {
       socket.off('opponentInfo', handleOpponentInfo);
       socket.off('submissionProgress', setSubmissionProgress);
       socket.off('priceAccepted', handlePriceAccepted);
+      socket.off('seatMoved', handleSeatMoved);
+      socket.off('joinedSession', handleJoinedAgain);
     };
   }, []);
 
@@ -922,6 +931,33 @@ export default function SessionPage() {
   // Only use session data if it matches the current sessionCode (prevents flickering from old session)
   const validSession = session && session.code === sessionCode ? session : null;
   
+  if (gameGone && studentCodeFromUrl) {
+    return (
+      <div className="lab"><main>
+        <div className="card" id="game-gone" style={{ padding: 20 }}>
+          <div className="qt" style={{ marginBottom: 10 }}>This game has stopped.</div>
+          <p style={{ marginBottom: 16 }}>Wait for the new code on the screen, then join the new game.</p>
+          <button className="go" type="button" onClick={() => { window.location.href = '/'; }}>Join the new game</button>
+        </div>
+      </main></div>
+    );
+  }
+
+  if (seatMoved && studentCodeFromUrl) {
+    return (
+      <div className="lab"><main>
+        <div className="card" id="seat-moved" style={{ padding: 20 }}>
+          <div className="qt" style={{ marginBottom: 10 }}>Your game is open in another tab or on another device.</div>
+          <p style={{ marginBottom: 16 }}>Play there, or tap below to play on this screen instead.</p>
+          <button className="go" type="button" onClick={() => {
+            setSeatMoved(false);
+            socket.emit('joinSession', { sessionCode, playerName: '', studentCode: studentCodeFromUrl, role: 'student' });
+          }}>Play on this screen</button>
+        </div>
+      </main></div>
+    );
+  }
+
   return (
     <div>
       <StudentView

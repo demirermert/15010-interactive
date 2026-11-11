@@ -255,6 +255,15 @@ Environment variables (set in the Render dashboard):
   $17,500 / $18,500. (Supersedes the V $4.50 table above.)
   Round times (Mert, 2026-11-10): Game 1 60, 50, 40, then 30 s; Games 2 and 3 45 s, then 30 s; demo 40 s x 3 and the
   chat game 60 s x 5 unchanged.
+- 2026-11-11, classroom trouble test (`test/classroom.mjs`, local server only; it kills and restarts that server). Real
+  pages for: a phone locked through a round end, 25 s offline across a result, a slow 3G-like connection, a network
+  without websockets (falls back to polling), the personal link open in two tabs, two students with the same name, a
+  40+ character name, 375 px with 130% text, no instructor page open for two rounds, back-to-back games from the join
+  page, an odd class with no Parley key, and the server dying mid-game. Three fixes came out of it: the tab that loses
+  its seat to a second tab or device now says so and offers "Play on this screen" (it used to sit frozen on an old
+  round); a repeated name becomes "Sam Lee (2)" (other online phones only; pairing compares names without the suffix,
+  so a dead seat still retires); and after a server restart students see "This game has stopped" with a button to the
+  join page (it was "Please create a new session"). 21 of 21; refresh 50 of 50; fuzz 334 of 334.
 
 ## Where things stand (2026-11-07)
 
