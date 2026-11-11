@@ -42,6 +42,7 @@ await dash.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 });
 await dash.goto(`${BASE}/instructor?key=${encodeURIComponent(KEY)}`, { waitUntil: 'networkidle2' });
 await dash.goto(`${BASE}/manage/${code}`, { waitUntil: 'networkidle2' });
 const dashRec = await dash.screencast({ path: path.join(OUT, 'instructor.webm') });
+const dashT0 = Date.now(); // the instructor video's time zero; the phone frames are placed on the same clock
 await sleep(2500);
 const clickButton = async (page, text) => {
   const ok = await page.evaluate(t => { const b = [...document.querySelectorAll('button')].find(x => x.textContent.trim() === t && !x.disabled); if (b) b.click(); return !!b; }, text);
@@ -57,7 +58,8 @@ await phone.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: tru
 // Chrome's screencast draws an emulated phone in a corner of the frame, so the phone is filmed as screenshots, 5 a second
 const frames = path.join(OUT, 'frames'); fs.mkdirSync(frames, { recursive: true });
 let frameN = 0, filming = true;
-const film = (async () => { while (filming) { const t = Date.now(); await phone.screenshot({ path: path.join(frames, `f${String(frameN++).padStart(5, '0')}.png`) }).catch(() => {}); await sleep(Math.max(0, 200 - (Date.now() - t))); } })();
+const frameTimes = []; // when each phone frame was taken, so the video runs in real time
+const film = (async () => { while (filming) { const t = Date.now(); const f = path.join(frames, `f${String(frameN++).padStart(5, '0')}.png`); try { await phone.screenshot({ path: f }); frameTimes.push({ f, t }); } catch {} await sleep(Math.max(0, 200 - (Date.now() - t))); } })();
 const phoneRec = { stop: async () => { filming = false; await film; } };
 await phone.goto(BASE + '/', { waitUntil: 'networkidle2' });
 await sleep(1200);
@@ -116,12 +118,24 @@ await browser.close();
 
 // to mp4 for Safari
 execFileSync(FFMPEG, ['-y', '-loglevel', 'error', '-i', path.join(OUT, 'instructor.webm'), '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', path.join(OUT, 'instructor.mp4')]);
-execFileSync(FFMPEG, ['-y', '-loglevel', 'error', '-framerate', '5', '-i', path.join(frames, 'f%05d.png'), '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-r', '25', '-movflags', '+faststart', path.join(OUT, 'student.mp4')]);
+// the phone in real time on the instructor's clock: the first frame held from the instructor's time zero, then each
+// frame for as long as it was on screen (ffmpeg concat with durations)
+const list = [];
+const lead = Math.max(0.04, (frameTimes[0].t - dashT0) / 1000);
+list.push(`file '${frameTimes[0].f}'`, `duration ${lead.toFixed(3)}`);
+frameTimes.forEach((x, k) => { const next = frameTimes[k + 1]?.t ?? x.t + 200; list.push(`file '${x.f}'`, `duration ${((next - x.t) / 1000).toFixed(3)}`); });
+list.push(`file '${frameTimes[frameTimes.length - 1].f}'`);
+fs.writeFileSync(path.join(frames, 'list.txt'), list.join('\n'));
+execFileSync(FFMPEG, ['-y', '-loglevel', 'error', '-f', 'concat', '-safe', '0', '-i', path.join(frames, 'list.txt'), '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2,fps=25', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', path.join(OUT, 'student.mp4')]);
+// one video, both screens side by side on the same clock (the phone holds its last frame once it stops)
+execFileSync(FFMPEG, ['-y', '-loglevel', 'error', '-i', path.join(OUT, 'instructor.mp4'), '-i', path.join(OUT, 'student.mp4'),
+  '-filter_complex', '[0:v]scale=-2:900,setsar=1[a];[1:v]scale=-2:900,setsar=1,tpad=stop_mode=clone:stop_duration=600[b];[a][b]hstack=inputs=2:shortest=1[v]',
+  '-map', '[v]', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', path.join(OUT, 'both.mp4')]);
 fs.rmSync(frames, { recursive: true, force: true });
 fs.writeFileSync(path.join(OUT, 'index.html'), `<!doctype html><meta charset="utf-8"><title>Game 1 recorded</title>
 <style>body{margin:16px;font:14px -apple-system,sans-serif;background:#f6f7f9}.row{display:flex;gap:20px;align-items:flex-start}h3{margin:4px 0 8px}</style>
 <h2>Game 1, recorded (session ${code}, ${rounds} rounds of ${rt} s, ${Number(args.bots || 7) + 1} students + the AI seat)</h2>
-<div class="row"><div><h3>Instructor dashboard</h3><video src="instructor.mp4" controls autoplay muted style="width:960px;border:1px solid #ccc;border-radius:8px"></video></div>
-<div><h3>Student phone</h3><video src="student.mp4" controls autoplay muted style="width:330px;border:1px solid #ccc;border-radius:16px"></video></div></div>`);
+<p>Instructor dashboard on the left, the student's phone on the right, on the same clock.</p>
+<video src="both.mp4" controls autoplay muted style="width:100%;max-width:1500px;border:1px solid #ccc;border-radius:8px"></video>`);
 console.log('done:', path.join(OUT, 'index.html'));
 process.exit(0);
