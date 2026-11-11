@@ -24,6 +24,7 @@ function buildApiUrl(path) {
 //  - three real games, driving gets cheaper each game: t = 0.004 / 0.0015 / 0 (0.4, 0.15, 0 cents a mile), Nash $3.70 /
 //    $3.45 / $3.30 (a 40-cent margin, as in a normal week, then 15, then 0), collusive $4.30 / $4.43 / $4.50, so the
 //    real $4.08 sits between Nash and collusion. 10 rounds, more time in the first rounds;
+//  Round times (Mert, 2026-11-10): Game 1 60, 50, 40, then 30 s; Games 2 and 3 45 s, then 30 s (they know the game).
 //  - a bonus game with chat on the second market (about 5 rounds of 60 s).
 // (Earlier the same day: cost $2.50, V $5, prices $2.50-$10, t 0.01/0.003/0. Before 2026-11-10: the 2025 drinks game,
 // 100 customers worth $200, $1 per unit walked, zero cost, prices 0 to 250.)
@@ -32,8 +33,8 @@ function buildApiUrl(path) {
 export const DEFAULT_GAMES = [
   { base: 'default-demo', label: 'Demo', cfg: { rounds: 3, differentTimePerRound: true, roundTime: 40, roundTimes: [40, 40, 40], travelCost: 0.0005 } },
   { base: 'default', label: 'Game 1', cfg: { travelCost: 0.004 } },
-  { base: 'default', label: 'Game 2', cfg: { travelCost: 0.0015 } },
-  { base: 'default', label: 'Game 3', cfg: { travelCost: 0 } },
+  { base: 'default', label: 'Game 2', cfg: { travelCost: 0.0015, roundTimes: [45, 30, 30, 30, 30, 30, 30, 30, 30, 30] } },
+  { base: 'default', label: 'Game 3', cfg: { travelCost: 0, roundTimes: [45, 30, 30, 30, 30, 30, 30, 30, 30, 30] } },
   { base: 'default-chat', label: 'Bonus game with chat', cfg: { travelCost: 0.0015, enableChat: true, rounds: 5, differentTimePerRound: true, roundTime: 60, roundTimes: [60, 60, 60, 60, 60] } }
 ];
 

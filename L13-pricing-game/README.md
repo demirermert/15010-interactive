@@ -249,6 +249,8 @@ Environment variables (set in the Render dashboard):
   0.004 / 0.0015 / 0 (chat game 0.0015): Nash $3.35 / $3.70 / $3.45 / $3.30, collusive $4.48 / $4.30 / $4.43 / $4.50;
   profit per round each at Nash $250 / $2,000 / $750 / $0, at collusion $5,875 / $5,000 / $5,625 / $6,000. Students
   read "Your cost is $3.30 per gallon (the wholesale price plus taxes, delivery and card fees)".
+  Round times (Mert, 2026-11-10): Game 1 60, 50, 40, then 30 s; Games 2 and 3 45 s, then 30 s; demo 40 s x 3 and the
+  chat game 60 s x 5 unchanged.
 
 ## Where things stand (2026-11-07)
 
