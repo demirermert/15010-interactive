@@ -184,7 +184,7 @@ body{margin:0;font:16px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,s
 .lab table.hist.rounds th,.lab table.hist.rounds td{white-space:nowrap}
 @media (max-width:560px){.lab .hin.compact img.logo{height:38px}.lab table.hist.rounds{font-size:12.5px}.lab table.hist.rounds th{font-size:10px;letter-spacing:.03em}.lab table.hist.rounds th,.lab table.hist.rounds td{padding:6px 3px}}
 /* the dashboard's floating history box for the market under the mouse (2026-11-10) */
-.dash .hoverbox{position:fixed;z-index:60;width:450px;max-width:calc(100vw - 16px);background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 44px rgba(0,0,0,.18);padding:12px 14px;pointer-events:none}
+.dash .hoverbox{position:fixed;z-index:60;width:680px;max-width:calc(100vw - 16px);background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 44px rgba(0,0,0,.18);padding:12px 14px;pointer-events:none}
 .dash .hoverbox table.res{font-size:13px;margin-top:6px}
 .dash .hoverbox table.res tr.tot td{font-weight:700;border-top:2px solid var(--line)}
 /* the price as dollars and cents in two boxes (Mert, 2026-11-10) */

@@ -133,7 +133,13 @@ export function InstructorDashboard({
   const priceLabel = 'Price ($ per gallon)';
   const vw = typeof window !== 'undefined' ? window.innerWidth : 1200, vh = typeof window !== 'undefined' ? window.innerHeight : 800;
 
-  const filteredBoard = (leaderboard || []).filter(r => r.name.toLowerCase().includes(search.toLowerCase()));
+  // the leaderboard sorts by a click on a heading (Mert, 2026-11-11): total profit high-to-low by default, again for
+  // low-to-high, or by name; the # column stays the rank by total profit
+  const [boardSort, setBoardSort] = useState({ key: 'profit', dir: -1 });
+  const sortBy = key => setBoardSort(s => (s.key === key ? { key, dir: -s.dir } : { key, dir: key === 'profit' ? -1 : 1 }));
+  const filteredBoard = (leaderboard || []).filter(r => r.name.toLowerCase().includes(search.toLowerCase()))
+    .slice().sort((x, y) => boardSort.key === 'name' ? boardSort.dir * x.name.localeCompare(y.name, undefined, { numeric: true }) : boardSort.dir * ((x.totalProfit || 0) - (y.totalProfit || 0)));
+  const arrow = key => (boardSort.key === key ? (boardSort.dir < 0 ? ' ▼' : ' ▲') : '');
 
   const download = () => { if (code) window.open(withKey(buildApiUrl(`/session/${code}/export`)), '_blank'); };
 
@@ -259,7 +265,9 @@ export function InstructorDashboard({
             {filteredBoard.length === 0 ? <div className="empty-note">No profits yet.</div> : (
               <div className="scroll">
                 <table className="res">
-                  <thead><tr><th>#</th><th>Name</th><th className="r">Total profit</th></tr></thead>
+                  <thead><tr><th>#</th>
+                    <th style={{ cursor: 'pointer' }} onClick={() => sortBy('name')} title="Sort by name">Name{arrow('name')}</th>
+                    <th className="r" style={{ cursor: 'pointer' }} onClick={() => sortBy('profit')} title="Sort by total profit">Total profit{arrow('profit')}</th></tr></thead>
                   <tbody>
                     {filteredBoard.map(r => {
                       const k = (leaderboard || []).indexOf(r) + 1;
@@ -334,23 +342,14 @@ export function InstructorDashboard({
         {/* the whole history of the market under the mouse (the 2025 page's hover box, 2026-11-10): the two price paths
             and one line per round with both prices and both profits */}
         {hoverRow && (
-          <div className="hoverbox" style={{ left: Math.max(8, Math.min(hover.x + 18, vw - 470)), top: Math.max(8, Math.min(hover.y + 18, vh - 420)) }}>
+          // a large price chart only, no table (Mert, 2026-11-11)
+          <div className="hoverbox" style={{ left: Math.max(8, Math.min(hover.x + 18, vw - 700)), top: Math.max(8, Math.min(hover.y + 18, vh - 440)) }}>
             <div className="section-label">{hoverRow.label}</div>
-            <RoundsChart rounds={nRounds} height={170} yLabel={priceLabel} series={[
+            <RoundsChart rounds={nRounds} height={300} yLabel={priceLabel} series={[
               { label: hoverRow.aName, color: '#1F2E5C', values: Array.from({ length: nRounds }, (_, i) => hoverRow.pricesA[i] ?? null) },
               { label: hoverRow.bName, color: '#A31F34', values: Array.from({ length: nRounds }, (_, i) => hoverRow.pricesB[i] ?? null), width: 2 }
             ]} />
-            <table className="res">
-              <thead><tr><th>Round</th><th className="r" style={{ color: '#1F2E5C' }}>{hoverRow.aName}</th><th className="r" style={{ color: '#A31F34' }}>{hoverRow.bName}</th><th className="r" style={{ color: '#1F2E5C' }}>Profit</th><th className="r" style={{ color: '#A31F34' }}>Profit</th></tr></thead>
-              <tbody>
-                {Array.from({ length: Math.max(hoverRow.pricesA.length, hoverRow.pricesB.length) }, (_, i) => (
-                  hoverRow.pricesA[i] == null && hoverRow.pricesB[i] == null ? null : (
-                    <tr key={i}><td>{i + 1}</td><td className="r">{priceFmt(hoverRow.pricesA[i], config)}</td><td className="r">{priceFmt(hoverRow.pricesB[i], config)}</td><td className="r">{money(hoverRow.profitsA[i])}</td><td className="r">{money(hoverRow.profitsB[i])}</td></tr>
-                  )
-                ))}
-                <tr className="tot"><td>Total</td><td /><td /><td className="r">{money(hoverRow.a)}</td><td className="r">{money(hoverRow.b)}</td></tr>
-              </tbody>
-            </table>
+            <div className="legend"><span><i style={{ background: '#1F2E5C' }} />{hoverRow.aName}: total {money(hoverRow.a)}</span><span><i style={{ background: '#A31F34' }} />{hoverRow.bName}: total {money(hoverRow.b)}</span></div>
           </div>
         )}
       </div>

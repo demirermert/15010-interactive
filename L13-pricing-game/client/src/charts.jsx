@@ -110,7 +110,7 @@ export function PairDots({ rows, height = 340, selected = null, onSelect = null,
   const y = v => T + (H - T - B) * (1 - (v - vMin) / (vMax - vMin || 1));
   const ticks = [0, 0.25, 0.5, 0.75, 1].map(f => vMin + f * (vMax - vMin));
   const fmt = v => '$' + Math.round(v).toLocaleString('en-US');
-  const r0 = Math.max(3, Math.min(8, step / 3.2));
+  const r0 = Math.max(2.5, Math.min(5, step / 4.5)); // smaller dots (Mert, 2026-11-11)
   const every = Math.max(1, Math.ceil(n / 25)); // label at most ~25 markets
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }} role="img">
