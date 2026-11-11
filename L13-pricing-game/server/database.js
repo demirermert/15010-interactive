@@ -58,6 +58,19 @@ db.exec(`
     FOREIGN KEY (opponent_id) REFERENCES players(id) ON DELETE CASCADE
   );
 
+  -- the chat game's messages (2026-11-11, Mert: "save the chat so that when we download the CSV they show up there")
+  CREATE TABLE IF NOT EXISTS chat_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL,
+    round_number INTEGER NOT NULL,
+    from_name TEXT NOT NULL,
+    to_name TEXT,
+    message TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_chat_session ON chat_messages(session_id);
+
   CREATE INDEX IF NOT EXISTS idx_sessions_code ON sessions(code);
   CREATE INDEX IF NOT EXISTS idx_players_session ON players(session_id);
   CREATE INDEX IF NOT EXISTS idx_rounds_session ON rounds(session_id);
@@ -227,6 +240,19 @@ export function getAllSessions() {
       studentCount: studentCount.count
     };
   });
+}
+
+export function saveChatMessage(sessionId, { round, fromName, toName, message }) {
+  db.prepare('INSERT INTO chat_messages (session_id, round_number, from_name, to_name, message) VALUES (?, ?, ?, ?, ?)')
+    .run(sessionId, round, fromName, toName || null, message);
+}
+
+// every chat message of a game, oldest first: [{ round, from, to, message, at }]
+export function getChatMessages(code) {
+  const session = statements.getSessionByCode.get(code);
+  if (!session) return [];
+  return db.prepare('SELECT round_number, from_name, to_name, message, created_at FROM chat_messages WHERE session_id = ? ORDER BY id')
+    .all(session.id).map(m => ({ round: m.round_number, from: m.from_name, to: m.to_name, message: m.message, at: m.created_at }));
 }
 
 export function getSessionIdByCode(code) {

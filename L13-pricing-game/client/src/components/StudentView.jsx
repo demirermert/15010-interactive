@@ -69,6 +69,13 @@ function Rules({ config }) {
   );
 }
 
+// back to the join page for the next game, with the name filled in (Mert, 2026-11-11: "a button after the game ends so
+// people can enter the new code"); the " (2)" a repeated name got is left off
+export function goToJoinPage(name) {
+  try { if (name) localStorage.setItem('l13_name', String(name).replace(/ \(\d+\)$/, '')); } catch { /* storage blocked */ }
+  window.location.href = '/';
+}
+
 export function StudentView({
   sessionCode,
   sessionStatus,
@@ -247,6 +254,8 @@ export function StudentView({
           </>
         )}
         {rank > 0 && <div className="fb info">You placed <b>{rank}</b> of {leaderboard.length} in the class by total profit.</div>}
+        <button className="go" type="button" id="next-game" style={{ marginTop: 14 }} onClick={() => goToJoinPage(playerName)}>Join the next game</button>
+        <div className="hint">Then type the new code from the screen.</div>
       </div>
     );
   } else if (spectator) {

@@ -1165,6 +1165,14 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
         timestamp: Date.now()
       };
       
+      // saved for the CSV, under the round it was about: the round being played, or in a break the next one
+      if (session.dbId) {
+        const played = (player.history || []).length;
+        const round = Math.min(session.config.rounds || 1, Math.max(1, played >= session.currentRound ? session.currentRound + 1 : session.currentRound));
+        try { db.saveChatMessage(session.dbId, { round, fromName: player.name, toName: opponent.name, message: message.trim() }); }
+        catch (e) { console.error('Failed to save a chat message:', e); }
+      }
+
       // Send to opponent
       io.to(opponentId).emit('chatMessage', chatPayload);
       

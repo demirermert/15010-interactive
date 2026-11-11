@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { socket } from '../socket.js';
-import { StudentView } from '../components/StudentView.jsx';
+import { StudentView, goToJoinPage } from '../components/StudentView.jsx';
 import { InstructorDashboard } from '../components/InstructorDashboard.jsx';
 import { getKey, keyHeaders } from '../auth.js';
 
@@ -937,7 +937,7 @@ export default function SessionPage() {
         <div className="card" id="game-gone" style={{ padding: 20 }}>
           <div className="qt" style={{ marginBottom: 10 }}>This game has stopped.</div>
           <p style={{ marginBottom: 16 }}>Wait for the new code on the screen, then join the new game.</p>
-          <button className="go" type="button" onClick={() => { window.location.href = '/'; }}>Join the new game</button>
+          <button className="go" type="button" onClick={() => goToJoinPage(userName)}>Join the new game</button>
         </div>
       </main></div>
     );

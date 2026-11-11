@@ -125,11 +125,15 @@ app.get('/session/:code/export', requireKey, (req, res) => {
       return res.status(404).json({ error: 'Session not found' });
     }
 
-    // Generate CSV
-    let csv = 'Round,Player Name,Price,Opponent Name,Opponent Price,Quantity,Profit,Market Share\n';
+    // Generate CSV. A chat game adds two columns: what the player wrote and what the rival wrote for that round (the
+    // round being played, or the break before it), messages joined by " | " (2026-11-11)
+    const chat = sessionData.config?.enableChat ? db.getChatMessages(code) : null;
+    const said = (round, name) => chat.filter(m => m.round === round && m.from === name).map(m => m.message).join(' | ');
+    let csv = 'Round,Player Name,Price,Opponent Name,Opponent Price,Quantity,Profit,Market Share' + (chat ? ',Chat Sent,Chat Received' : '') + '\n';
     sessionData.rounds.forEach(round => {
       round.results.forEach(result => {
-        csv += `${round.round},${csvCell(result.playerName)},${result.price},${csvCell(result.opponentName)},${result.opponentPrice},${Number(result.demand).toFixed(2)},${Number(result.profit).toFixed(2)},${(Number(result.marketShare) * 100).toFixed(2)}%\n`;
+        csv += `${round.round},${csvCell(result.playerName)},${result.price},${csvCell(result.opponentName)},${result.opponentPrice},${Number(result.demand).toFixed(2)},${Number(result.profit).toFixed(2)},${(Number(result.marketShare) * 100).toFixed(2)}%`
+          + (chat ? `,${csvCell(said(round.round, result.playerName))},${csvCell(said(round.round, result.opponentName))}` : '') + '\n';
       });
     });
 

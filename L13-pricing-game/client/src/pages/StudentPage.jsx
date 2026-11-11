@@ -22,7 +22,7 @@ function generateRandomName() {
 
 export default function StudentPage() {
   const navigate = useNavigate();
-  const [name, setName] = useState('');
+  const [name, setName] = useState(() => { try { return localStorage.getItem('l13_name') || ''; } catch { return ''; } }); // filled in by "Join the next game"
   const [sessionCodeInput, setSessionCodeInput] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
 
