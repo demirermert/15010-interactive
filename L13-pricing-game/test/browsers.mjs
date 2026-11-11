@@ -40,7 +40,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const GAMES = {
   1: { label: 'Game 1', rounds: 10, roundTime: [60, 50, 40, 30, 30, 30, 30, 30, 30, 30], travelCost: 0.01 },
   2: { label: 'Game 2', rounds: 10, roundTime: [45, 30, 30, 30, 30, 30, 30, 30, 30, 30], travelCost: 0.004 },
-  3: { label: 'Game 3', rounds: 10, roundTime: [45, 30, 30, 30, 30, 30, 30, 30, 30, 30], travelCost: 0 }
+  3: { label: 'Game 3', rounds: 10, roundTime: [45, 30, 30, 30, 30, 30, 30, 30, 30, 30], travelCost: 0.0002 }
 };
 const G = { ...GAMES[Number(args.game || 1)] };
 if (args.short) { G.rounds = 3; G.roundTime = [25, 25, 25]; G.label += ' (short)'; } // a quick dry run

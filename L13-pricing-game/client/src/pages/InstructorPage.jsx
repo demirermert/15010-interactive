@@ -34,7 +34,8 @@ export const DEFAULT_GAMES = [
   { base: 'default-demo', label: 'Demo', cfg: { rounds: 3, differentTimePerRound: true, roundTime: 40, roundTimes: [40, 40, 40], travelCost: 0.001 } },
   { base: 'default', label: 'Game 1', cfg: { travelCost: 0.01 } },
   { base: 'default', label: 'Game 2', cfg: { travelCost: 0.004, roundTimes: [45, 30, 30, 30, 30, 30, 30, 30, 30, 30] } },
-  { base: 'default', label: 'Game 3', cfg: { travelCost: 0, roundTimes: [45, 30, 30, 30, 30, 30, 30, 30, 30, 30] } },
+  // Game 3: a tiny driving cost (0.02 cents a mile, Mert 2026-11-11) so the Nash price is $3.32, just above cost
+  { base: 'default', label: 'Game 3', cfg: { travelCost: 0.0002, roundTimes: [45, 30, 30, 30, 30, 30, 30, 30, 30, 30] } },
   { base: 'default-chat', label: 'Bonus game with chat', cfg: { travelCost: 0.004, enableChat: true, rounds: 5, differentTimePerRound: true, roundTime: 60, roundTimes: [60, 60, 60, 60, 60] } }
 ];
 
@@ -53,7 +54,7 @@ const DEFAULT_CONFIG = {
   sigma: 5,
   // Hotelling model parameters
   travelCost: 0.01,
-  consumerValue: 7, // option C (Mert, 2026-11-10): Nash $4.30 / $3.70 / $3.30, collusive $6.50 / $6.80 / $7.00
+  consumerValue: 7, // option C (Mert, 2026-11-10): Nash $4.30 / $3.70 / $3.32, collusive $6.50 / $6.80 / $6.99 (Game 3 from t = 0 to 0.0002 on 2026-11-11)
   x1: 0,
   x2: 100,
   priceMin: 3.3, // prices from the wholesale cost up (Mert, 2026-11-10: "between 2.50 and 10")
@@ -597,7 +598,7 @@ export default function InstructorPage() {
 
           {showCreateForm && formMode === 'defaults' && (
             <form onSubmit={e => { e.preventDefault(); handleAddDefaults(); }} className="setup-form three">
-              <p className="small">The games of the class, side by side, each with its own settings: the demo (you and a volunteer against ChatGPT, 3 rounds of 40 s), the three gas-station games (cost $3.30 a gallon, this week's Massachusetts figure; driving gets cheaper each game, so the Nash price falls from $4.30 to $3.70 to $3.30, against a $4.08 MA pump average), and the bonus game with chat. Remove any you do not want, change what you like, then confirm; they appear in the list below, ready to open one at a time.</p>
+              <p className="small">The games of the class, side by side, each with its own settings: the demo (you and a volunteer against ChatGPT, 3 rounds of 40 s), the three gas-station games (cost $3.30 a gallon, this week's Massachusetts figure; driving gets cheaper each game, so the Nash price falls from $4.30 to $3.70 to $3.32, against a $4.08 MA pump average), and the bonus game with chat. Remove any you do not want, change what you like, then confirm; they appear in the list below, ready to open one at a time.</p>
               {defaultGames.map((g, i) => (
                 <div key={`${g.label}-${g.name}`} className="gcol">
                   <div className="ghead">
