@@ -129,10 +129,11 @@ app.get('/session/:code/export', requireKey, (req, res) => {
     // round being played, or the break before it), messages joined by " | " (2026-11-11)
     const chat = sessionData.config?.enableChat ? db.getChatMessages(code) : null;
     const said = (round, name) => chat.filter(m => m.round === round && m.from === name).map(m => m.message).join(' | ');
-    let csv = 'Round,Player Name,Price,Opponent Name,Opponent Price,Quantity,Profit,Market Share' + (chat ? ',Chat Sent,Chat Received' : '') + '\n';
+    // "Random Price": Yes when the student sent no price and the game gave a random one at the deadline (2026-11-11)
+    let csv = 'Round,Player Name,Price,Random Price,Opponent Name,Opponent Price,Opponent Random Price,Quantity,Profit,Market Share' + (chat ? ',Chat Sent,Chat Received' : '') + '\n';
     sessionData.rounds.forEach(round => {
       round.results.forEach(result => {
-        csv += `${round.round},${csvCell(result.playerName)},${result.price},${csvCell(result.opponentName)},${result.opponentPrice},${Number(result.demand).toFixed(2)},${Number(result.profit).toFixed(2)},${(Number(result.marketShare) * 100).toFixed(2)}%`
+        csv += `${round.round},${csvCell(result.playerName)},${result.price},${result.forced ? 'Yes' : 'No'},${csvCell(result.opponentName)},${result.opponentPrice},${result.opponentForced ? 'Yes' : 'No'},${Number(result.demand).toFixed(2)},${Number(result.profit).toFixed(2)},${(Number(result.marketShare) * 100).toFixed(2)}%`
           + (chat ? `,${csvCell(said(round.round, result.playerName))},${csvCell(said(round.round, result.opponentName))}` : '') + '\n';
       });
     });

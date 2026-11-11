@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { computeDemand } from './demandModel.js';
 
 // Initialize OpenAI client (API key will be set from environment variable)
 let openai = null;
@@ -114,7 +115,18 @@ function buildGamePrompt(config, history, opponentHistory) {
     const clamp = p => Math.max(pMin, Math.min(pMax, p));
     const x2 = config.x2;
     const farthest = Math.max(x1, 100 - x2, Math.abs(x2 - x1) / 2);
-    const monopolyPrice = clamp((V + c) / 2);
+    // the best price of a station alone on the road, searched to the cent with the game's own demand (Codex review,
+    // 2026-11-11: the interior formula (V + c)/2 said $5.15 in Game 1, where $6.00 sells the whole road and earns more)
+    const monopolyPrice = (() => {
+      let best = clamp((V + c) / 2), bestProfit = -Infinity;
+      for (let cents = Math.ceil(pMin * 100); cents <= Math.floor(pMax * 100); cents++) {
+        const p = cents / 100;
+        const q = computeDemand({ priceA: p, priceB: pMax + V + 1000, config }).demandA;
+        const profit = (p - c) * q;
+        if (profit > bestProfit + 1e-9) { bestProfit = profit; best = p; }
+      }
+      return best;
+    })();
     const nashPrice = clamp(c + (t > 0 && x1 !== x2 ? t * 100 : 0));
     const collusivePrice = clamp(V - t * farthest);
     const perDollar = t > 0 && x1 !== x2 ? (M / 100 / (2 * t)).toFixed(2) : null;

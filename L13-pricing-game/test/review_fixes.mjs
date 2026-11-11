@@ -78,6 +78,27 @@ try {
     a.emit('submitPrice', { sessionCode: g.code, price: 6 });
     await sleep(400);
     check('a price with no round (a page from before the change) is still taken', acks.some(x => x.price === 6));
+    // 9 (second review): Bob never submits, so his prices are random and the CSV says so
+    await until(() => g.over, 20000);
+    const csv = (await (await fetch(BASE + `/api/session/${g.code}/export`, { headers: { 'x-instructor-key': KEY } })).text()).trim().split('\n');
+    const bob = csv.find(l => l.startsWith('1,"Bob"')), ann = csv.find(l => l.startsWith('2,"Ann"'));
+    check('the CSV marks random prices: header', csv[0].startsWith('Round,Player Name,Price,Random Price,Opponent Name,Opponent Price,Opponent Random Price,'), csv[0]);
+    // round 1: neither sent a price; round 2: Ann sent $6, Bob nothing
+    check("...unsent prices are Yes, Ann's round-2 $6 is No", /^1,"Bob",[\d.]+,Yes,"Ann",[\d.]+,Yes,/.test(bob || '') && /^2,"Ann",6,No,"Bob",[\d.]+,Yes,/.test(ann || ''), bob + ' / ' + ann);
+  }
+
+  // 3 (second review): two students type the same name; the first one's phone is locked at Start: both play
+  {
+    const g = await game({ rounds: 1, roundTime: 10 });
+    const x1 = bot(g.code, 'Alex'); await sleep(300);
+    const x2 = bot(g.code, 'Alex'); await sleep(300);
+    bot(g.code, 'Kim'); bot(g.code, 'Lee'); await sleep(400);
+    x1.disconnect(); await sleep(500);
+    let roster = null; g.inst.on('sessionUpdate', u => { roster = u; });
+    g.start(); await sleep(1500);
+    const studs = (roster?.players || []).filter(p => p.role === 'student');
+    check('two students named Alex: the one locked at Start still gets a rival', studs.filter(p => /^Alex/.test(p.name)).length === 2 && studs.filter(p => /^Alex/.test(p.name)).every(p => p.pairId), JSON.stringify(studs.map(p => [p.name, p.connected, p.pairId])));
+    x2.disconnect();
   }
 
   // 2. Sending / Send again / confirmed
@@ -116,6 +137,8 @@ try {
     const g = await game({ rounds: 1, roundTime: 40, enableChat: true, travelCost: 0.004 });
     const b = bot(g.code, 'Rival');
     const p = await joinPage(g.code, 'Sam');
+    // 11 (second review): no chat box in the lobby
+    check('in the lobby the chat says it opens when the game starts', await until(() => has(p, '#chat-wait'), 8000) && !(await has(p, '.chatrow input')));
     g.start();
     await p.waitForSelector('.chatrow input', { timeout: 20000 });
     b.emit('chatMessage', { sessionCode: g.code, message: 'hello from rival' });
@@ -149,6 +172,7 @@ try {
     await p.waitForSelector('#next-game', { timeout: 45000 });
     const t = await p.evaluate(() => document.body.innerText);
     check('equal profits ($99 each) are not a win', /Rounds won\s+0 of 1\s+0 of 1/.test(t), (t.match(/Rounds won[^\n]*/) || [''])[0]);
+    check('the game-over headline calls it a tie', t.includes('You and your rival earned the same'), (t.match(/(You out-earned|Your rival earned|You and your rival)[^\n]*/) || [''])[0]);
     check('equal totals share first place', /You placed 1 of 2 in the class by total profit, tied with 1 other/.test(t), (t.match(/You placed[^\n]*/) || [''])[0]);
     await p.close();
   }

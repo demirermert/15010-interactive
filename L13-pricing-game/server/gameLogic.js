@@ -510,9 +510,11 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
       // ghost we can recognise is dropped: an offline seat whose name is also held by a connected seat, which is a
       // student who joined twice (a browser that forgot its seat and came back through the join page).
       const all = Array.from(session.players.values()).filter(p => p.role === 'student');
-      // names compared without the " (2)" a repeated name gets on joining (2026-11-11), so a phone that died and came
-      // back on another device as "Fay (2)" still retires the dead "Fay"
-      const base = n => n.trim().toLowerCase().replace(/ \(\d+\)$/, '');
+      // names compared exactly (2026-11-11 evening, Codex review): "Alex" and "Alex (2)" are two students, and the one
+      // whose phone is locked at Start must not lose the game. (From that afternoon the suffix was stripped so that a
+      // seat abandoned for another device would retire; that also benched a real second Alex. A ghost seat is now paired
+      // like any dark phone and its rival gets the forced prices.)
+      const base = n => n.trim().toLowerCase();
       const liveNames = new Set(all.filter(p => p.connected).map(p => base(p.name)));
       const students = all.filter(p => p.connected || !liveNames.has(base(p.name)));
       if (students.length < 1) {
@@ -987,14 +989,18 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
             opponentPrice: priceB,
             demand: demandA,
             profit: profitA,
-            share: shareA
+            share: shareA,
+            forced: !!submission[pair.playerA].forced,
+            opponentForced: !!submission[pair.playerB].forced
           });
           db.saveRoundResult(roundDbId, playerB.dbId, playerA.dbId, {
             price: priceB,
             opponentPrice: priceA,
             demand: demandB,
             profit: profitB,
-            share: shareB
+            share: shareB,
+            forced: !!submission[pair.playerB].forced,
+            opponentForced: !!submission[pair.playerA].forced
           });
         } catch (err) {
           console.error('Failed to save round results to database:', err);

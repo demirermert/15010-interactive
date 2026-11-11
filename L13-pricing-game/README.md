@@ -272,6 +272,15 @@ Environment variables (set in the Render dashboard):
   refresh or reconnect (`chatHistory`); profits are compared to the cent, so equal profits are a tie, and equal totals
   share a place in the class (the AI seat still counts, Mert). Chat bubbles: navy "You" on the right, crimson "Rival"
   on the left, scrolling to the newest. fuzz_prices 335 of 335, refresh 50 of 50, chat_csv 8 of 8, classroom 21 of 21.
+- 2026-11-11 night, second Codex review, the realistic ones: the chat stays closed until the game starts ("Chat opens
+  when the game starts"; a lobby message went nowhere); seats are retired at Start only on an exact name match, so a
+  second "Alex" ("Alex (2)") whose phone is locked at Start still plays (the afternoon's suffix-stripping benched him);
+  the AI's "price if you were alone" is searched to the cent with the game's demand ($6.00 in Game 1, was $5.15);
+  the CSV has "Random Price" and "Opponent Random Price" (Yes when the game gave a random price at the deadline;
+  round_results.forced / opponent_forced); the game-over headline compares totals to the cent. Left alone as needing a
+  cheating student or odd settings: seat takeover via another's code, pasted prices, 40-character twin names, twin
+  names reconnecting before Start, Nash for custom settings, rounds under 5 s. review_fixes 17 of 17, refresh 50 of 50,
+  fuzz_prices 335 of 335, chat_csv 8 of 8, classroom 21 of 21.
 
 ## Where things stand (2026-11-07)
 

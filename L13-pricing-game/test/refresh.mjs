@@ -212,9 +212,11 @@ async function game2() {
   const T = '[game2]';
   const { code, inst } = await newSession('refresh 2', { rounds: 2, showOpponentName: true });
   const A = { ...await joinNew(code, 'Eve'), code }, B = { ...await joinNew(code, 'Fay'), code }, C = { ...await joinNew(code, 'Gus'), code };
-  // Fay's browser forgot her seat and she joined again from the join page: a second seat, "Fay (2)" since 2026-11-11, the old one offline
-  const Bdup = { ...await joinNew(code, 'Fay'), code };
+  // Fay's browser forgot her seat and she joined again from the join page after her old one dropped: same name, the old seat
+  // offline (a second seat joining while the first is still online is "Fay (2)", a different student, paired: review_fixes.mjs)
   B.close();
+  await sleep(300);
+  const Bdup = { ...await joinNew(code, 'Fay'), code };
   // Gus's phone is locked when the instructor presses start
   C.close();
   await sleep(400);
@@ -225,7 +227,7 @@ async function game2() {
   check(`${T} the connected phones get round 1`, started.every(p => p.round === 1));
   await sleep(300);
   const roster2 = studentsIn(inst.last('sessionUpdate'));
-  check(`${T} the dark phone is paired; the offline duplicate seat is not`, roster2.find(p => p.name === 'Gus')?.pairId && roster2.filter(p => /^Fay( \(2\))?$/.test(p.name)).length === 2 && roster2.filter(p => /^Fay( \(2\))?$/.test(p.name) && p.pairId).length === 1 && roster2.find(p => p.name === 'Fay (2)' && p.connected)?.pairId, JSON.stringify(roster2.map(p => [p.name, p.connectionStatus, !!p.pairId])));
+  check(`${T} the dark phone is paired; the offline duplicate seat is not`, roster2.find(p => p.name === 'Gus')?.pairId && roster2.filter(p => /^Fay( \(2\))?$/.test(p.name)).length === 2 && roster2.filter(p => /^Fay( \(2\))?$/.test(p.name) && p.pairId).length === 1 && roster2.find(p => p.name === 'Fay' && p.connected)?.pairId, JSON.stringify(roster2.map(p => [p.name, p.connectionStatus, !!p.pairId])));
   // Gus unlocks his phone during round 1: he is in the game, with the round open
   const C2 = await refresh(C, { closeOld: false });
   const rsC = await C2.until('roundStarted', p => p.round === 1, 3000).catch(() => null);

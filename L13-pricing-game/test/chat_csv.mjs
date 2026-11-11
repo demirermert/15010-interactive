@@ -53,7 +53,7 @@ check("Ann's round 1 row has what she wrote in round 1", ann1?.includes("Ann r1:
 const ann2 = lines.find(l => l.startsWith('2,"Ann"'));
 check("Ann's round 2 row has her round 2 message and what she wrote in the break before it", ann2?.includes('Ann r2') && ann2?.includes('Ann after r1'), ann2);
 check("the rival's messages are in Chat Received", ann1 && /"[^"]*r1[^"]*"$/.test(ann1) && !ann1.endsWith('Ann r1: let\'s both go high, $6.50"'), ann1);
-check('names with commas and quotes stay one cell each', lines.slice(1).every(l => (l.match(/("([^"]|"")*"|[^,]+)/g) || []).length === 10), lines.find(l => l.includes('Jr')));
+check('names with commas and quotes stay one cell each', lines.slice(1).every(l => (l.match(/("([^"]|"")*"|[^,]+)/g) || []).length === 12), lines.find(l => l.includes('Jr')));
 const plain = await (await fetch(BASE + '/api/session', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-instructor-key': KEY },
   body: JSON.stringify({ instructorName: 'T', sessionName: 'no chat', config: { ...config, enableChat: false } }) })).json();
 check('a game without chat keeps the old columns', true, plain.code);

@@ -77,6 +77,12 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_results_round ON round_results(round_id);
 `);
 
+// whether each price was the student's or a random one given at the deadline (Codex review, 2026-11-11); older
+// databases get the columns added
+for (const col of ['forced', 'opponent_forced']) {
+  try { db.exec(`ALTER TABLE round_results ADD COLUMN ${col} INTEGER NOT NULL DEFAULT 0`); } catch { /* already there */ }
+}
+
 // Prepared statements for better performance
 const statements = {
   insertSession: db.prepare(`
@@ -100,8 +106,8 @@ const statements = {
   `),
   
   insertRoundResult: db.prepare(`
-    INSERT INTO round_results (round_id, player_id, opponent_id, price, opponent_price, demand, profit, market_share)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO round_results (round_id, player_id, opponent_id, price, opponent_price, demand, profit, market_share, forced, opponent_forced)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `),
   
   getSessionByCode: db.prepare(`
@@ -164,7 +170,7 @@ export function saveRound(sessionId, roundNumber) {
 }
 
 export function saveRoundResult(roundId, playerDbId, opponentDbId, resultData) {
-  const { price, opponentPrice, demand, profit, share } = resultData;
+  const { price, opponentPrice, demand, profit, share, forced, opponentForced } = resultData;
   statements.insertRoundResult.run(
     roundId,
     playerDbId,
@@ -173,7 +179,9 @@ export function saveRoundResult(roundId, playerDbId, opponentDbId, resultData) {
     opponentPrice,
     demand,
     profit,
-    share
+    share,
+    forced ? 1 : 0,
+    opponentForced ? 1 : 0
   );
 }
 
@@ -197,7 +205,9 @@ export function getSessionData(code) {
         opponentPrice: r.opponent_price,
         demand: r.demand,
         profit: r.profit,
-        marketShare: r.market_share
+        marketShare: r.market_share,
+        forced: !!r.forced,
+        opponentForced: !!r.opponent_forced
       }))
     };
   });

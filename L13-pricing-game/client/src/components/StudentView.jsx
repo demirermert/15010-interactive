@@ -245,7 +245,7 @@ export function StudentView({
     left = (
       <div className="card">
         <div className="case">Game over</div>
-        <div className="qt">{total > rivalTotal ? 'You out-earned your rival over the game' : total < rivalTotal ? 'Your rival earned more over the game' : 'You and your rival earned the same'}</div>
+        <div className="qt">{toCents(total) > toCents(rivalTotal) ? 'You out-earned your rival over the game' : toCents(total) < toCents(rivalTotal) ? 'Your rival earned more over the game' : 'You and your rival earned the same'}</div>
         <div className="res2">
           <div className="box you"><div className="lbl"><span className="who">You</span>Total profit</div><div className="num" style={total < 0 ? { color: 'var(--rival)' } : undefined}>{money(total)}</div></div>
           <div className="box rival"><div className="lbl"><span className="who">{rivalLabel}</span>Total profit</div><div className="num">{money(rivalTotal)}</div></div>
@@ -367,7 +367,9 @@ export function StudentView({
       {config?.enableChat && (
         <div className="card">
           <div className="gname">Chat with your rival</div>
-          {rivalIsAI ? <div className="hint" id="chat-off">Your rival this game is a computer, so there is no chat.</div> : <>
+          {/* no rival before the start: a lobby message went nowhere and came back as an error in round 1 (Codex review, 2026-11-11) */}
+          {!side || spectator ? <div className="hint" id="chat-wait">{spectator ? 'You have no rival this game, so there is no chat.' : 'Chat opens when the game starts.'}</div>
+          : rivalIsAI ? <div className="hint" id="chat-off">Your rival this game is a computer, so there is no chat.</div> : <>
           <div className="chat" ref={chatRef}>
             {(chatMessages || []).map((m, i) => (
               // mine by socket or by name (names are unique in a game), so a reconnect keeps my messages mine
