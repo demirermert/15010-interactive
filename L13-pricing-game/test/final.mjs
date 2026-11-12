@@ -164,7 +164,7 @@ for (let gi = 0; gi < GAME_KEYS.length; gi++) {
     await s.page.click('button[type=submit]');
     await s.page.waitForFunction(code => new RegExp(`/session/${code}/[A-Z0-9]{6}$`).test(location.pathname), { timeout: 30000 }, CODE);
   };
-  students.forEach(s => Object.assign(s, { link: null, seen: { round: {}, result: {} }, submitted: {}, ack: {}, refused: 0, rejoined: null, sent: [] }));
+  students.forEach(s => Object.assign(s, { kb: Promise.resolve(), link: null, seen: { round: {}, result: {} }, submitted: {}, ack: {}, refused: 0, rejoined: null, sent: [] }));
   const js = Date.now();
   await Promise.all(students.map(async (s, k) => {
     await sleep(k * 150 + Math.random() * 3000);
@@ -201,7 +201,11 @@ for (let gi = 0; gi < GAME_KEYS.length; gi++) {
           if (G.enableChat && !chatOff) (async () => {
             await sleep(1000 + Math.random() * 6000);
             const msg = `${s.name} r${r}: how about $${(6 + Math.random()).toFixed(2)}?`;
-            try { await s.page.type('.chatrow input', msg, { delay: 5 }); await s.page.click('.chatrow button'); s.sent.push({ r, msg }); } catch (e) { errors.push(`${s.name}: chat r${r} failed ${e.message.slice(0, 100)}`); }
+            // one keyboard per phone: the chat and the price are typed one after the other, never at once (in the first
+            // full run they were typed together and the keystrokes mixed)
+            await (s.kb = s.kb.then(async () => {
+              try { await s.page.type('.chatrow input', msg, { delay: 5 }); await s.page.click('.chatrow button'); s.sent.push({ r, msg }); } catch (e) { errors.push(`${s.name}: chat r${r} failed ${e.message.slice(0, 100)}`); }
+            }));
           })();
           if (s.kind === 'never') { s.submitted[r] = 'never'; }
           else (async () => {
@@ -219,15 +223,15 @@ for (let gi = 0; gi < GAME_KEYS.length; gi++) {
                 s.rejoined = s.page.url() === s.link;
                 await s.page.waitForSelector('.pin2 .dollars', { timeout: 15000 });
               }
-              if (s.kind === 'too-high-first' && r === 2) {
+              if (s.kind === 'too-high-first' && r === 2) await (s.kb = s.kb.then(async () => {
                 await typePrice(s.page, 12.5);
                 await sleep(500);
                 const c2 = await readCard(s.page);
                 if (/between/.test(c2?.err || '')) s.refused++;
                 for (const sel of ['.pin2 .cents', '.pin2 .dollars']) { await s.page.focus(sel); await s.page.evaluate(q => document.querySelector(q).select(), sel); await s.page.keyboard.press('Backspace'); }
-              }
-              const t1 = Date.now();
-              await typePrice(s.page, price);
+              }));
+              let t1 = Date.now();
+              await (s.kb = s.kb.then(async () => { t1 = Date.now(); await typePrice(s.page, price); }));
               s.submitted[r] = price;
               let ok = false;
               while (Date.now() - t1 < 8000) { const c = await readCard(s.page); if (/Submitted at/.test(c?.ok || '')) { ok = true; break; } await sleep(150); }
