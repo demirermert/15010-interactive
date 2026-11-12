@@ -11,14 +11,18 @@ function niceMax(v) {
 
 // Lines over rounds. series: [{ label, color, values: [number|null per round], dashed, width, band: [lo[], hi[]] }]
 // lines: horizontal reference lines [{ label, color, y }] (none on the Class 13 dashboard: Mert wants the 2025 charts as they were)
-export function RoundsChart({ rounds, series, lines = [], height = 260, yLabel = 'Price ($)' }) {
+export function RoundsChart({ rounds, series, lines = [], height = 260, yLabel = 'Price ($)', yMin = 0 }) {
   const W = 640, H = height, L = 52, R = 16, T = 14, B = 34;
   const all = series.flatMap(s => s.values.concat(s.band ? s.band[0].concat(s.band[1]) : []).filter(v => Number.isFinite(v))).concat(lines.map(l => l.y));
-  const yMax = niceMax(Math.max(1, ...all) * 1.08);
+  // yMin: where the axis starts (the average-price chart starts at the lowest allowed price, Mert 2026-11-12)
+  const yMax = yMin > 0 ? Math.max(Math.ceil(yMin) + 1, Math.ceil(Math.max(yMin, ...all) * 1.04)) : niceMax(Math.max(1, ...all) * 1.08);
   const n = Math.max(rounds, 2);
   const x = i => L + (W - L - R) * (n === 1 ? 0.5 : i / (n - 1));
-  const y = v => T + (H - T - B) * (1 - v / yMax);
-  const ticks = [0, 0.25, 0.5, 0.75, 1].map(f => f * yMax);
+  const y = v => T + (H - T - B) * (1 - (v - yMin) / (yMax - yMin));
+  // from yMin: the floor, then whole dollars (every second one on a tall axis)
+  const step = yMax - yMin > 7 ? 2 : 1;
+  const ticks = yMin > 0 ? [yMin, ...Array.from({ length: Math.floor((yMax - Math.ceil(yMin)) / step) + 1 }, (_, k) => Math.ceil(yMin) + k * step).filter(v => v - yMin >= 0.4 && v <= yMax)]
+    : [0, 0.25, 0.5, 0.75, 1].map(f => f * yMax);
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }} role="img">
       {ticks.map(t => (

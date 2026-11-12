@@ -40,6 +40,7 @@ const JOIN_URL = SECTION ? `https://15010.ai/l13-${SECTION}` : BASE + '/';
 const OUT = args.out && args.out !== true ? String(args.out) : fs.mkdtempSync(path.join(os.tmpdir(), 'l13-final-'));
 fs.mkdirSync(path.join(OUT, 'shots'), { recursive: true });
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+const WATCH = !!args.watch; // the instructor (Mert) opens the lobby and starts the game on the real instructor page; the script only plays the students
 const T0 = Date.now();
 const sec = () => ((Date.now() - T0) / 1000).toFixed(1);
 const log = (...a) => { const line = `[${sec()}s] ${a.join(' ')}`; console.log(line); fs.appendFileSync(path.join(OUT, 'log.txt'), line + '\n'); };
@@ -125,7 +126,7 @@ for (let gi = 0; gi < GAME_KEYS.length; gi++) {
   errors = [];
   const config = { ...COMMON, rounds: G.rounds, roundTime: G.roundTime, travelCost: G.travelCost, enableChat: !!G.enableChat };
   const created = await fetch(BASE + '/api/session', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-instructor-key': KEY },
-    body: JSON.stringify({ instructorName: 'Final test', sessionName: `final test ${G.label} x${N}`, config }) });
+    body: JSON.stringify({ instructorName: WATCH ? 'Mert' : 'Final test', sessionName: WATCH ? `Rehearsal ${G.label}, ${N} students` : `final test ${G.label} x${N}`, config }) });
   const session = await created.json();
   if (created.status !== 201) { log('could not create the session:', JSON.stringify(session)); break; }
   const CODE = session.code; codes.push(CODE);
@@ -137,14 +138,16 @@ for (let gi = 0; gi < GAME_KEYS.length; gi++) {
   let lobbyCount = 0, gameOver = false, lobbyOpen = false, overAt = 0;
   const stuck = [];
   inst.on('connect', () => inst.emit('joinSession', { sessionCode: CODE, playerName: 'Final test', role: 'instructor', key: KEY }));
-  inst.on('joinedSession', () => inst.emit('openLobby', { sessionCode: CODE }));
+  inst.on('joinedSession', () => { if (!WATCH) inst.emit('openLobby', { sessionCode: CODE }); });
   inst.on('sessionUpdate', p => { if (p.status === 'lobby') { lobbyOpen = true; lobbyCount = (p.players || []).filter(q => q.role === 'student' && q.connected).length; } });
   inst.on('roundStarted', p => { announced.round[p.round] ??= gsec(); log(`server: ${G.label} round ${p.round} started`); });
   inst.on('roundSummary', p => { announced.result[p.round] ??= gsec(); });
   inst.on('submissionProgress', p => { if (p.submitted === p.total) log(`server: all ${p.total} prices in for round ${p.round}`); });
   inst.on('sessionComplete', () => { gameOver = true; overAt = Date.now(); log(`server: ${G.label} over`); });
   inst.on('errorMessage', m => log('server error to instructor:', m));
+  if (WATCH) log(`WAITING for the instructor to open the lobby of ${CODE}`);
   while (!lobbyOpen) await sleep(200);
+  if (WATCH) log('lobby open: the students join now');
   dash.goto(BASE + `/manage/${CODE}`, { waitUntil: 'networkidle2', timeout: 60000 }).catch(e => errors.push('dashboard: ' + e.message));
 
   // join: the first game from the join page; later ones with "Join the next game"
@@ -180,8 +183,8 @@ for (let gi = 0; gi < GAME_KEYS.length; gi++) {
   let chatLobbyOk = null;
   if (G.enableChat) chatLobbyOk = (await Promise.all(students.map(s => s.page.$('#chat-wait').then(Boolean).catch(() => false)))).filter(Boolean).length;
   await shoot(gi, 'lobby');
-  log(`starting ${G.label} with ${lobbyAtStart} in the lobby`);
-  inst.emit('startSession', { sessionCode: CODE });
+  if (WATCH) { log(`WAITING for the instructor to press Start (${lobbyAtStart} in the lobby)`); while (announced.round[1] === undefined) await sleep(200); }
+  else { log(`starting ${G.label} with ${lobbyAtStart} in the lobby`); inst.emit('startSession', { sessionCode: CODE }); }
 
   // one student's game
   async function play(s) {

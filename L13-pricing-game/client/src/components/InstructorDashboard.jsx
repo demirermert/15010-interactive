@@ -131,6 +131,7 @@ export function InstructorDashboard({
   };
   const hoverRow = hover ? pairTotals.find(r => r.key === hover.key) : null;
   const priceLabel = 'Price ($ per gallon)';
+  const priceFloor = Number(config?.priceBounds?.min) || 0; // the lowest price a student can set ($3.30): the average-price chart's y axis starts here
   const vw = typeof window !== 'undefined' ? window.innerWidth : 1200, vh = typeof window !== 'undefined' ? window.innerHeight : 800;
 
   // the leaderboard sorts by a click on a heading (Mert, 2026-11-11): total profit high-to-low by default, again for
@@ -234,8 +235,8 @@ export function InstructorDashboard({
             <div className="qtext">The average price the room set in each round; the band is one standard deviation either side.</div>
             {byRound.length === 0 ? <div className="empty-note">The first round's prices appear here when it ends.</div> : (
               <>
-                <RoundsChart rounds={nRounds} height={280} yLabel={priceLabel} series={[
-                  { label: 'Average', color: '#1F2E5C', values: avgSeries, band: [avgSeries.map((v, i) => (v == null ? null : Math.max(0, v - sdSeries[i]))), avgSeries.map((v, i) => (v == null ? null : v + sdSeries[i]))] }
+                <RoundsChart rounds={nRounds} height={280} yLabel={priceLabel} yMin={priceFloor} series={[
+                  { label: 'Average', color: '#1F2E5C', values: avgSeries, band: [avgSeries.map((v, i) => (v == null ? null : Math.max(priceFloor, v - sdSeries[i]))), avgSeries.map((v, i) => (v == null ? null : v + sdSeries[i]))] }
                 ]} />
                 <div className="legend">
                   <span><i style={{ background: '#1F2E5C' }} />Average price</span>
