@@ -45,6 +45,8 @@ const sec = () => ((Date.now() - T0) / 1000).toFixed(1);
 const log = (...a) => { const line = `[${sec()}s] ${a.join(' ')}`; console.log(line); fs.appendFileSync(path.join(OUT, 'log.txt'), line + '\n'); };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const cents = x => Math.round((Number(x) || 0) * 100);
+// one keyboard per phone: run fn after whatever the phone is typing; a failure is the caller's, not the next typist's
+const typing = (s, fn) => { const p = s.kb.then(fn); s.kb = p.catch(() => {}); return p; };
 
 // ---- the class presets (client/src/pages/InstructorPage.jsx, DEFAULT_GAMES on DEFAULT_CONFIG) ---------------------
 const COMMON = { breakTime: 10, marketSize: 10000, marginalCost: 3.3, randomPriceMax: 6, modelType: 'hotelling', consumerValue: 7,
@@ -203,9 +205,9 @@ for (let gi = 0; gi < GAME_KEYS.length; gi++) {
             const msg = `${s.name} r${r}: how about $${(6 + Math.random()).toFixed(2)}?`;
             // one keyboard per phone: the chat and the price are typed one after the other, never at once (in the first
             // full run they were typed together and the keystrokes mixed)
-            await (s.kb = s.kb.then(async () => {
+            await typing(s, async () => {
               try { await s.page.type('.chatrow input', msg, { delay: 5 }); await s.page.click('.chatrow button'); s.sent.push({ r, msg }); } catch (e) { errors.push(`${s.name}: chat r${r} failed ${e.message.slice(0, 100)}`); }
-            }));
+            });
           })();
           if (s.kind === 'never') { s.submitted[r] = 'never'; }
           else (async () => {
@@ -222,22 +224,30 @@ for (let gi = 0; gi < GAME_KEYS.length; gi++) {
                 await s.page.waitForFunction(code => new RegExp(`/session/${code}/[A-Z0-9]{6}$`).test(location.pathname), { timeout: 30000 }, CODE);
                 s.rejoined = s.page.url() === s.link;
                 await s.page.waitForSelector('.pin2 .dollars', { timeout: 15000 });
+                await sleep(1500); // a person reads the screen before typing (the page shows "Rejoining" for a moment first)
               }
-              if (s.kind === 'too-high-first' && r === 2) await (s.kb = s.kb.then(async () => {
+              if (s.kind === 'too-high-first' && r === 2) await typing(s, async () => {
                 await typePrice(s.page, 12.5);
                 await sleep(500);
                 const c2 = await readCard(s.page);
                 if (/between/.test(c2?.err || '')) s.refused++;
                 for (const sel of ['.pin2 .cents', '.pin2 .dollars']) { await s.page.focus(sel); await s.page.evaluate(q => document.querySelector(q).select(), sel); await s.page.keyboard.press('Backspace'); }
-              }));
+              });
               let t1 = Date.now();
-              await (s.kb = s.kb.then(async () => { t1 = Date.now(); await typePrice(s.page, price); }));
+              await typing(s, async () => { t1 = Date.now(); await typePrice(s.page, price); });
               s.submitted[r] = price;
               let ok = false;
               while (Date.now() - t1 < 8000) { const c = await readCard(s.page); if (/Submitted at/.test(c?.ok || '')) { ok = true; break; } await sleep(150); }
               if (ok) s.ack[r] = (Date.now() - t1) / 1000;
               else { const c = await readCard(s.page); errors.push(`${s.name}: round ${r} typed ${price}, no "Submitted at" within 8 s (${(c?.err || (c?.sending ? 'Sending...' : c?.qt) || '').slice(0, 100)})`); }
-            } catch (e) { errors.push(`${s.name}: round ${r} submit failed ${e.message.slice(0, 120)}`); s.submitted[r] = 'failed'; }
+            } catch (e) {
+              errors.push(`${s.name}: round ${r} submit failed ${e.message.slice(0, 120)}`); s.submitted[r] = 'failed';
+              // what the page shows at that moment (2026-11-11: after closing the tab and coming back)
+              const diag = await withTimeout(s.page.evaluate(() => ({ url: location.pathname, pin: !!document.querySelector('.pin2 .dollars'), q: document.querySelector('#qcard')?.innerText.slice(0, 160) })).catch(x => ({ err: x.message })), 5000);
+              const pages = (await s.ctx.pages()).length;
+              log(`DIAG ${s.name} r${r}: pages in its browser ${pages}, closed=${s.page.isClosed()}, ${JSON.stringify(diag)}`);
+              await withTimeout(s.page.screenshot({ path: path.join(OUT, `diag-${gi + 1}-${s.name.replace(/ /g, '')}-r${r}.png`) }).catch(() => {}), 10000);
+            }
           })();
         }
       } else if (card && (m = /^Round (\d+) result/.exec(card.kase))) s.seen.result[Number(m[1])] ??= t;
