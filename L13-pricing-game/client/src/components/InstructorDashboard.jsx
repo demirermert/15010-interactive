@@ -27,11 +27,11 @@ function asPairs(results) {
     used.add(i);
     const j = results.findIndex((o, k) => !used.has(k) && o.playerName === r.opponentName && o.opponentName === r.playerName);
     if (j >= 0) used.add(j);
-    const side = x => x && { name: x.playerName, playerId: x.playerId, price: x.price, profit: x.profit };
+    const side = x => x && { name: x.playerName, playerId: x.playerId, price: x.price, profit: x.profit, share: x.marketShare };
     out.push({
       pairId: [r.playerName, r.opponentName].sort().join(' | '),
       playerA: side(r),
-      playerB: j >= 0 ? side(results[j]) : { name: r.opponentName, price: r.opponentPrice, profit: null }
+      playerB: j >= 0 ? side(results[j]) : { name: r.opponentName, price: r.opponentPrice, profit: null, share: null }
     });
   });
   return out;
@@ -107,10 +107,11 @@ export function InstructorDashboard({
   const pairTotals = useMemo(() => {
     const m = new Map();
     byRound.forEach(r => r.results.forEach(p => {
-      const cur = m.get(p.pairId) || { key: p.pairId, label: `${p.playerA?.name} & ${p.playerB?.name}`, aName: p.playerA?.name, bName: p.playerB?.name, a: 0, b: 0, pricesA: [], pricesB: [], profitsA: [], profitsB: [] };
+      const cur = m.get(p.pairId) || { key: p.pairId, label: `${p.playerA?.name} & ${p.playerB?.name}`, aName: p.playerA?.name, bName: p.playerB?.name, a: 0, b: 0, pricesA: [], pricesB: [], profitsA: [], profitsB: [], sharesA: [], sharesB: [] };
       cur.a += p.playerA?.profit || 0; cur.b += p.playerB?.profit || 0;
       cur.pricesA[r.round - 1] = p.playerA?.price; cur.pricesB[r.round - 1] = p.playerB?.price;
       cur.profitsA[r.round - 1] = p.playerA?.profit; cur.profitsB[r.round - 1] = p.playerB?.profit;
+      cur.sharesA[r.round - 1] = p.playerA?.share; cur.sharesB[r.round - 1] = p.playerB?.share;
       m.set(p.pairId, cur);
     }));
     return [...m.values()].sort((x, y) => (y.a + y.b) - (x.a + x.b));
@@ -344,13 +345,23 @@ export function InstructorDashboard({
             and one line per round with both prices and both profits */}
         {hoverRow && (
           // a large price chart only, no table (Mert, 2026-11-11)
-          <div className="hoverbox" style={{ left: Math.max(8, Math.min(hover.x + 18, vw - 700)), top: Math.max(8, Math.min(hover.y + 18, vh - 440)) }}>
+          <div className="hoverbox" style={{ left: Math.max(8, Math.min(hover.x + 18, vw - 700)), top: Math.max(8, Math.min(hover.y + 18, vh - 540)) }}>
             <div className="section-label">{hoverRow.label}</div>
             <RoundsChart rounds={nRounds} height={300} yLabel={priceLabel} series={[
               { label: hoverRow.aName, color: '#1F2E5C', values: Array.from({ length: nRounds }, (_, i) => hoverRow.pricesA[i] ?? null) },
               { label: hoverRow.bName, color: '#A31F34', values: Array.from({ length: nRounds }, (_, i) => hoverRow.pricesB[i] ?? null), width: 2 }
             ]} />
             <div className="legend"><span><i style={{ background: '#1F2E5C' }} />{hoverRow.aName}: total {money(hoverRow.a)}</span><span><i style={{ background: '#A31F34' }} />{hoverRow.bName}: total {money(hoverRow.b)}</span></div>
+            {/* each station's market share, round by round (Mert, 2026-11-12) */}
+            <table className="res shares">
+              <thead><tr><th>Market share</th>{Array.from({ length: nRounds }, (_, i) => <th key={i} className="r">R{i + 1}</th>)}</tr></thead>
+              <tbody>
+                {[[hoverRow.aName, hoverRow.sharesA, '#1F2E5C'], [hoverRow.bName, hoverRow.sharesB, '#A31F34']].map(([nm, sh, col]) => (
+                  <tr key={nm}><td style={{ color: col, fontWeight: 600 }}>{nm}</td>
+                    {Array.from({ length: nRounds }, (_, i) => <td key={i} className="r">{Number.isFinite(sh[i]) ? `${Math.round(sh[i] * 100)}%` : ''}</td>)}</tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
