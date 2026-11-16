@@ -56,7 +56,7 @@ const PRESETS = {
   1: { label: 'Game 1', rounds: 10, roundTime: [60, 50, 40, 30, 30, 30, 30, 30, 30, 30], travelCost: 0.01, nash: 4.30 },
   2: { label: 'Game 2', rounds: 10, roundTime: [45, 30, 30, 30, 30, 30, 30, 30, 30, 30], travelCost: 0.004, nash: 3.70 },
   3: { label: 'Game 3', rounds: 10, roundTime: [45, 30, 30, 30, 30, 30, 30, 30, 30, 30], travelCost: 0.0002, nash: 3.32 },
-  chat: { label: 'Chat game', rounds: 5, roundTime: [60, 60, 60, 60, 60], travelCost: 0.004, nash: 3.70, enableChat: true, aiChatReview: !!args.review }
+  chat: { label: 'Chat game', rounds: 5, roundTime: [60, 60, 60, 60, 60], travelCost: 0.004, nash: 3.70, enableChat: true }
 };
 const GAME_KEYS = String(args.games || '1,2,3,chat').split(',').map(s => s.trim());
 const presetOf = k => {
@@ -124,7 +124,7 @@ const codes = [];
 for (let gi = 0; gi < GAME_KEYS.length; gi++) {
   const G = presetOf(GAME_KEYS[gi]);
   errors = [];
-  const config = { ...COMMON, rounds: G.rounds, roundTime: G.roundTime, travelCost: G.travelCost, enableChat: !!G.enableChat, aiChatReview: !!G.aiChatReview };
+  const config = { ...COMMON, rounds: G.rounds, roundTime: G.roundTime, travelCost: G.travelCost, enableChat: !!G.enableChat };
   const created = await fetch(BASE + '/api/session', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-instructor-key': KEY },
     body: JSON.stringify({ instructorName: WATCH ? 'Mert' : 'Final test', sessionName: WATCH ? `Rehearsal ${G.label}, ${N} students` : `final test ${G.label} x${N}`, config }) });
   const session = await created.json();
@@ -145,8 +145,6 @@ for (let gi = 0; gi < GAME_KEYS.length; gi++) {
   inst.on('submissionProgress', p => { if (p.submitted === p.total) log(`server: all ${p.total} prices in for round ${p.round}`); });
   inst.on('sessionComplete', () => { gameOver = true; overAt = Date.now(); log(`server: ${G.label} over`); });
   inst.on('errorMessage', m => log('server error to instructor:', m));
-  let review = null; // --review: the AI legal review of the chats (2026-11-16)
-  inst.on('chatReview', r => { review = r; if (r.status === 'done') log(`server: AI review done, ${r.results.filter(x => x.verdict === 'Illegal').length} illegal, ${r.results.filter(x => x.verdict === 'Legal').length} legal, ${r.results.filter(x => !x.verdict).length} failed, of ${r.total}`); });
   if (WATCH) log(`WAITING for the instructor to open the lobby of ${CODE}`);
   while (!lobbyOpen) await sleep(200);
   if (WATCH) log('lobby open: the students join now');
@@ -281,23 +279,6 @@ for (let gi = 0; gi < GAME_KEYS.length; gi++) {
   await shots;
   while (!gameOver) await sleep(300);
   await sleep(4000);
-  // the review: wait for it, then every page facing a student shows its pair's verdict
-  let reviewLine = '';
-  if (G.aiChatReview) {
-    const rt0 = Date.now();
-    while (!(review && review.status === 'done') && Date.now() - rt0 < 300000) await sleep(500);
-    const took = ((Date.now() - rt0) / 1000 + 4).toFixed(0);
-    await sleep(2000);
-    const shown = await Promise.all(students.map(s => withTimeout(s.page.evaluate(() => document.querySelector('#ai-verdict .vbig')?.textContent || (document.querySelector('#chat-off') ? 'AI' : '')).catch(() => ''), 5000)));
-    const byPage = students.map((s, k) => ({ s, v: shown[k] }));
-    const vsAI = byPage.filter(x => x.v === 'AI').length;
-    const want = students.filter(s => !s.chatOff).length;
-    const ok = byPage.filter(x => x.v === 'Legal' || x.v === 'Illegal').length;
-    // each page's verdict is its pair's
-    const wrong = byPage.filter(x => (x.v === 'Legal' || x.v === 'Illegal') && review?.results.find(r => r.nameA === x.s.name || r.nameB === x.s.name)?.verdict !== x.v).length;
-    reviewLine = `AI review: ${review?.status === 'done' ? 'done' : 'NOT DONE'} about ${took} s after the end; ${review?.results.filter(x => x.verdict === 'Illegal').length} illegal, ${review?.results.filter(x => x.verdict === 'Legal').length} legal, ${review?.results.filter(x => !x.verdict).length} failed of ${review?.total} pairs; verdict on the phone ${ok} of ${want} (facing the AI: ${vsAI}); a phone showing another pair's verdict: ${wrong}`;
-    if (review?.status !== 'done' || ok !== want || wrong || review.results.some(x => !x.verdict)) errors.push('review: ' + reviewLine);
-  }
   await shoot(gi, 'over');
 
   // ---- checks ------------------------------------------------------------------------------------------------
@@ -387,7 +368,6 @@ for (let gi = 0; gi < GAME_KEYS.length; gi++) {
     `AI seat: ${ai.join(', ') || 'none'}${aiRows.length ? `; prices ${aiRows.map(r => r.price.toFixed(2)).join(' ')}${aiRows.every(r => cents(r.price) === cents(G.nash)) ? ' (every round the Nash price: probably the fallback, OpenAI not answering)' : ''}; random ${aiRows.filter(r => r.forced).length}` : ''}`,
     `too-high price refused: ${students.filter(s => s.kind === 'too-high-first').filter(s => s.refused).length} of ${students.filter(s => s.kind === 'too-high-first').length}; closed the tab in round 3 and got the seat back: ${students.filter(s => s.kind === 'close-and-rejoin').map(s => `${s.name} ${s.rejoined ? 'yes' : 'NO'}`).join(', ')}`,
     ...(chatLine ? [chatLine] : []),
-    ...(reviewLine ? [reviewLine] : []),
     `pages that never showed the game over: ${stuck.length}${stuck.length ? '\n    ' + stuck.join('\n    ') : ''}`,
     `page errors: ${errors.length}${errors.length ? '\n    ' + errors.slice(0, 12).join('\n    ') : ''}`,
     `FAILURES: ${F.length}${F.length ? '\n    ' + F.slice(0, 25).join('\n    ') : ''}`

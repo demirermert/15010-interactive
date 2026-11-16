@@ -2,7 +2,6 @@ import { computeDemand } from './demandModel.js';
 import * as db from './database.js';
 import { getAIPriceDecision, isOpenAIInitialized } from './aiPlayer.js';
 import { validateConfig, studentConfig, cleanName } from './config.js';
-import { reviewChat, LAW_TEXT } from './chatReview.js';
 
 const SESSION_CODE_LENGTH = 4;
 const STATUS = {
@@ -475,18 +474,6 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
         const me = session.players.get(socket.id);
         const log = me?.pairId ? session.chatLog.get(me.pairId) : null;
         if (log?.length) socket.emit('chatHistory', { messages: log });
-      }
-      // after the end, the review: a student's own pair, the instructor everything (2026-11-16)
-      if (session.config.aiChatReview && session.status === STATUS.COMPLETE) {
-        if (socket.data.role === 'instructor') socket.emit('chatReview', reviewState(session));
-        else {
-          const me = session.players.get(socket.id);
-          const pair = me?.pairId && session.pairs.find(p => p.id === me.pairId);
-          if (pair && humanPairs(session).some(x => x.pair === pair)) {
-            const res = reviewOfPair(session, pair.id);
-            socket.emit('chatVerdict', forStudent(res || { pending: !!session.review?.running }, pair.playerA === socket.id ? 'A' : 'B'));
-          }
-        }
       }
       broadcastSession(session);
       if (session.status === STATUS.RUNNING) emitSubmissionProgress(session);
@@ -1113,89 +1100,6 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
     instructorIds.forEach(id => io.to(id).emit('sessionComplete', { rounds: session.roundResults, leaderboard }));
     io.to(session.code).except(instructorIds).emit('sessionComplete', { leaderboard });
     broadcastSession(session);
-    if (session.config.aiChatReview) runChatReview(session);
-  }
-
-  // ---- the AI legal review of the chats (Mert, 2026-11-16) ------------------------------------------------------
-  // Each pair of two students: its chat (from the chat log, as the phones saw it) goes to the model with the law, under
-  // "Station A" and "Station B". The verdicts reach both phones of the pair as they come in, and the dashboards; they
-  // are saved, so a reload, a late dashboard and the CSV have them. Eight pairs at a time.
-  function humanPairs(session) {
-    return session.pairs.map(pair => ({ pair, a: session.players.get(pair.playerA), b: session.players.get(pair.playerB) }))
-      .filter(x => x.a && x.b && !x.a.isAI && !x.b.isAI);
-  }
-
-  function reviewOfPair(session, pairId) {
-    return session.review?.results.get(pairId) || null;
-  }
-
-  function reviewState(session) {
-    const r = session.review;
-    if (!r) return { status: 'none', total: 0, done: 0, results: [], law: LAW_TEXT };
-    return { status: r.running ? 'running' : 'done', total: r.total, done: r.results.size, results: [...r.results.values()], law: LAW_TEXT };
-  }
-
-  function emitReviewToInstructors(session) {
-    const state = reviewState(session);
-    instructorSockets(session).forEach(id => io.to(id).emit('chatReview', state));
-  }
-
-  // what a student's phone gets: its own pair's verdict, with which station it was, without the names (the rival's
-  // name stays hidden unless the game shows it)
-  const forStudent = (result, myStation) => { const { nameA, nameB, ...rest } = result || {}; return { ...rest, myStation, law: LAW_TEXT }; };
-  function emitVerdictToPair(session, pair, result) {
-    [pair.playerA, pair.playerB].forEach(sid => {
-      const p = session.players.get(sid);
-      if (p && !p.isAI) io.to(sid).emit('chatVerdict', forStudent(result, pair.playerA === sid ? 'A' : 'B'));
-    });
-  }
-
-  async function runChatReview(session) {
-    if (session.review?.running) return;
-    const list = humanPairs(session);
-    session.review = { running: true, total: list.length, results: new Map() };
-    console.log(`[Chat review] ${session.code}: reviewing ${list.length} pairs`);
-    list.forEach(({ pair }) => emitVerdictToPair(session, pair, { pending: true }));
-    emitReviewToInstructors(session);
-    const queue = list.slice();
-    const worker = async () => {
-      for (let item = queue.shift(); item; item = queue.shift()) {
-        const { pair, a, b } = item;
-        const log = session.chatLog?.get(pair.id) || [];
-        const messages = log.map(m => ({ round: m.round || 1, station: m.from === a.name ? 'A' : 'B', text: m.message }));
-        let result;
-        try {
-          const out = await reviewChat(messages);
-          result = { pairId: pair.id, nameA: a.name, nameB: b.name, ...out };
-        } catch (err) {
-          result = { pairId: pair.id, nameA: a.name, nameB: b.name, error: 'The AI review could not be reached. The instructor can run it again.' };
-          console.error(`[Chat review] ${session.code} ${pair.id}: ${err.message}`);
-        }
-        result.messages = messages;
-        session.review.results.set(pair.id, result);
-        if (session.dbId) { try { db.saveChatReview(session.dbId, result); } catch (e) { console.error('Failed to save a chat review:', e); } }
-        emitVerdictToPair(session, pair, result);
-        emitReviewToInstructors(session);
-      }
-    };
-    await Promise.all(Array.from({ length: Math.min(8, list.length) }, worker));
-    session.review.running = false;
-    emitReviewToInstructors(session);
-    console.log(`[Chat review] ${session.code}: done, ${[...session.review.results.values()].filter(r => r.verdict === 'Illegal').length} illegal of ${list.length}`);
-  }
-
-  function handleRerunChatReview(socket, sessionCode) {
-    try {
-      const session = ensureSession(sessionCode);
-      const player = session.players.get(socket.id);
-      if (!player || player.role !== 'instructor') throw new Error('Only the instructor can do this');
-      if (!session.config.aiChatReview) throw new Error('This game has no AI review of the chats.');
-      if (session.status !== STATUS.COMPLETE) throw new Error('The review runs after the game is over.');
-      if (session.review?.running) throw new Error('The review is still running.');
-      runChatReview(session);
-    } catch (err) {
-      socket.emit('errorMessage', err.message);
-    }
   }
 
   function clearTimers(session) {
@@ -1298,25 +1202,18 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
         throw new Error('Opponent not found');
       }
       
-      // the review reads the chat as it stood at the end (2026-11-16)
-      if (session.config.aiChatReview && session.status === STATUS.COMPLETE) {
-        throw new Error('The game is over, so the chat is closed.');
-      }
-
-      // the round it was about: the round being played, or in a break the next one
-      const played = (player.history || []).length;
-      const round = Math.min(session.config.rounds || 1, Math.max(1, played >= session.currentRound ? session.currentRound + 1 : session.currentRound));
       // Send message to opponent (and back to sender for confirmation)
       const chatPayload = {
         from: player.name,
         fromSocketId: socket.id,
         message: message.trim(),
-        timestamp: Date.now(),
-        round
+        timestamp: Date.now()
       };
       
-      // saved for the CSV, under that round
+      // saved for the CSV, under the round it was about: the round being played, or in a break the next one
       if (session.dbId) {
+        const played = (player.history || []).length;
+        const round = Math.min(session.config.rounds || 1, Math.max(1, played >= session.currentRound ? session.currentRound + 1 : session.currentRound));
         try { db.saveChatMessage(session.dbId, { round, fromName: player.name, toName: opponent.name, message: message.trim() }); }
         catch (e) { console.error('Failed to save a chat message:', e); }
       }
@@ -1344,7 +1241,6 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
     handleStartSession,
     handlePriceSubmission,
     handleChatMessage,
-    handleRerunChatReview,
     handleEndSession,
     handleDisconnect,
     handleHeartbeat

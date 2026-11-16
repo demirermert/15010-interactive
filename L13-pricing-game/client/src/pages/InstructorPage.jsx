@@ -36,8 +36,7 @@ export const DEFAULT_GAMES = [
   { base: 'default', label: 'Game 2', cfg: { travelCost: 0.004, roundTimes: [45, 30, 30, 30, 30, 30, 30, 30, 30, 30] } },
   // Game 3: a tiny driving cost (0.02 cents a mile, Mert 2026-11-11) so the Nash price is $3.32, just above cost
   { base: 'default', label: 'Game 3', cfg: { travelCost: 0.0002, roundTimes: [45, 30, 30, 30, 30, 30, 30, 30, 30, 30] } },
-  // with the AI legal review of the chats on (Mert, 2026-11-16)
-  { base: 'default-chat', label: 'Bonus game with chat', cfg: { travelCost: 0.004, enableChat: true, aiChatReview: true, rounds: 5, differentTimePerRound: true, roundTime: 60, roundTimes: [60, 60, 60, 60, 60] } }
+  { base: 'default-chat', label: 'Bonus game with chat', cfg: { travelCost: 0.004, enableChat: true, rounds: 5, differentTimePerRound: true, roundTime: 60, roundTimes: [60, 60, 60, 60, 60] } }
 ];
 
 const DEFAULT_CONFIG = {
@@ -62,7 +61,6 @@ const DEFAULT_CONFIG = {
   priceMax: 10,
   defaultPrice: 3,
   enableChat: false,
-  aiChatReview: false,
   hideRoundCount: false,
   showOpponentName: false,
   showModelParameters: false
@@ -245,7 +243,6 @@ function GameFields({ cfg, setCfg, compact = false }) {
         <legend className="bgk">Options</legend>
         {[
           ['enableChat', 'Enable chat between paired students', 'Students matched together can chat during the game'],
-          ['aiChatReview', 'AI legal review of the chats', 'After the game, the AI reads each pair\'s chat against U.S. antitrust law and says Legal or Illegal and why; students see their own verdict, you see all (needs chat)'],
           ['hideRoundCount', 'Hide the total number of rounds', 'Students see "Round 3" instead of "Round 3 of 10"'],
           ['showOpponentName', 'Show opponent names', 'Students see who they are paired with'],
           ['showModelParameters', 'Also tell students the value of a gallon (V)', 'The wholesale cost and the driving cost are always in the instructions; this adds what a gallon is worth to a driver']
@@ -321,7 +318,6 @@ export default function InstructorPage() {
     x2: Number(cfg.x2),
     priceBounds: { min: Number(cfg.priceMin), max: Number(cfg.priceMax) },
     enableChat: Boolean(cfg.enableChat),
-    aiChatReview: Boolean(cfg.enableChat && cfg.aiChatReview),
     hideRoundCount: Boolean(cfg.hideRoundCount),
     showOpponentName: Boolean(cfg.showOpponentName),
     showModelParameters: Boolean(cfg.showModelParameters)
@@ -418,7 +414,7 @@ export default function InstructorPage() {
     const margin = t > 0 && apart ? t * 100 : 0;
     const room = Math.max(1e-9, (Number(cfg.consumerValue) || 0) - c);
     const what = margin === 0 ? 'no differentiation' : margin / room < 0.08 ? 'very low differentiation' : margin / room < 0.25 ? 'less differentiation' : 'full differentiation';
-    return `${what} · Nash price $${(c + margin).toFixed(2)}${cfg.enableChat ? (cfg.aiChatReview ? ' · chat on, AI legal review' : ' · chat on') : ''}`;
+    return `${what} · Nash price $${(c + margin).toFixed(2)}${cfg.enableChat ? ' · chat on' : ''}`;
   };
 
   const handleDownload = (code, event) => {
