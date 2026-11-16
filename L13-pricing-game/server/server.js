@@ -130,11 +130,15 @@ app.get('/session/:code/export', requireKey, (req, res) => {
     const chat = sessionData.config?.enableChat ? db.getChatMessages(code) : null;
     const said = (round, name) => chat.filter(m => m.round === round && m.from === name).map(m => m.message).join(' | ');
     // "Random Price": Yes when the student sent no price and the game gave a random one at the deadline (2026-11-11)
-    let csv = 'Round,Player Name,Price,Random Price,Opponent Name,Opponent Price,Opponent Random Price,Quantity,Profit,Market Share' + (chat ? ',Chat Sent,Chat Received' : '') + '\n';
+    // a game with the AI legal review adds its verdict for the pair, the rule and the reason (2026-11-16)
+    const reviews = sessionData.config?.aiChatReview ? (sessionData.chatReviews || []) : null;
+    const reviewOf = name => reviews.find(r => r.nameA === name || r.nameB === name);
+    let csv = 'Round,Player Name,Price,Random Price,Opponent Name,Opponent Price,Opponent Random Price,Quantity,Profit,Market Share' + (chat ? ',Chat Sent,Chat Received' : '') + (reviews ? ',AI Verdict,AI Rule,AI Reason' : '') + '\n';
     sessionData.rounds.forEach(round => {
       round.results.forEach(result => {
         csv += `${round.round},${csvCell(result.playerName)},${result.price},${result.forced ? 'Yes' : 'No'},${csvCell(result.opponentName)},${result.opponentPrice},${result.opponentForced ? 'Yes' : 'No'},${Number(result.demand).toFixed(2)},${Number(result.profit).toFixed(2)},${(Number(result.marketShare) * 100).toFixed(2)}%`
-          + (chat ? `,${csvCell(said(round.round, result.playerName))},${csvCell(said(round.round, result.opponentName))}` : '') + '\n';
+          + (chat ? `,${csvCell(said(round.round, result.playerName))},${csvCell(said(round.round, result.opponentName))}` : '')
+          + (reviews ? (r => `,${csvCell(r ? r.verdict || 'Not reviewed' : 'No review (rival was the computer)')},${csvCell(r?.rule || '')},${csvCell(r?.reason || r?.error || '')}`)(reviewOf(result.playerName)) : '') + '\n';
       });
     });
 
@@ -174,6 +178,7 @@ io.on('connection', socket => {
   safe('startSession', ({ sessionCode }) => manager.handleStartSession(socket, sessionCode));
   safe('submitPrice', payload => manager.handlePriceSubmission(socket, payload));
   safe('chatMessage', payload => manager.handleChatMessage(socket, payload));
+  safe('rerunChatReview', ({ sessionCode }) => manager.handleRerunChatReview(socket, sessionCode));
   safe('endSession', ({ sessionCode }) => manager.handleEndSession(socket, sessionCode));
   safe('heartbeat', () => manager.handleHeartbeat(socket.id));
   socket.on('disconnect', () => {

@@ -57,6 +57,8 @@ export function validateConfig(raw) {
     if (out.consumerValue <= out.marginalCost) throw new Error('The value of a gallon (V) must be above the wholesale cost, or no sale can ever pay.');
   }
   out.enableChat = Boolean(c.enableChat);
+  // the AI legal review of the chats after the game (2026-11-16); only in a chat game
+  out.aiChatReview = out.enableChat && Boolean(c.aiChatReview);
   out.hideRoundCount = Boolean(c.hideRoundCount);
   out.showOpponentName = Boolean(c.showOpponentName);
   out.showModelParameters = Boolean(c.showModelParameters);

@@ -71,6 +71,24 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_chat_session ON chat_messages(session_id);
 
+  -- the AI legal review of each pair's chat (Mert, 2026-11-16): one row per pair, names as in the game
+  CREATE TABLE IF NOT EXISTS chat_reviews (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL,
+    pair_id TEXT NOT NULL,
+    name_a TEXT NOT NULL,
+    name_b TEXT NOT NULL,
+    verdict TEXT,
+    crossed_by TEXT,
+    rule TEXT,
+    reason TEXT,
+    evidence TEXT,
+    error TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_review_session ON chat_reviews(session_id);
+
   CREATE INDEX IF NOT EXISTS idx_sessions_code ON sessions(code);
   CREATE INDEX IF NOT EXISTS idx_players_session ON players(session_id);
   CREATE INDEX IF NOT EXISTS idx_rounds_session ON rounds(session_id);
@@ -225,7 +243,9 @@ export function getSessionData(code) {
       role: p.role,
       pairId: p.pair_id
     })),
-    rounds: roundsWithResults
+    rounds: roundsWithResults,
+    // the AI legal review of the chats, when the game had one (2026-11-16)
+    chatReviews: JSON.parse(session.config).aiChatReview ? getChatReviews(code) : undefined
   };
 }
 
@@ -263,6 +283,27 @@ export function getChatMessages(code) {
   if (!session) return [];
   return db.prepare('SELECT round_number, from_name, to_name, message, created_at FROM chat_messages WHERE session_id = ? ORDER BY id')
     .all(session.id).map(m => ({ round: m.round_number, from: m.from_name, to: m.to_name, message: m.message, at: m.created_at }));
+}
+
+// the review of one pair, replacing an earlier one of the same pair (a "Review again" overwrites)
+export function saveChatReview(sessionId, r) {
+  db.prepare('DELETE FROM chat_reviews WHERE session_id = ? AND pair_id = ?').run(sessionId, r.pairId);
+  db.prepare('INSERT INTO chat_reviews (session_id, pair_id, name_a, name_b, verdict, crossed_by, rule, reason, evidence, error) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(sessionId, r.pairId, r.nameA, r.nameB, r.verdict || null, r.crossedBy || null, r.rule || null, r.reason || null, JSON.stringify(r.evidence || []), r.error || null);
+}
+
+// every pair's review of a game: [{ pairId, nameA, nameB, verdict, crossedBy, rule, reason, evidence, error }]
+export function getChatReviews(code) {
+  const session = statements.getSessionByCode.get(code);
+  if (!session) return [];
+  const chat = db.prepare('SELECT round_number, from_name, to_name, message FROM chat_messages WHERE session_id = ? ORDER BY id').all(session.id);
+  return db.prepare('SELECT * FROM chat_reviews WHERE session_id = ? ORDER BY id').all(session.id).map(r => ({
+    pairId: r.pair_id, nameA: r.name_a, nameB: r.name_b, verdict: r.verdict, crossedBy: r.crossed_by, rule: r.rule, reason: r.reason,
+    evidence: (() => { try { return JSON.parse(r.evidence || '[]'); } catch { return []; } })(), error: r.error,
+    // the pair's chat, for the dashboard's transcript
+    messages: chat.filter(m => (m.from_name === r.name_a && m.to_name === r.name_b) || (m.from_name === r.name_b && m.to_name === r.name_a))
+      .map(m => ({ round: m.round_number, station: m.from_name === r.name_a ? 'A' : 'B', text: m.message }))
+  }));
 }
 
 export function getSessionIdByCode(code) {

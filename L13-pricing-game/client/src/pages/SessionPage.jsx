@@ -53,6 +53,9 @@ export default function SessionPage() {
   const [hasAttemptedJoin, setHasAttemptedJoin] = useState(false);
   const [nextRoundCountdown, setNextRoundCountdown] = useState(null);
   const [chatMessages, setChatMessages] = useState([]);
+  // the AI legal review of the chats (2026-11-16): a student's own pair's verdict, the instructor's whole review
+  const [chatVerdict, setChatVerdict] = useState(null);
+  const [chatReview, setChatReview] = useState(null);
   const [opponentName, setOpponentName] = useState(null);
   const [submissionProgress, setSubmissionProgress] = useState(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -152,6 +155,8 @@ export default function SessionPage() {
             const sessionData = await response.json();
             console.log('[SessionPage] Fetched session data:', sessionData);
             setIsCompletedSession(true);
+            // the saved review, unless the live one already came over the socket
+            if (Array.isArray(sessionData.chatReviews)) setChatReview(prev => prev || { status: 'done', total: sessionData.chatReviews.length, done: sessionData.chatReviews.length, results: sessionData.chatReviews });
             
             // Reconstruct allRoundSummaries from the fetched data
             if (sessionData.rounds && sessionData.rounds.length > 0) {
@@ -410,6 +415,8 @@ export default function SessionPage() {
     const handleChatHistory = payload => {
       if (Array.isArray(payload?.messages)) setChatMessages(payload.messages);
     };
+    const handleChatVerdict = payload => setChatVerdict(payload || null);
+    const handleChatReview = payload => setChatReview(payload || null);
 
     const handleOpponentInfo = (payload) => {
       setOpponentName(payload.opponentName);
@@ -429,6 +436,8 @@ export default function SessionPage() {
     socket.on('submissionProgress', setSubmissionProgress);
     socket.on('priceAccepted', handlePriceAccepted);
     socket.on('chatHistory', handleChatHistory);
+    socket.on('chatVerdict', handleChatVerdict);
+    socket.on('chatReview', handleChatReview);
     const handleSeatMoved = () => setSeatMoved(true);
     const handleJoinedAgain = () => setSeatMoved(false);
     socket.on('seatMoved', handleSeatMoved);
@@ -449,6 +458,8 @@ export default function SessionPage() {
       socket.off('submissionProgress', setSubmissionProgress);
       socket.off('priceAccepted', handlePriceAccepted);
       socket.off('chatHistory', handleChatHistory);
+      socket.off('chatVerdict', handleChatVerdict);
+      socket.off('chatReview', handleChatReview);
       socket.off('seatMoved', handleSeatMoved);
       socket.off('joinedSession', handleJoinedAgain);
     };
@@ -955,6 +966,8 @@ export default function SessionPage() {
               roundActive={roundActive}
               nextRoundCountdown={nextRoundCountdown}
               submissionProgress={submissionProgress}
+              chatReview={chatReview}
+              onRerunReview={() => { setErrorMessage(''); socket.emit('rerunChatReview', { sessionCode }); }}
             />
           </>
         )}
@@ -999,6 +1012,7 @@ export default function SessionPage() {
         roundTime={roundInfo?.fullTime ?? roundInfo?.roundTime ?? null}
         spectator={!!joinInfo?.spectator}
         acceptedPrice={acceptedPrice}
+        chatVerdict={chatVerdict}
         errorMessage={errorMessage}
         onDismissError={() => setErrorMessage('')}
       />

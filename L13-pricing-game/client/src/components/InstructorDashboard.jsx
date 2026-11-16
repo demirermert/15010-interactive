@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { RoundsChart, PairBars, PairDots } from '../charts.jsx';
 import { money, priceFmt } from '../econ.js';
 import { withKey } from '../auth.js';
+import { LawText } from './StudentView.jsx';
 
 // The instructor's projector page in the 2026 lab look (2026-11-02; the 2025 page is in git history),
 // laid out like the Class 6-11 dashboards: the room's state on top, then the prices, the leaderboard and the pairs.
@@ -71,7 +72,9 @@ export function InstructorDashboard({
   timer,
   roundActive,
   nextRoundCountdown,
-  submissionProgress
+  submissionProgress,
+  chatReview,
+  onRerunReview
 }) {
   const navigate = useNavigate();
   const [armed, setArmed] = useState(false);
@@ -290,6 +293,8 @@ export function InstructorDashboard({
             )}
           </section>
 
+          {config?.aiChatReview && <ReviewPanel review={chatReview} pairTotals={pairTotals} status={status} onRerun={onRerunReview} />}
+
           {/* one market, chosen by name (Mert, 2026-11-11) */}
           <section className="panel wide">
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -366,5 +371,75 @@ export function InstructorDashboard({
         )}
       </div>
     </div>
+  );
+}
+
+// The AI legal review of the chats (Mert, 2026-11-16): the counts, prices in illegal vs legal markets, and every pair's
+// verdict, rule and reason; a row opens the quoted lines and the whole chat.
+function ReviewPanel({ review, pairTotals, status, onRerun }) {
+  const [open, setOpen] = useState(null);
+  const results = review?.results || [];
+  const running = review?.status === 'running';
+  const pairOf = r => pairTotals.find(p => p.key === r.pairId || p.key === [r.nameA, r.nameB].sort().join(' | '));
+  const meanPrice = rows => {
+    const v = rows.flatMap(r => { const p = pairOf(r); return p ? [...p.pricesA, ...p.pricesB] : []; }).filter(Number.isFinite);
+    return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
+  };
+  const meanProfit = rows => {
+    const v = rows.flatMap(r => { const p = pairOf(r); return p ? [p.a, p.b] : []; }).filter(Number.isFinite);
+    return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
+  };
+  const ill = results.filter(r => r.verdict === 'Illegal'), leg = results.filter(r => r.verdict === 'Legal'), failed = results.filter(r => !r.verdict);
+  const order = [...ill, ...failed, ...leg];
+  const nameOf = (r, st) => (st === 'A' ? r.nameA : r.nameB);
+  const crossed = r => (r.crossedBy === 'both' ? 'Both' : r.crossedBy === 'A' ? r.nameA : r.crossedBy === 'B' ? r.nameB : '');
+  const fmt = v => (v == null ? '-' : '$' + v.toFixed(2));
+  return (
+    <section className="panel wide review">
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="section-label">AI legal review of the chats</div>
+        {status === 'complete' && !running && review && <button className="btn" onClick={onRerun}>Review again</button>}
+      </div>
+      <div className="qtext">After the game, each pair's chat goes to the AI with U.S. antitrust law (the Sherman Act and the FTC's rule on invitations to collude). It says Legal or Illegal, who crossed the line, and why. Each student sees their own pair's verdict on the phone.</div>
+      {status !== 'complete' ? <div className="empty-note">Runs when the game ends.</div>
+      : !review || review.status === 'none' ? <div className="empty-note">Starting the review...</div> : (
+        <>
+          {running && <div className="fb info" id="review-progress">Reviewing: {review.done} of {review.total} pairs done</div>}
+          <div className="rv-stats">
+            <div className="rv-box bad"><div className="n">{ill.length}</div><div className="l">Illegal</div></div>
+            <div className="rv-box good"><div className="n">{leg.length}</div><div className="l">Legal</div></div>
+            {failed.length > 0 && <div className="rv-box"><div className="n">{failed.length}</div><div className="l">Not reviewed</div></div>}
+            <div className="rv-box"><div className="n">{fmt(meanPrice(ill))} <small>vs</small> {fmt(meanPrice(leg))}</div><div className="l">Average price, illegal vs legal markets</div></div>
+            <div className="rv-box"><div className="n">{meanProfit(ill) == null ? '-' : money(meanProfit(ill))} <small>vs</small> {meanProfit(leg) == null ? '-' : money(meanProfit(leg))}</div><div className="l">Total profit per station, illegal vs legal</div></div>
+          </div>
+          <div className="scroll" style={{ maxHeight: 640 }}>
+            <table className="res rv-table">
+              <thead><tr><th>Pair (Station A & Station B)</th><th>Verdict</th><th>Crossed the line</th><th>Rule</th><th>Why</th></tr></thead>
+              <tbody>
+                {order.map(r => (
+                  <React.Fragment key={r.pairId}>
+                    <tr className={`rv-row ${r.verdict === 'Illegal' ? 'bad' : r.verdict === 'Legal' ? 'good' : ''}`} onClick={() => setOpen(open === r.pairId ? null : r.pairId)}>
+                      <td>{r.nameA} & {r.nameB}</td>
+                      <td className="v">{r.verdict || 'Not reviewed'}</td>
+                      <td>{crossed(r)}</td>
+                      <td>{r.rule || ''}</td>
+                      {/* the AI writes Station A / B (it never sees names); here the names go back in */}
+                      <td className="why">{r.reason ? r.reason.replace(/Station A\b/g, r.nameA).replace(/Station B\b/g, r.nameB) : r.error || ''}</td>
+                    </tr>
+                    {open === r.pairId && (
+                      <tr className="rv-open"><td colSpan={5}>
+                        {(r.evidence || []).length > 0 && <div className="rv-ev"><b>The lines that decide it</b>{r.evidence.map((e, i) => <div key={i}>Round {e.round}, {nameOf(r, e.station)}: "{e.text}"</div>)}</div>}
+                        <div className="rv-chat"><b>The whole chat</b>{(r.messages || []).length === 0 ? <div>No messages.</div> : r.messages.map((m, i) => <div key={i} className={m.station === 'A' ? 'a' : 'b'}><span>R{m.round} {nameOf(r, m.station)}</span>{m.text}</div>)}</div>
+                      </td></tr>
+                    )}
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {review.law && <details className="rv-law"><summary>The law the AI applied</summary><LawText text={review.law} /></details>}
+        </>
+      )}
+    </section>
   );
 }

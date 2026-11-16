@@ -75,6 +75,47 @@ function Rules({ config }) {
 // people can enter the new code"); the " (2)" a repeated name got is left off
 const toCents = x => Math.round((Number(x) || 0) * 100);
 
+// The law text (a small markdown: ## headings, **bold**, - bullets, paragraphs) as React elements
+export function LawText({ text }) {
+  const bold = line => line.split(/(\*\*[^*]+\*\*)/g).map((part, i) => (/^\*\*[^*]+\*\*$/.test(part) ? <b key={i}>{part.slice(2, -2)}</b> : part));
+  return (
+    <div className="law">
+      {String(text || '').trim().split(/\n\s*\n/).map((block, i) => {
+        const b = block.trim();
+        if (b.startsWith('## ')) return <h4 key={i}>{b.slice(3)}</h4>;
+        if (/^- /.test(b)) return <ul key={i}>{b.split(/\n(?=- )/).map((li, k) => <li key={k}>{bold(li.replace(/^- /, '').replace(/\s*\n\s*/g, ' '))}</li>)}</ul>;
+        return <p key={i}>{bold(b.replace(/\s*\n\s*/g, ' '))}</p>;
+      })}
+    </div>
+  );
+}
+
+// The AI legal review of the pair's chat, on the game-over card (Mert, 2026-11-16)
+function Verdict({ v }) {
+  if (!v) return null;
+  if (v.pending) return <div className="verdict wait" id="ai-verdict"><div className="vlbl">AI legal review of your chat</div><div className="vtxt">The AI is reading your chat against U.S. antitrust law. Your verdict appears here in a moment.</div></div>;
+  if (v.error && !v.verdict) return <div className="verdict wait" id="ai-verdict"><div className="vlbl">AI legal review of your chat</div><div className="vtxt">{v.error}</div></div>;
+  const me = v.myStation || 'A', them = me === 'A' ? 'B' : 'A';
+  const label = st => `Station ${st} (${st === me ? 'you' : 'your rival'})`;
+  const by = v.crossedBy === 'both' ? 'Both of you crossed the line.' : v.crossedBy === me ? 'Your messages crossed the line.' : v.crossedBy === them ? "Your rival's messages crossed the line." : '';
+  const ill = v.verdict === 'Illegal';
+  return (
+    <div className={`verdict ${ill ? 'bad' : 'good'}`} id="ai-verdict">
+      <div className="vlbl">AI legal review of your chat</div>
+      <div className="vbig">{ill ? 'Illegal' : 'Legal'}</div>
+      <div className="vsub">You were Station {me}.{by ? ' ' + by : ''}</div>
+      {v.rule && <div className="vrule">{v.rule}</div>}
+      {v.reason && <div className="vtxt">{v.reason}</div>}
+      {(v.evidence || []).length > 0 && (
+        <div className="vev">
+          {v.evidence.map((e, i) => <div key={i} className="q"><span>Round {e.round}, {label(e.station)}</span>"{e.text}"</div>)}
+        </div>
+      )}
+      {v.law && <details className="vlaw"><summary>The law the AI applied</summary><LawText text={v.law} /></details>}
+    </div>
+  );
+}
+
 export function goToJoinPage(name) {
   try { if (name) localStorage.setItem('l13_name', String(name).replace(/ \(\d+\)$/, '')); } catch { /* storage blocked */ }
   window.location.href = '/';
@@ -105,6 +146,7 @@ export function StudentView({
   roundTime,
   spectator,
   acceptedPrice,
+  chatVerdict,
   errorMessage,
   onDismissError
 }) {
@@ -269,6 +311,7 @@ export function StudentView({
           </>
         )}
         {rank > 0 && <div className="fb info">You placed <b>{rank}</b> of {leaderboard.length} in the class by total profit{tiedWith ? `, tied with ${tiedWith} other${tiedWith > 1 ? 's' : ''}` : ''}.</div>}
+        {config?.aiChatReview && !rivalIsAI && !spectator && <Verdict v={chatVerdict} />}
         <button className="go" type="button" id="next-game" style={{ marginTop: 14 }} onClick={() => goToJoinPage(playerName)}>Join the next game</button>
         <div className="hint">Then type the new code from the screen.</div>
       </div>
@@ -376,10 +419,12 @@ export function StudentView({
               (mine => <div key={i} className={`m${mine ? ' me' : ' them'}`}><span className="who">{mine ? 'You' : 'Rival'}</span>{m.message}</div>)(m.fromSocketId === currentSocketId || (!!me && m.from === me))
             ))}
           </div>
+          {/* with the AI review, the chat closes at the end: the review reads it as it stood (2026-11-16) */}
+          {config?.aiChatReview && sessionStatus === 'complete' ? <div className="hint" id="chat-closed">The game is over, so the chat is closed.</div> : (
           <form className="chatrow" onSubmit={e => { e.preventDefault(); if (chatInput.trim()) { onSendChatMessage(chatInput.trim()); setChatInput(''); } }}>
             <input value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="Message" />
             <button type="submit">Send</button>
-          </form></>}
+          </form>)}</>}
         </div>
       )}
       <div className="card">
