@@ -82,6 +82,9 @@ export function InstructorDashboard({
   const [pairSearch, setPairSearch] = useState('');
   const [selectedPair, setSelectedPair] = useState(null);
   const [hover, setHover] = useState(null); // { key, x, y }: the pair under the mouse, for the floating history box
+  const [tab, setTab] = useState('results');
+  const reviewBadge = chatReview?.status === 'running' ? `reviewing ${chatReview.done} of ${chatReview.total}`
+    : chatReview?.status === 'done' ? `${chatReview.results.filter(r => r.verdict === 'Illegal').length} illegal of ${chatReview.results.length}` : '';
   const onHover = (key, e) => setHover(key ? { key, x: e.clientX, y: e.clientY } : null);
   const config = session?.config;
   const status = session?.status;
@@ -231,8 +234,18 @@ export function InstructorDashboard({
           <div className="err"><span>{errorMessage}</span><button className="btn" onClick={onDismissError}>Dismiss</button></div>
         )}
 
-        <div className="grid">
-          <section className="panel wide">{state}</section>
+        <div className={`grid${config?.aiChatReview && tab === 'review' ? ' show-review' : ''}`}>
+          <section className="panel wide statep">{state}</section>
+
+          {/* a game with the AI legal review gets two tabs under the header (Mert, 2026-11-16) */}
+          {config?.aiChatReview && (
+            <div className="tabs wide">
+              <button className={tab === 'results' ? 'on' : ''} onClick={() => setTab('results')}>Game results</button>
+              <button className={tab === 'review' ? 'on' : ''} id="tab-review" onClick={() => setTab('review')}>
+                AI legal review{reviewBadge ? <span className="badge">{reviewBadge}</span> : null}
+              </button>
+            </div>
+          )}
 
           <section className="panel wide">
             <div className="section-label">Average price across rounds</div>
@@ -400,7 +413,7 @@ function ReviewPanel({ review, pairTotals, status, onRerun }) {
         <div className="section-label">AI legal review of the chats</div>
         {status === 'complete' && !running && review && <button className="btn" onClick={onRerun}>Review again</button>}
       </div>
-      <div className="qtext">After the game, each pair's chat goes to the AI with U.S. antitrust law (the Sherman Act and the FTC's rule on invitations to collude). It says Legal or Illegal, who crossed the line, and why. Each student sees their own pair's verdict on the phone.</div>
+      <div className="qtext">Each pair's chat, judged by the AI against U.S. antitrust law (the Sherman Act and the FTC's rule on invitations to collude). Click a pair for the AI's reasoning and the whole chat. Students see their own pair's verdict on the phone.</div>
       {status !== 'complete' ? <div className="empty-note">Runs when the game ends.</div>
       : !review || review.status === 'none' ? <div className="empty-note">Starting the review...</div> : (
         <>
@@ -412,23 +425,24 @@ function ReviewPanel({ review, pairTotals, status, onRerun }) {
             <div className="rv-box"><div className="n">{fmt(meanPrice(ill))} <small>vs</small> {fmt(meanPrice(leg))}</div><div className="l">Average price, illegal vs legal markets</div></div>
             <div className="rv-box"><div className="n">{meanProfit(ill) == null ? '-' : money(meanProfit(ill))} <small>vs</small> {meanProfit(leg) == null ? '-' : money(meanProfit(leg))}</div><div className="l">Total profit per station, illegal vs legal</div></div>
           </div>
-          <div className="scroll" style={{ maxHeight: 640 }}>
+          <div>
             <table className="res rv-table">
-              <thead><tr><th>Pair (Station A & Station B)</th><th>Verdict</th><th>Crossed the line</th><th>Rule</th><th>Why</th></tr></thead>
+              <thead><tr><th>Pair</th><th>Verdict</th><th>Crossed the line</th><th>Why: the sentences that decide it</th></tr></thead>
               <tbody>
                 {order.map(r => (
                   <React.Fragment key={r.pairId}>
                     <tr className={`rv-row ${r.verdict === 'Illegal' ? 'bad' : r.verdict === 'Legal' ? 'good' : ''}`} onClick={() => setOpen(open === r.pairId ? null : r.pairId)}>
-                      <td>{r.nameA} & {r.nameB}</td>
-                      <td className="v">{r.verdict || 'Not reviewed'}</td>
+                      <td>{r.nameA}<br />{r.nameB}</td>
+                      <td><div className="v">{r.verdict || 'Not reviewed'}</div><div className="rule">{r.rule || ''}</div></td>
                       <td>{crossed(r)}</td>
-                      <td>{r.rule || ''}</td>
-                      {/* the AI writes Station A / B (it never sees names); here the names go back in */}
-                      <td className="why">{r.reason ? r.reason.replace(/Station A\b/g, r.nameA).replace(/Station B\b/g, r.nameB) : r.error || ''}</td>
+                      {/* short: the quoted sentences; the AI's full reason opens with the row */}
+                      <td className="why">{(r.evidence || []).length ? r.evidence.map((e, i) => <div key={i} className="said"><span>{nameOf(r, e.station)}:</span> "{e.text}"</div>)
+                        : <span className="none">{r.error || ((r.messages || []).length ? 'Nothing about prices' : 'No messages')}</span>}</td>
                     </tr>
                     {open === r.pairId && (
-                      <tr className="rv-open"><td colSpan={5}>
-                        {(r.evidence || []).length > 0 && <div className="rv-ev"><b>The lines that decide it</b>{r.evidence.map((e, i) => <div key={i}>Round {e.round}, {nameOf(r, e.station)}: "{e.text}"</div>)}</div>}
+                      <tr className="rv-open"><td colSpan={4}>
+                        {/* the AI writes Station A / B (it never sees names); here the names go back in */}
+                        {r.reason && <div className="rv-reason"><b>The AI's reasoning</b>{r.reason.replace(/Station A\b/g, r.nameA).replace(/Station B\b/g, r.nameB)}</div>}
                         <div className="rv-chat"><b>The whole chat</b>{(r.messages || []).length === 0 ? <div>No messages.</div> : r.messages.map((m, i) => <div key={i} className={m.station === 'A' ? 'a' : 'b'}><span>R{m.round} {nameOf(r, m.station)}</span>{m.text}</div>)}</div>
                       </td></tr>
                     )}
