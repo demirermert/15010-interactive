@@ -1,0 +1,16 @@
+{
+  "name": "pricing-game-automation",
+  "version": "1.0.0",
+  "description": "Automated testing for the pricing game",
+  "type": "module",
+  "scripts": {
+    "test-game": "node pricing-game-automation.js",
+    "test-auto": "node pricing-game-automation.js -a",
+    "test-auto-8": "node pricing-game-automation.js -a 8",
+    "test-auto-10": "node pricing-game-automation.js -a 10"
+  },
+  "dependencies": {
+    "puppeteer": "^22.0.0"
+  }
+}
+
