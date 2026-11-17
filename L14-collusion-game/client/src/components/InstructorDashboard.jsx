@@ -278,7 +278,7 @@ export function InstructorDashboard({
             </div>
           )}
 
-          {isAnnounce && <AnnouncementsPanel log={annLog} status={status} />}
+          {isAnnounce && <AnnouncementsPanel log={annLog} status={status} review={chatReview} />}
 
           <section className="panel wide">
             <div className="section-label">Average price across rounds</div>
@@ -423,8 +423,22 @@ export function InstructorDashboard({
 // The AI legal review of the chats (Mert, 2026-11-16): the counts, prices in illegal vs legal markets, and every pair's
 // verdict, rule and reason; a row opens the quoted lines and the whole chat.
 // every pair's announcements, newest round first (Mert, 2026-11-16: "in the dashboard we'll also show the announcements")
-function AnnouncementsPanel({ log, status }) {
+function AnnouncementsPanel({ log, status, review }) {
   const [q, setQ] = useState('');
+  // after the AI review: the announcements it found illegal are highlighted (Mert, 2026-11-16) = the lines it quoted,
+  // of the station(s) that crossed the line
+  const norm = t => String(t || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  const resultOf = e => (review?.results || []).find(r => r.pairId === e.pairId || (r.nameA === e.nameA && r.nameB === e.nameB));
+  const illegal = (e, st) => {
+    const r = resultOf(e);
+    if (!r || r.verdict !== 'Illegal') return false;
+    // the AI's full list of illegal lines; a review saved before that list existed falls back to its quoted lines
+    const lines = (r.illegal || []).length ? r.illegal : (r.evidence || []).filter(x => r.crossedBy === 'both' || x.station === r.crossedBy);
+    return lines.some(x => x.station === st && Number(x.round) === Number(e.round) && norm(x.text) === norm(e[st]));
+  };
+  // the tag is the round's: Illegal on a round with an illegal announcement, Legal for a pair found legal
+  const pairTag = e => { const r = resultOf(e); if (!r?.verdict) return null; const bad = illegal(e, 'A') || illegal(e, 'B');
+    return bad ? <span className="an-tag bad">Illegal</span> : r.verdict === 'Legal' ? <span className="an-tag good">Legal</span> : null; };
   const rounds = [...new Set((log || []).map(e => e.round))].sort((a, b) => b - a);
   const match = e => !q || `${e.nameA} ${e.nameB} ${e.A} ${e.B}`.toLowerCase().includes(q.toLowerCase());
   return (
@@ -433,7 +447,7 @@ function AnnouncementsPanel({ log, status }) {
         <div className="section-label">Announcements</div>
         <input className="search" placeholder="Find a name or a word" value={q} onChange={e => setQ(e.target.value)} />
       </div>
-      <div className="qtext">Each pair's two announcements, revealed together when the announcement time ends.</div>
+      <div className="qtext">Each pair's two announcements, revealed together when the announcement time ends.{(review?.results || []).length ? ' After the AI review, the announcements it found illegal are in red, and each pair has its verdict.' : ''}</div>
       {rounds.length === 0 ? <div className="empty-note">{status === 'running' ? 'The first announcements appear here when they are revealed.' : 'Appears when the first announcements are revealed.'}</div>
         : rounds.map(r => (
           <div key={r}>
@@ -442,8 +456,9 @@ function AnnouncementsPanel({ log, status }) {
               <tbody>
                 {(log || []).filter(e => e.round === r && match(e)).map(e => (
                   <tr key={e.pairId}>
-                    <td className="nm a">{e.nameA}</td><td className="tx">{e.A ? `"${e.A}"` : <i>No announcement</i>}</td>
-                    <td className="nm b">{e.nameB}</td><td className="tx">{e.B ? `"${e.B}"` : <i>No announcement</i>}</td>
+                    <td className="nm a">{e.nameA}</td><td className={`tx${illegal(e, 'A') ? ' ill' : ''}`}>{e.A ? `"${e.A}"` : <i>No announcement</i>}</td>
+                    <td className="nm b">{e.nameB}</td><td className={`tx${illegal(e, 'B') ? ' ill' : ''}`}>{e.B ? `"${e.B}"` : <i>No announcement</i>}</td>
+                    <td className="vt">{pairTag(e)}</td>
                   </tr>
                 ))}
               </tbody>

@@ -23,7 +23,8 @@ Apply exactly the law and the decision rule you are given. Answer with one JSON 
  "crossedBy": "A", "B", "both" or "neither" (which station sent the messages that make it illegal; "neither" when Legal),
  "rule": the name of the rule that decides it, a few words (e.g. "Price agreement (Sherman Act Section 1)", "Invitation to collude (FTC Act Section 5)", "No discussion of prices"),
  "reason": two or three plain sentences for the students saying why, naming the stations as Station A and Station B and citing the rule,
- "evidence": up to three of the messages that decide it, each {"round": number, "station": "A" or "B", "text": the message copied exactly}; an empty list when nothing in the chat is about prices}`;
+ "evidence": up to five of the messages that decide it (the ones that cross the line, and a reply that accepts), each {"round": number, "station": "A" or "B", "text": the message copied exactly}; an empty list when nothing in the chat is about prices,
+ "illegal": EVERY message that crosses the line, in every round, including a later message that continues or confirms an agreement or an offer (e.g. "$6.50 again", "same here"), each {"round", "station", "text" copied exactly}; an empty list when Legal}`;
 
 // messages: [{ round, station: 'A'|'B', text }]; mode 'chat' (messages between the stations) or 'announce' (one
 // public announcement per station per round, 2026-11-16)
@@ -42,7 +43,8 @@ function parse(text) {
   const verdict = /illegal/i.test(j.verdict) ? 'Illegal' : /legal/i.test(j.verdict) ? 'Legal' : null;
   if (!verdict) throw new Error(`no verdict in the answer: ${String(j.verdict).slice(0, 40)}`);
   return { verdict, crossedBy: ['A', 'B', 'both', 'neither'].includes(j.crossedBy) ? j.crossedBy : (verdict === 'Legal' ? 'neither' : 'both'),
-    rule: String(j.rule || '').slice(0, 200), reason: String(j.reason || '').slice(0, 1200), evidence: Array.isArray(j.evidence) ? j.evidence : [] };
+    rule: String(j.rule || '').slice(0, 200), reason: String(j.reason || '').slice(0, 1200), evidence: Array.isArray(j.evidence) ? j.evidence : [],
+    illegal: Array.isArray(j.illegal) ? j.illegal : [] };
 }
 
 // One pair. Returns { verdict, crossedBy, rule, reason, evidence: [{ round, station, text }] }; throws when the model
@@ -71,12 +73,16 @@ export async function reviewChat(messages, mode = 'chat') {
       catch (e) { throw new Error(`${e.message} (finish ${choice?.finish_reason}, ${completion.usage?.completion_tokens} tokens, answer ${JSON.stringify(String(choice?.message?.content || choice?.message?.refusal || '').slice(0, 160))})`); }
       // keep only quotes that really are in the chat (a model can paraphrase); a quote must match a message of that station
       const norm = s => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase();
-      out.evidence = out.evidence.slice(0, 3).map(e => {
+      const real = list => list.map(e => {
         const st = e?.station === 'B' ? 'B' : 'A';
-        const hit = messages.find(m => m.station === st && (norm(m.text) === norm(e?.text) || (norm(e?.text).length >= 8 && norm(m.text).includes(norm(e?.text)))))
+        const hit = messages.find(m => m.station === st && Number(m.round) === Number(e?.round) && norm(m.text) === norm(e?.text))
+          || messages.find(m => m.station === st && (norm(m.text) === norm(e?.text) || (norm(e?.text).length >= 8 && norm(m.text).includes(norm(e?.text)))))
           || messages.find(m => norm(e?.text).length >= 8 && norm(m.text).includes(norm(e?.text)));
         return hit ? { round: hit.round, station: hit.station, text: hit.text } : null;
       }).filter(Boolean);
+      out.evidence = real(out.evidence.slice(0, 5));
+      // every line that crosses the line (the dashboard marks them), none when Legal
+      out.illegal = out.verdict === 'Illegal' ? real(out.illegal.slice(0, 40)).filter((e, i, a) => a.findIndex(x => x.round === e.round && x.station === e.station && x.text === e.text) === i) : [];
       return out;
     } catch (err) {
       lastErr = err;

@@ -286,10 +286,12 @@ export function getChatMessages(code) {
 }
 
 // the review of one pair, replacing an earlier one of the same pair (a "Review again" overwrites)
+// every line the AI found illegal (2026-11-16), a column added to databases made before it
+try { db.exec('ALTER TABLE chat_reviews ADD COLUMN illegal TEXT'); } catch (e) { /* already there */ }
 export function saveChatReview(sessionId, r) {
   db.prepare('DELETE FROM chat_reviews WHERE session_id = ? AND pair_id = ?').run(sessionId, r.pairId);
-  db.prepare('INSERT INTO chat_reviews (session_id, pair_id, name_a, name_b, verdict, crossed_by, rule, reason, evidence, error) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .run(sessionId, r.pairId, r.nameA, r.nameB, r.verdict || null, r.crossedBy || null, r.rule || null, r.reason || null, JSON.stringify(r.evidence || []), r.error || null);
+  db.prepare('INSERT INTO chat_reviews (session_id, pair_id, name_a, name_b, verdict, crossed_by, rule, reason, evidence, error, illegal) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(sessionId, r.pairId, r.nameA, r.nameB, r.verdict || null, r.crossedBy || null, r.rule || null, r.reason || null, JSON.stringify(r.evidence || []), r.error || null, JSON.stringify(r.illegal || []));
 }
 
 // every pair's review of a game: [{ pairId, nameA, nameB, verdict, crossedBy, rule, reason, evidence, error }]
@@ -300,6 +302,7 @@ export function getChatReviews(code) {
   return db.prepare('SELECT * FROM chat_reviews WHERE session_id = ? ORDER BY id').all(session.id).map(r => ({
     pairId: r.pair_id, nameA: r.name_a, nameB: r.name_b, verdict: r.verdict, crossedBy: r.crossed_by, rule: r.rule, reason: r.reason,
     evidence: (() => { try { return JSON.parse(r.evidence || '[]'); } catch { return []; } })(), error: r.error,
+    illegal: (() => { try { return JSON.parse(r.illegal || '[]'); } catch { return []; } })(),
     // the pair's chat, for the dashboard's transcript
     messages: chat.filter(m => (m.from_name === r.name_a && m.to_name === r.name_b) || (m.from_name === r.name_b && m.to_name === r.name_a))
       .map(m => ({ round: m.round_number, station: m.from_name === r.name_a ? 'A' : 'B', text: m.message }))

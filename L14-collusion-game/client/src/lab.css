@@ -272,4 +272,7 @@ body{margin:0;font:16px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,s
 .dash .announcements .an-table{table-layout:fixed}
 .dash .announcements .an-table td{white-space:normal;vertical-align:top;font-size:14px}
 .dash .announcements .an-table td.nm{width:11%;font-weight:600;font-size:13px}.dash .announcements .an-table td.nm.a{color:var(--navy)}.dash .announcements .an-table td.nm.b{color:var(--red)}
-.dash .announcements .an-table td.tx{width:39%}.dash .announcements .an-table td i{color:var(--muted)}
+.dash .announcements .an-table td.tx{width:35%}
+.dash .announcements .an-table td.tx.ill{background:#fdecee;color:#8a1c2c;font-weight:600;border-left:3px solid var(--red)}
+.dash .announcements .an-table td.vt{width:8%;text-align:right}
+.dash .announcements .an-tag{font-size:12px;font-weight:700;border-radius:999px;padding:2px 9px}.dash .announcements .an-tag.bad{background:#fdecee;color:var(--red)}.dash .announcements .an-tag.good{background:#e9f5ec;color:var(--ok)}.dash .announcements .an-table td i{color:var(--muted)}
