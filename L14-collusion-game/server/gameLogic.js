@@ -1,7 +1,7 @@
 import { computeDemand } from './demandModel.js';
 import * as db from './database.js';
 import { getAIPriceDecision, isOpenAIInitialized } from './aiPlayer.js';
-import { validateConfig, studentConfig, cleanName } from './config.js';
+import { validateConfig, studentConfig, cleanName, hasAnnounce, announceSecs } from './config.js';
 import { reviewChat, LAW_TEXT } from './chatReview.js';
 
 const SESSION_CODE_LENGTH = 4;
@@ -471,7 +471,7 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
       
       socket.emit('joinedSession', joinResponse);
       // the announcement game: the phase in progress and the announcements seen so far (2026-11-16)
-      if (session.config.announceTime > 0 && session.status !== STATUS.LOBBY && session.status !== STATUS.SETUP) {
+      if (hasAnnounce(session.config) && session.status !== STATUS.LOBBY && session.status !== STATUS.SETUP) {
         if (socket.data.role === 'student') {
           const rv = revealedFor(session, socket.id);
           if (rv.length) socket.emit('announcementsRevealed', { revealed: rv });
@@ -480,7 +480,7 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
           if (session.announceLog?.length) socket.emit('announcementsAll', { log: session.announceLog });
         }
         if (socket.data.role !== 'student' && session.announcing) {
-          socket.emit('announcePhase', { round: session.currentRound, remaining: Math.max(0, Math.ceil((session.announceEndsAt - Date.now()) / 1000)), full: session.config.announceTime });
+          socket.emit('announcePhase', { round: session.currentRound, remaining: Math.max(0, Math.ceil((session.announceEndsAt - Date.now()) / 1000)), full: announceSecs(session.config, session.currentRound) });
           emitAnnounceProgress(session);
         }
       }
@@ -653,7 +653,7 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
     session.currentRound += 1;
     session.submissions.clear();
     session.roundFinalizing = false; // Reset flag for new round
-    if (session.config.announceTime > 0) { startAnnouncePhase(session); return; }
+    if (hasAnnounce(session.config)) { startAnnouncePhase(session); return; }
     startPricePhase(session);
   }
 
@@ -665,7 +665,7 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
     const pair = session.pairs.find(p => p.playerA === socketId || p.playerB === socketId);
     const mine = pair && session.announcements?.get(pair.id)?.[pair.playerA === socketId ? 'A' : 'B'];
     const remaining = Math.max(0, Math.ceil((session.announceEndsAt - Date.now()) / 1000));
-    return { round: session.currentRound, remaining, full: session.config.announceTime, side: sideOf(session, socketId), rivalIsAI: rivalIsAI(session, socketId), mine: mine || '' };
+    return { round: session.currentRound, remaining, full: announceSecs(session.config, session.currentRound), side: sideOf(session, socketId), rivalIsAI: rivalIsAI(session, socketId), mine: mine || '' };
   }
 
   function emitAnnounceProgress(session) {
@@ -678,9 +678,10 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
   function startAnnouncePhase(session) {
     session.announcing = true;
     session.announcements = new Map();
-    session.announceEndsAt = Date.now() + session.config.announceTime * 1000;
+    const secs = announceSecs(session.config, session.currentRound);
+    session.announceEndsAt = Date.now() + secs * 1000;
     session.pairs.forEach(pair => [pair.playerA, pair.playerB].forEach(sid => io.to(sid).emit('announcePhase', announcePayloadFor(session, sid))));
-    instructorSockets(session).forEach(id => io.to(id).emit('announcePhase', { round: session.currentRound, remaining: session.config.announceTime, full: session.config.announceTime }));
+    instructorSockets(session).forEach(id => io.to(id).emit('announcePhase', { round: session.currentRound, remaining: secs, full: secs }));
     broadcastSession(session);
     emitAnnounceProgress(session);
     session.timers.countdown = setInterval(() => {
@@ -694,14 +695,14 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
       if (session.timers.countdown) { clearInterval(session.timers.countdown); session.timers.countdown = null; }
       try { revealAnnouncements(session); } catch (e) { console.error(`[Session ${session.code}] reveal failed:`, e); }
       startPricePhase(session);
-    }, session.config.announceTime * 1000);
+    }, secs * 1000);
   }
 
   function handleAnnouncement(socket, payload) {
     try {
       const session = ensureSession(payload?.sessionCode);
       const text = typeof payload?.text === 'string' ? payload.text.replace(/\s+/g, ' ').trim().slice(0, 400) : '';
-      if (!session.config.announceTime) throw new Error('This game has no announcements.');
+      if (!hasAnnounce(session.config)) throw new Error('This game has no announcements.');
       if (session.status !== STATUS.RUNNING || !session.announcing) throw new Error('The announcement time is over.');
       const sentFor = Number(payload?.round);
       if (Number.isFinite(sentFor) && sentFor > 0 && sentFor !== session.currentRound) throw new Error('That announcement was for an earlier round.');
@@ -1284,7 +1285,7 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
         const messages = log.map(m => ({ round: m.round || 1, station: m.from === a.name ? 'A' : 'B', text: m.message }));
         let result;
         try {
-          const out = await reviewChat(messages, session.config.announceTime > 0 ? 'announce' : 'chat');
+          const out = await reviewChat(messages, hasAnnounce(session.config) ? 'announce' : 'chat');
           result = { pairId: pair.id, nameA: a.name, nameB: b.name, ...out };
         } catch (err) {
           result = { pairId: pair.id, nameA: a.name, nameB: b.name, error: 'The AI review could not be reached. The instructor can run it again.' };

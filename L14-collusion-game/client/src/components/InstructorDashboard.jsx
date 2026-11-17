@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { RoundsChart, PairBars, PairDots } from '../charts.jsx';
-import { money, priceFmt } from '../econ.js';
+import { money, priceFmt, hasAnnounce } from '../econ.js';
 import { withKey } from '../auth.js';
 import { LawText } from './StudentView.jsx';
 
@@ -89,7 +89,7 @@ export function InstructorDashboard({
   // the announcement phase's clock ticks on the dashboard too (2026-11-16)
   const [nowTick, setNowTick] = useState(Date.now());
   useEffect(() => { if (!announce) return undefined; const t = setInterval(() => setNowTick(Date.now()), 250); return () => clearInterval(t); }, [announce]);
-  const isAnnounce = (session?.config?.announceTime || 0) > 0;
+  const isAnnounce = hasAnnounce(session?.config);
   // every pair's announcements: live from the server, or after a reload of a finished game from the review's chats
   const annLog = (announceLog || []).length ? announceLog
     : (chatReview?.results || []).flatMap(r => [...new Set((r.messages || []).map(m => m.round))].map(round => ({ round, pairId: r.pairId, nameA: r.nameA, nameB: r.nameB,
@@ -278,7 +278,7 @@ export function InstructorDashboard({
             </div>
           )}
 
-          {isAnnounce && <AnnouncementsPanel log={annLog} status={status} review={chatReview} />}
+          {isAnnounce && <AnnouncementsPanel log={annLog} status={status} review={chatReview} byRound={byRound} config={config} />}
 
           <section className="panel wide">
             <div className="section-label">Average price across rounds</div>
@@ -423,8 +423,32 @@ export function InstructorDashboard({
 // The AI legal review of the chats (Mert, 2026-11-16): the counts, prices in illegal vs legal markets, and every pair's
 // verdict, rule and reason; a row opens the quoted lines and the whole chat.
 // every pair's announcements, newest round first (Mert, 2026-11-16: "in the dashboard we'll also show the announcements")
-function AnnouncementsPanel({ log, status, review }) {
+function AnnouncementsPanel({ log, status, review, byRound, config }) {
   const [q, setQ] = useState('');
+  // hovering a name: that student's prices round by round, the rival's next to them (Mert, 2026-11-17)
+  const priceRows = name => (byRound || []).map(r => {
+    const p = (r.results || []).find(x => x.playerA?.name === name || x.playerB?.name === name);
+    if (!p) return null;
+    const me = p.playerA?.name === name ? p.playerA : p.playerB, them = p.playerA?.name === name ? p.playerB : p.playerA;
+    return { round: r.round, mine: me?.price, rival: them?.price, profit: me?.profit };
+  }).filter(Boolean);
+  const NameCell = ({ name, side, round }) => {
+    const rows = priceRows(name);
+    return (
+      <td className={`nm ${side}`}>
+        <span className="an-name">{name}
+          {rows.length > 0 && (
+            <span className="an-tip">
+              <b>{name}</b>
+              <table><thead><tr><th>Round</th><th>Price</th><th>Rival</th><th>Profit</th></tr></thead>
+                <tbody>{rows.map(x => <tr key={x.round} className={x.round === round ? 'cur' : ''}><td>{x.round}</td><td>{priceFmt(x.mine, config)}</td><td>{priceFmt(x.rival, config)}</td><td>{money(x.profit)}</td></tr>)}</tbody>
+              </table>
+            </span>
+          )}
+        </span>
+      </td>
+    );
+  };
   // after the AI review: the announcements it found illegal are highlighted (Mert, 2026-11-16) = the lines it quoted,
   // of the station(s) that crossed the line
   const norm = t => String(t || '').replace(/\s+/g, ' ').trim().toLowerCase();
@@ -456,8 +480,8 @@ function AnnouncementsPanel({ log, status, review }) {
               <tbody>
                 {(log || []).filter(e => e.round === r && match(e)).map(e => (
                   <tr key={e.pairId}>
-                    <td className="nm a">{e.nameA}</td><td className={`tx${illegal(e, 'A') ? ' ill' : ''}`}>{e.A ? `"${e.A}"` : <i>No announcement</i>}</td>
-                    <td className="nm b">{e.nameB}</td><td className={`tx${illegal(e, 'B') ? ' ill' : ''}`}>{e.B ? `"${e.B}"` : <i>No announcement</i>}</td>
+                    <NameCell name={e.nameA} side="a" round={e.round} /><td className={`tx${illegal(e, 'A') ? ' ill' : ''}`}>{e.A ? `"${e.A}"` : <i>No announcement</i>}</td>
+                    <NameCell name={e.nameB} side="b" round={e.round} /><td className={`tx${illegal(e, 'B') ? ' ill' : ''}`}>{e.B ? `"${e.B}"` : <i>No announcement</i>}</td>
                     <td className="vt">{pairTag(e)}</td>
                   </tr>
                 ))}

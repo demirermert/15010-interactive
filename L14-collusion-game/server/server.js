@@ -8,6 +8,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import { createGameManager } from './gameLogic.js';
 import * as db from './database.js';
 import { initializeOpenAI } from './aiPlayer.js';
+import { hasAnnounce } from './config.js';
 
 const PORT = process.env.PORT || 4000;
 // With INSTRUCTOR_KEY set (Render), the instructor pages and the session REST calls need it; students never do.
@@ -127,7 +128,7 @@ app.get('/session/:code/export', requireKey, (req, res) => {
 
     // Generate CSV. A chat game adds two columns: what the player wrote and what the rival wrote for that round (the
     // round being played, or the break before it), messages joined by " | " (2026-11-11)
-    const announce = sessionData.config?.announceTime > 0;
+    const announce = hasAnnounce(sessionData.config);
     const chat = sessionData.config?.enableChat || announce ? db.getChatMessages(code) : null;
     const said = (round, name) => chat.filter(m => m.round === round && m.from === name).map(m => m.message).join(' | ');
     // "Random Price": Yes when the student sent no price and the game gave a random one at the deadline (2026-11-11)

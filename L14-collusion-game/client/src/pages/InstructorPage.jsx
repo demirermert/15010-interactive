@@ -30,6 +30,14 @@ function buildApiUrl(path) {
 // 100 customers worth $200, $1 per unit walked, zero cost, prices 0 to 250.)
 // Every game uses per-round times (Mert, 2026-11-08). Each entry patches DEFAULT_CONFIG; `base` 'default' is numbered
 // default-1, -2, -3 (continuing past existing ones); the others are default-demo, default-chat.
+// the announcement time as the server takes it: a number, or a list when several are given ("180, 120")
+export function announcePayload(v) {
+  const list = (Array.isArray(v) ? v : String(v ?? '').split(/[,;\s]+/)).map(Number).filter(x => Number.isFinite(x) && x > 0);
+  if (!list.length) return 0;
+  return list.length === 1 ? list[0] : list;
+}
+const announceOn = v => [].concat(announcePayload(v)).some(x => x > 0);
+
 export const DEFAULT_GAMES = [
   { base: 'default-demo', label: 'Demo', cfg: { rounds: 3, differentTimePerRound: true, roundTime: 40, roundTimes: [40, 40, 40], travelCost: 0.001 } },
   { base: 'default', label: 'Game 1', cfg: { travelCost: 0.01 } },
@@ -39,7 +47,7 @@ export const DEFAULT_GAMES = [
   // with the AI legal review of the chats on (Mert, 2026-11-16)
   { base: 'default-chat', label: 'Bonus game with chat', cfg: { travelCost: 0.004, enableChat: true, aiChatReview: true, showModelParameters: true, rounds: 5, differentTimePerRound: true, roundTime: 60, roundTimes: [60, 60, 60, 60, 60] } },
   // the announcement game (Mert, 2026-11-16): 2 rounds; each a 2-minute public announcement, the reveal, then 1 minute for the price
-  { base: 'default-announce', label: 'Announcement game', cfg: { travelCost: 0.004, enableChat: false, announceTime: 120, aiChatReview: true, showModelParameters: true, rounds: 2, differentTimePerRound: true, roundTime: 60, roundTimes: [60, 60] } }
+  { base: 'default-announce', label: 'Announcement game', cfg: { travelCost: 0.004, enableChat: false, announceTime: '180, 120', aiChatReview: true, showModelParameters: true, rounds: 2, differentTimePerRound: true, roundTime: 60, roundTimes: [60, 60] } }
 ];
 
 const DEFAULT_CONFIG = {
@@ -172,8 +180,9 @@ function GameFields({ cfg, setCfg, compact = false }) {
         <input type="number" min="0" step="1" {...numField('breakTime', 0)} />
       </div>
       <div className="input-row">
-        <label>Announcement time before each round's price (seconds; 0 = no announcements)</label>
-        <input type="number" min="0" step="1" {...numField('announceTime', 0)} />
+        <label>Announcement time before each round's price, seconds: one number, or one per round such as 180, 120 (0 = no announcements)</label>
+        <input type="text" inputMode="numeric" value={Array.isArray(cfg.announceTime) ? cfg.announceTime.join(', ') : cfg.announceTime ?? 0}
+          onChange={event => setCfg(c => ({ ...c, announceTime: event.target.value }))} />
       </div>
       <div className="input-row">
         <label>{cfg.modelType === 'hotelling' ? 'Gallons sold on the road per round (market size)' : 'Market size'}</label>
@@ -314,7 +323,7 @@ export default function InstructorPage() {
     rounds: Number(cfg.rounds),
     roundTime: cfg.differentTimePerRound ? cfg.roundTimes.map(t => Number(t)) : Number(cfg.roundTime),
     breakTime: Number(cfg.breakTime),
-    announceTime: Number(cfg.announceTime) || 0,
+    announceTime: announcePayload(cfg.announceTime),
     marketSize: Number(cfg.marketSize),
     marginalCost: Number(cfg.marginalCost),
     randomPriceMax: cfg.randomPriceMax === '' || cfg.randomPriceMax == null ? undefined : Number(cfg.randomPriceMax),
@@ -329,7 +338,7 @@ export default function InstructorPage() {
     x2: Number(cfg.x2),
     priceBounds: { min: Number(cfg.priceMin), max: Number(cfg.priceMax) },
     enableChat: Boolean(cfg.enableChat),
-    aiChatReview: Boolean((cfg.enableChat || Number(cfg.announceTime) > 0) && cfg.aiChatReview),
+    aiChatReview: Boolean((cfg.enableChat || announceOn(cfg.announceTime)) && cfg.aiChatReview),
     hideRoundCount: Boolean(cfg.hideRoundCount),
     showOpponentName: Boolean(cfg.showOpponentName),
     showModelParameters: Boolean(cfg.showModelParameters)
@@ -426,7 +435,7 @@ export default function InstructorPage() {
     const margin = t > 0 && apart ? t * 100 : 0;
     const room = Math.max(1e-9, (Number(cfg.consumerValue) || 0) - c);
     const what = margin === 0 ? 'no differentiation' : margin / room < 0.08 ? 'very low differentiation' : margin / room < 0.25 ? 'less differentiation' : 'full differentiation';
-    return `${what} · Nash price $${(c + margin).toFixed(2)}${Number(cfg.announceTime) > 0 ? ` · announcements (${cfg.announceTime} s)${cfg.aiChatReview ? ', AI legal review' : ''}` : cfg.enableChat ? (cfg.aiChatReview ? ' · chat on, AI legal review' : ' · chat on') : ''}`;
+    return `${what} · Nash price $${(c + margin).toFixed(2)}${announceOn(cfg.announceTime) ? ` · announcements (${[].concat(announcePayload(cfg.announceTime)).join(' / ')} s)${cfg.aiChatReview ? ', AI legal review' : ''}` : cfg.enableChat ? (cfg.aiChatReview ? ' · chat on, AI legal review' : ' · chat on') : ''}`;
   };
 
   const handleDownload = (code, event) => {

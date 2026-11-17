@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { RoundsChart } from '../charts.jsx';
-import { money, pct, roundTimeFor, priceFmt, qty, kfmt, moneyK } from '../econ.js';
+import { money, pct, roundTimeFor, priceFmt, qty, kfmt, moneyK, hasAnnounce, announceWords } from '../econ.js';
 
 // true on a phone-width screen (the rounds table then uses short figures and short headings so it needs no sideways scroll)
 function useNarrow(px = 560) {
@@ -46,14 +46,14 @@ function Rules({ config }) {
   const secs = Array.isArray(t) ? null : t;
   const cost = Number(config?.marginalCost) || 0;
   const drive = Number(config?.travelCost) || 0;
-  const ann = config?.announceTime > 0;
-  const annLen = ann ? (config.announceTime % 60 === 0 ? `${config.announceTime / 60} minute${config.announceTime === 60 ? '' : 's'}` : `${config.announceTime} seconds`) : '';
+  const ann = hasAnnounce(config);
+  const annLen = ann ? announceWords(config) : '';
   const priceSecs = Array.isArray(t) ? t[0] : t;
   return (
     <div className="story">
       {/* the announcement game: the announcements first (Mert, 2026-11-17) */}
-      {ann && <p className="ann-rule"><b>This game has public announcements.</b> Each round starts with <b>{annLen}</b> in which you
-        publish one <b>public announcement</b>, like a press release to the market. When the time is up you see your rival's
+      {ann && <p className="ann-rule"><b>This game has public announcements.</b> Each round starts with time to write one <b>public announcement</b> (<b>{annLen}</b>)
+        and publish it, like a press release to the market. When the time is up you see your rival's
         announcement and your rival sees yours; then you have <b>{priceSecs} seconds</b> to set your price. Announcements are saved with
         the results{config?.aiChatReview ? ' and reviewed by an AI against U.S. antitrust law after the game' : ''}.</p>}
       <p>You and another student each run a gas station on the same road. {rounds}</p>
@@ -82,7 +82,7 @@ function Rules({ config }) {
       )}
       <p><b>Your goal:</b> the most total profit over all rounds, not the most gallons.</p>
       <p>After each round you see your rival's price, both market shares and both profits.</p>
-      {config?.announceTime > 0
+      {ann
         ? null
         : config?.enableChat
         ? <p><b>In this game you can chat with your rival</b> in the chat box. What you write is saved with the results.</p>
@@ -408,7 +408,7 @@ export function StudentView({
       <div className="card">
         <div className="case">Round {currentRound}{!hide && rounds ? ` of ${rounds}` : ''}</div>
         <div className="qt">{done ? (acceptedPrice != null ? 'Your price is in' : 'Sending your price') : 'Set your price'}</div>
-        {config?.announceTime > 0 && !rivalIsAI && (revealed || []).find(r => r.round === currentRound) && <AnnouncePair r={(revealed || []).find(r => r.round === currentRound)} rivalLabel={rivalLabel} />}
+        {hasAnnounce(config) && !rivalIsAI && (revealed || []).find(r => r.round === currentRound) && <AnnouncePair r={(revealed || []).find(r => r.round === currentRound)} rivalLabel={rivalLabel} />}
         <div className="clock"><span className={`s${low ? ' low' : ''}`}>{Math.max(0, timer)}s</span><span className="l">left in this round</span></div>
         <div className={`bar${low ? ' low' : ''}`}><i style={{ width: `${Math.max(0, Math.min(100, (timer / (fullTime || 1)) * 100))}%` }} /></div>
         <form onSubmit={handleSubmit}>
@@ -483,7 +483,7 @@ export function StudentView({
   const right = (
     <div className="stack">
       {/* the "Your market" road card went on 2026-11-11 (Mert); the rules still describe the road */}
-      {config?.announceTime > 0 && !rivalIsAI && !spectator && (
+      {hasAnnounce(config) && !rivalIsAI && !spectator && (
         <div className="card" id="announcements-card">
           <div className="gname">Announcements</div>
           {(revealed || []).length === 0 ? <div className="hint">Both announcements of a round appear here when they are revealed.</div>

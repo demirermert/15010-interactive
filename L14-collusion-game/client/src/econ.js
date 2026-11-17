@@ -140,3 +140,23 @@ export function roundTimeFor(config, round) {
   if (Array.isArray(rt)) return rt[round - 1] || rt[0] || 30;
   return rt || 30;
 }
+
+// the announcement game (2026-11-16/17): whether a game has announcements; a round's announcement time (one number,
+// or one per round); and the times as words for the rules ("3 minutes in round 1 and 2 minutes in round 2")
+export function hasAnnounce(config) {
+  const a = config?.announceTime;
+  return Array.isArray(a) ? a.some(v => Number(v) > 0) : Number(a) > 0;
+}
+export function announceSecs(config, round) {
+  const a = config?.announceTime;
+  if (Array.isArray(a)) return Number(a[Math.min(Math.max(1, round), a.length) - 1]) || 0;
+  return Number(a) || 0;
+}
+const secsWords = s => (s % 60 === 0 ? `${s / 60} minute${s === 60 ? '' : 's'}` : `${s} seconds`);
+export function announceWords(config) {
+  const a = config?.announceTime;
+  if (!Array.isArray(a)) return secsWords(Number(a) || 0);
+  if (a.every(v => Number(v) === Number(a[0]))) return secsWords(Number(a[0]));
+  const parts = a.map((v, i) => `${secsWords(Number(v))} in round ${i + 1}`);
+  return parts.length === 2 ? parts.join(' and ') : parts.slice(0, -1).join(', ') + ' and ' + parts[parts.length - 1];
+}

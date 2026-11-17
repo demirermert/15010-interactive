@@ -60,9 +60,15 @@ export function validateConfig(raw) {
   // the AI legal review of the chats after the game (2026-11-16); only in a chat game
   // the announcement game (Mert, 2026-11-16): before each round's price, a phase of this many seconds in which each
   // station writes one announcement; both are revealed together, then the round's price time starts. 0 = off.
-  out.announceTime = c.announceTime ? num(c.announceTime, 'Announcement time (seconds)', 10, 900, { fallback: 120 }) : 0;
-  if (out.announceTime) out.enableChat = false; // one announcement a round, no chat
-  out.aiChatReview = (out.enableChat || out.announceTime > 0) && Boolean(c.aiChatReview);
+  // one number for every round, or one per round (Mert, 2026-11-17: 3 minutes in round 1, 2 in round 2)
+  if (Array.isArray(c.announceTime)) {
+    const list = c.announceTime.map((v, i) => num(v, `Announcement time, round ${i + 1} (seconds)`, 10, 900, { fallback: 120 }));
+    out.announceTime = list.length ? list : 0;
+  } else {
+    out.announceTime = c.announceTime ? num(c.announceTime, 'Announcement time (seconds)', 10, 900, { fallback: 120 }) : 0;
+  }
+  if (hasAnnounce(out)) out.enableChat = false; // one announcement a round, no chat
+  out.aiChatReview = (out.enableChat || hasAnnounce(out)) && Boolean(c.aiChatReview);
   out.hideRoundCount = Boolean(c.hideRoundCount);
   out.showOpponentName = Boolean(c.showOpponentName);
   out.showModelParameters = Boolean(c.showModelParameters);
@@ -81,4 +87,16 @@ export function studentConfig(config) {
 export function cleanName(name) {
   if (typeof name !== 'string') return '';
   return name.replace(/\s+/g, ' ').trim().slice(0, 40);
+}
+
+// the announcement game (2026-11-16/17): whether a game has announcements, and how long a round's phase is (a list
+// gives one value per round; a round past its end takes the last)
+export function hasAnnounce(config) {
+  const a = config?.announceTime;
+  return Array.isArray(a) ? a.some(v => Number(v) > 0) : Number(a) > 0;
+}
+export function announceSecs(config, round) {
+  const a = config?.announceTime;
+  if (Array.isArray(a)) return Number(a[Math.min(Math.max(1, round), a.length) - 1]) || 0;
+  return Number(a) || 0;
 }
