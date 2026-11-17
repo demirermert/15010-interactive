@@ -166,7 +166,7 @@ await dash.goto(`${BASE}/manage/${code}`, { waitUntil: 'networkidle2' }); await 
 const panel = await dash.$('#announcements-panel'); if (panel) await panel.screenshot({ path: path.join(OUT, '5-dashboard-announcements.png') });
 check('the dashboard shows the announcements panel after a reload', !!panel && /stay at \$6/.test(await dash.$eval('#announcements-panel', e => e.innerText).catch(() => '')));
 await dash.click('#tab-review').catch(() => {}); await sleep(400);
-const rp = await dash.$('.review'); if (rp) await rp.screenshot({ path: path.join(OUT, '6-dashboard-review.png') });
+const rp = await dash.$('.grid > section.review'); if (rp) await rp.screenshot({ path: path.join(OUT, '6-dashboard-review.png') });
 
 // the AI seat: an odd game of 3, the one facing the AI cannot announce
 const g2 = await (await fetch(BASE + '/api/session', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-instructor-key': KEY },

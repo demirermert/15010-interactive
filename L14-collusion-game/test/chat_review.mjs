@@ -146,7 +146,7 @@ const rows = await dash.$$eval('.review .rv-row', r => r.length).catch(() => 0);
 check('the dashboard lists every pair', rows === N / 2, String(rows));
 await dash.click('.review .rv-row').catch(() => {});
 await sleep(400);
-const panel = await dash.$('.review'); if (panel) await panel.screenshot({ path: path.join(OUT, 'dashboard-review.png') });
+const panel = await dash.$('.grid > section.review'); if (panel) await panel.screenshot({ path: path.join(OUT, 'dashboard-review.png') });
 
 console.log(`\n${pass} of ${pass + fail} checks passed; screenshots in ${OUT}`);
 fs.writeFileSync(path.join(OUT, 'review.json'), JSON.stringify(review, null, 2));

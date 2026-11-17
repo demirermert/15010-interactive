@@ -11,7 +11,9 @@ const LAW_FILE = path.join(path.dirname(fileURLToPath(import.meta.url)), 'antitr
 // from "## The setting" on: the note at the top is for whoever edits the file
 const RAW = fs.readFileSync(LAW_FILE, 'utf8');
 export const LAW_TEXT = RAW.includes('## The setting') ? RAW.slice(RAW.indexOf('## The setting')) : RAW;
-const MODEL = process.env.AI_MODEL || 'gpt-4o';
+// the review's own model (Mert, 2026-11-17: gpt-6-sol), so the ChatGPT pricing seat (AI_MODEL) is not changed by it
+const MODEL = process.env.REVIEW_MODEL || process.env.AI_MODEL || 'gpt-4o';
+console.log(`AI legal review model: ${MODEL}`);
 const KEY = process.env.OPENAI_API_KEY;
 const client = KEY ? new OpenAI({ apiKey: KEY, baseURL: process.env.OPENAI_BASE_URL || undefined, timeout: 60000, maxRetries: 1 }) : null;
 
