@@ -53,7 +53,7 @@ function Rules({ config }) {
     <div className="story">
       {/* the announcement game: the announcements first (Mert, 2026-11-17) */}
       {ann && <p className="ann-rule"><b>This game has public announcements.</b> Each round starts with time to write one <b>public announcement</b> (<b>{annLen}</b>)
-        and publish it, like a press release to the market. When the time is up you see your rival's
+        and publish it, like a statement on your earnings call. When the time is up you see your rival's
         announcement and your rival sees yours; then you have <b>{priceSecs} seconds</b> to set your price. Announcements are saved with
         the results{config?.aiChatReview ? ' and reviewed by an AI against U.S. antitrust law after the game' : ''}.</p>}
       <p>You and another student each run a gas station on the same road. {rounds}</p>
@@ -138,7 +138,7 @@ function AnnounceCard({ a, saved, rounds, hide, onSend, errorMessage, onDismissE
       <div className="qt">Write your public announcement</div>
       <div className="clock"><span className={`s${low ? ' low' : ''}`}>{mm}</span><span className="l">until both announcements are revealed</span></div>
       <div className={`bar${low ? ' low' : ''}`}><i style={{ width: `${Math.max(0, Math.min(100, (left / (a.full || 1)) * 100))}%` }} /></div>
-      <div className="hint" style={{ margin: '8px 0' }}>Like a press release to the market. Your rival sees it when the time is up, and you see theirs. Then you have a minute to set your price.</div>
+      <div className="hint" style={{ margin: '8px 0' }}>Like a statement on your earnings call. Your rival sees it when the time is up, and you see theirs. Then you have a minute to set your price.</div>
       <form onSubmit={e => { e.preventDefault(); if (draft.trim()) onSend(draft.trim(), a.round); }}>
         <textarea className="ann-input" id="announce-text" rows={4} maxLength={400} value={draft} onChange={e => setDraft(e.target.value)} placeholder="Our station announces..." />
         <button className="go" type="submit" disabled={!draft.trim() || draft.trim() === mine}>{mine ? 'Update announcement' : 'Publish announcement'}</button>
