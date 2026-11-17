@@ -37,13 +37,16 @@ export const DEFAULT_GAMES = [
   // Game 3: a tiny driving cost (0.02 cents a mile, Mert 2026-11-11) so the Nash price is $3.32, just above cost
   { base: 'default', label: 'Game 3', cfg: { travelCost: 0.0002, roundTimes: [45, 30, 30, 30, 30, 30, 30, 30, 30, 30] } },
   // with the AI legal review of the chats on (Mert, 2026-11-16)
-  { base: 'default-chat', label: 'Bonus game with chat', cfg: { travelCost: 0.004, enableChat: true, aiChatReview: true, rounds: 5, differentTimePerRound: true, roundTime: 60, roundTimes: [60, 60, 60, 60, 60] } }
+  { base: 'default-chat', label: 'Bonus game with chat', cfg: { travelCost: 0.004, enableChat: true, aiChatReview: true, rounds: 5, differentTimePerRound: true, roundTime: 60, roundTimes: [60, 60, 60, 60, 60] } },
+  // the announcement game (Mert, 2026-11-16): 2 rounds; each a 2-minute public announcement, the reveal, then 1 minute for the price
+  { base: 'default-announce', label: 'Announcement game', cfg: { travelCost: 0.004, enableChat: false, announceTime: 120, aiChatReview: true, rounds: 2, differentTimePerRound: true, roundTime: 60, roundTimes: [60, 60] } }
 ];
 
 const DEFAULT_CONFIG = {
   rounds: 10,
   roundTime: 30,
   breakTime: 10,
+  announceTime: 0, // seconds of the announcement phase before each round's price; 0 = no announcements (2026-11-16)
   differentTimePerRound: true,
   roundTimes: [60, 50, 40, 30, 30, 30, 30, 30, 30, 30],
   marketSize: 10000, // gallons sold on the road per round when every driver buys
@@ -169,6 +172,10 @@ function GameFields({ cfg, setCfg, compact = false }) {
         <input type="number" min="0" step="1" {...numField('breakTime', 0)} />
       </div>
       <div className="input-row">
+        <label>Announcement time before each round's price (seconds; 0 = no announcements)</label>
+        <input type="number" min="0" step="1" {...numField('announceTime', 0)} />
+      </div>
+      <div className="input-row">
         <label>{cfg.modelType === 'hotelling' ? 'Gallons sold on the road per round (market size)' : 'Market size'}</label>
         <input type="number" min="1" step="1" {...numField('marketSize', 1)} />
       </div>
@@ -245,7 +252,7 @@ function GameFields({ cfg, setCfg, compact = false }) {
         <legend className="bgk">Options</legend>
         {[
           ['enableChat', 'Enable chat between paired students', 'Students matched together can chat during the game'],
-          ['aiChatReview', 'AI legal review of the chats', 'After the game, the AI reads each pair\'s chat against U.S. antitrust law and says Legal or Illegal and why; students see their own verdict, you see all (needs chat)'],
+          ['aiChatReview', 'AI legal review of the chats', 'After the game, the AI reads each pair\'s chat or announcements against U.S. antitrust law and says Legal or Illegal and why; students see their own verdict, you see all (needs chat or announcements)'],
           ['hideRoundCount', 'Hide the total number of rounds', 'Students see "Round 3" instead of "Round 3 of 10"'],
           ['showOpponentName', 'Show opponent names', 'Students see who they are paired with'],
           ['showModelParameters', 'Also tell students the value of a gallon (V)', 'The wholesale cost and the driving cost are always in the instructions; this adds what a gallon is worth to a driver']
@@ -307,6 +314,7 @@ export default function InstructorPage() {
     rounds: Number(cfg.rounds),
     roundTime: cfg.differentTimePerRound ? cfg.roundTimes.map(t => Number(t)) : Number(cfg.roundTime),
     breakTime: Number(cfg.breakTime),
+    announceTime: Number(cfg.announceTime) || 0,
     marketSize: Number(cfg.marketSize),
     marginalCost: Number(cfg.marginalCost),
     randomPriceMax: cfg.randomPriceMax === '' || cfg.randomPriceMax == null ? undefined : Number(cfg.randomPriceMax),
@@ -321,7 +329,7 @@ export default function InstructorPage() {
     x2: Number(cfg.x2),
     priceBounds: { min: Number(cfg.priceMin), max: Number(cfg.priceMax) },
     enableChat: Boolean(cfg.enableChat),
-    aiChatReview: Boolean(cfg.enableChat && cfg.aiChatReview),
+    aiChatReview: Boolean((cfg.enableChat || Number(cfg.announceTime) > 0) && cfg.aiChatReview),
     hideRoundCount: Boolean(cfg.hideRoundCount),
     showOpponentName: Boolean(cfg.showOpponentName),
     showModelParameters: Boolean(cfg.showModelParameters)
@@ -418,7 +426,7 @@ export default function InstructorPage() {
     const margin = t > 0 && apart ? t * 100 : 0;
     const room = Math.max(1e-9, (Number(cfg.consumerValue) || 0) - c);
     const what = margin === 0 ? 'no differentiation' : margin / room < 0.08 ? 'very low differentiation' : margin / room < 0.25 ? 'less differentiation' : 'full differentiation';
-    return `${what} · Nash price $${(c + margin).toFixed(2)}${cfg.enableChat ? (cfg.aiChatReview ? ' · chat on, AI legal review' : ' · chat on') : ''}`;
+    return `${what} · Nash price $${(c + margin).toFixed(2)}${Number(cfg.announceTime) > 0 ? ` · announcements (${cfg.announceTime} s)${cfg.aiChatReview ? ', AI legal review' : ''}` : cfg.enableChat ? (cfg.aiChatReview ? ' · chat on, AI legal review' : ' · chat on') : ''}`;
   };
 
   const handleDownload = (code, event) => {

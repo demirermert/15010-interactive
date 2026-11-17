@@ -35,7 +35,8 @@ const SCRIPTS = [
   { name: 'explicit deal', want: 'Illegal', by: 'both', lines: [['A', 1, "let's both set $6.50 every round"], ['B', 1, 'deal'], ['A', 2, 'still at 6.50?'], ['B', 2, 'yes']] },
   { name: 'invitation refused', want: 'Illegal', by: 'A', lines: [['A', 1, 'how about we both stay at $6 so neither of us loses money?'], ['B', 1, "no thanks, I'll set my own price"]] },
   { name: 'small talk', want: 'Legal', by: 'neither', lines: [['A', 1, 'hi! good luck'], ['B', 1, 'you too, have fun'], ['A', 2, 'this class is early lol']] },
-  { name: 'future price signal', want: 'Illegal', by: 'A', lines: [['A', 1, "FYI I'm going to charge $5.80 next round"], ['B', 2, 'ok']] },
+  // B's "ok" can be read as accepting: A or both (2026-11-16)
+  { name: 'future price signal', want: 'Illegal', by: ['A', 'both'], lines: [['A', 1, "FYI I'm going to charge $5.80 next round"], ['B', 2, 'ok']] },
   { name: 'no messages', want: 'Legal', by: 'neither', lines: [] },
   { name: 'threat', want: 'Illegal', by: 'B', lines: [['B', 1, 'if you go below $5 I will drop to $3.30 and we both lose'], ['A', 1, 'whatever']] },
   { name: 'coded language', want: 'Illegal', by: 'both', lines: [['A', 1, "let's be nice to each other, no price war"], ['B', 1, 'agreed, keep it high']] },
@@ -99,7 +100,7 @@ for (const pl of plan) {
   const r = review.results.find(x => x.pairId === pl.pairId);
   const ok = r?.verdict === pl.script.want;
   check(`${pl.script.name}: ${pl.script.want}`, ok, `${r?.verdict} (crossed by ${r?.crossedBy}; ${r?.rule}) ${r?.reason}`);
-  if (pl.script.want === 'Illegal') check(`${pl.script.name}: crossed by ${pl.script.by}`, r?.crossedBy === pl.script.by, r?.crossedBy);
+  if (pl.script.want === 'Illegal') check(`${pl.script.name}: crossed by ${pl.script.by}`, [].concat(pl.script.by).includes(r?.crossedBy), r?.crossedBy);
   for (const side of ['A', 'B']) {
     const v = pl[side].verdicts.filter(x => !x.pending).pop();
     if (!v || v.verdict !== r?.verdict || v.myStation !== side || 'nameA' in v || 'nameB' in v || !v.law) check(`${pl.script.name}: ${side}'s phone got its verdict`, false, JSON.stringify(v)?.slice(0, 200));
@@ -130,7 +131,7 @@ await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true
 await page.goto(`${BASE}/session/${code}/${ill.A.code}`, { waitUntil: 'networkidle2' });
 await page.waitForSelector('#ai-verdict .vbig', { timeout: 15000 }).catch(() => {});
 const card = await page.$eval('#ai-verdict', e => e.innerText).catch(() => '');
-check('the game-over card shows the verdict', /AI legal review of your chat[\s\S]*(Illegal|Legal)/i.test(card), card.slice(0, 160));
+check('the game-over card shows the verdict', /AI legal review[\s\S]*(Illegal|Legal)/i.test(card), card.slice(0, 160));
 check('the chat card says the chat is closed', !!(await page.$('#chat-closed')));
 const el = await page.$('#ai-verdict'); if (el) await el.screenshot({ path: path.join(OUT, 'student-verdict.png') });
 await page.screenshot({ path: path.join(OUT, 'student-page.png'), fullPage: true });

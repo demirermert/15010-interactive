@@ -58,7 +58,11 @@ export function validateConfig(raw) {
   }
   out.enableChat = Boolean(c.enableChat);
   // the AI legal review of the chats after the game (2026-11-16); only in a chat game
-  out.aiChatReview = out.enableChat && Boolean(c.aiChatReview);
+  // the announcement game (Mert, 2026-11-16): before each round's price, a phase of this many seconds in which each
+  // station writes one announcement; both are revealed together, then the round's price time starts. 0 = off.
+  out.announceTime = c.announceTime ? num(c.announceTime, 'Announcement time (seconds)', 10, 900, { fallback: 120 }) : 0;
+  if (out.announceTime) out.enableChat = false; // one announcement a round, no chat
+  out.aiChatReview = (out.enableChat || out.announceTime > 0) && Boolean(c.aiChatReview);
   out.hideRoundCount = Boolean(c.hideRoundCount);
   out.showOpponentName = Boolean(c.showOpponentName);
   out.showModelParameters = Boolean(c.showModelParameters);

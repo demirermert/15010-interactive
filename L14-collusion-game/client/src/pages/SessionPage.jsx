@@ -56,6 +56,13 @@ export default function SessionPage() {
   // the AI legal review of the chats (2026-11-16): a student's own pair's verdict, the instructor's whole review
   const [chatVerdict, setChatVerdict] = useState(null);
   const [chatReview, setChatReview] = useState(null);
+  // the announcement game (2026-11-16): the phase in progress { round, endsAt, full, rivalIsAI, side }, my saved
+  // announcement, what each round revealed [{ round, mine, rival }], and for the dashboard progress and every pair's
+  const [announce, setAnnounce] = useState(null);
+  const [announceSaved, setAnnounceSaved] = useState(null);
+  const [revealed, setRevealed] = useState([]);
+  const [announceProgress, setAnnounceProgress] = useState(null);
+  const [announceLog, setAnnounceLog] = useState([]);
   const [opponentName, setOpponentName] = useState(null);
   const [submissionProgress, setSubmissionProgress] = useState(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -243,6 +250,7 @@ export default function SessionPage() {
     };
     
     const handleRoundStarted = payload => {
+      setAnnounce(null);
       setRoundInfo(payload);
       setRoundActive(true);
       // If payload includes hasSubmitted (when rejoining), use it; otherwise default to false
@@ -308,6 +316,7 @@ export default function SessionPage() {
     
     const handleSessionComplete = payload => {
       setRoundActive(false);
+      setAnnounce(null);
       if (Array.isArray(payload.rounds) && payload.rounds.length) setLatestRoundSummary(payload.rounds[payload.rounds.length - 1]);
       if (Array.isArray(payload.leaderboard)) setLeaderboard(payload.leaderboard);
       
@@ -416,6 +425,15 @@ export default function SessionPage() {
       if (Array.isArray(payload?.messages)) setChatMessages(payload.messages);
     };
     const handleChatVerdict = payload => setChatVerdict(payload || null);
+    const handleAnnouncePhase = p => {
+      setAnnounce({ ...p, endsAt: Date.now() + (Number(p.remaining) || 0) * 1000 });
+      setAnnounceSaved(p.mine ? { round: p.round, text: p.mine } : null);
+      setRoundActive(false);
+    };
+    const handleAnnounceTimer = p => setAnnounce(a => (a ? { ...a, endsAt: Date.now() + (Number(p.remaining) || 0) * 1000 } : a));
+    const handleAnnouncementSaved = p => setAnnounceSaved(p);
+    const handleRevealed = p => { if (Array.isArray(p?.revealed)) setRevealed(p.revealed); setAnnounce(null); };
+    const handleAnnounceLog = p => { if (Array.isArray(p?.log)) setAnnounceLog(p.log); setAnnounce(null); };
     const handleChatReview = payload => setChatReview(payload || null);
 
     const handleOpponentInfo = (payload) => {
@@ -437,6 +455,12 @@ export default function SessionPage() {
     socket.on('priceAccepted', handlePriceAccepted);
     socket.on('chatHistory', handleChatHistory);
     socket.on('chatVerdict', handleChatVerdict);
+    socket.on('announcePhase', handleAnnouncePhase);
+    socket.on('announceTimer', handleAnnounceTimer);
+    socket.on('announcementSaved', handleAnnouncementSaved);
+    socket.on('announcementsRevealed', handleRevealed);
+    socket.on('announceProgress', setAnnounceProgress);
+    socket.on('announcementsAll', handleAnnounceLog);
     socket.on('chatReview', handleChatReview);
     const handleSeatMoved = () => setSeatMoved(true);
     const handleJoinedAgain = () => setSeatMoved(false);
@@ -459,6 +483,12 @@ export default function SessionPage() {
       socket.off('priceAccepted', handlePriceAccepted);
       socket.off('chatHistory', handleChatHistory);
       socket.off('chatVerdict', handleChatVerdict);
+      socket.off('announcePhase', handleAnnouncePhase);
+      socket.off('announceTimer', handleAnnounceTimer);
+      socket.off('announcementSaved', handleAnnouncementSaved);
+      socket.off('announcementsRevealed', handleRevealed);
+      socket.off('announceProgress', setAnnounceProgress);
+      socket.off('announcementsAll', handleAnnounceLog);
       socket.off('chatReview', handleChatReview);
       socket.off('seatMoved', handleSeatMoved);
       socket.off('joinedSession', handleJoinedAgain);
@@ -865,6 +895,9 @@ export default function SessionPage() {
   const handleSendChatMessage = (message) => {
     socket.emit('chatMessage', { sessionCode, message });
   };
+  const handleSendAnnouncement = (text, round) => {
+    socket.emit('announce', { sessionCode, text, round });
+  };
 
   // If joined as instructor
   if (userRole === 'instructor') {
@@ -967,6 +1000,9 @@ export default function SessionPage() {
               nextRoundCountdown={nextRoundCountdown}
               submissionProgress={submissionProgress}
               chatReview={chatReview}
+              announce={announce}
+              announceProgress={announceProgress}
+              announceLog={announceLog}
               onRerunReview={() => { setErrorMessage(''); socket.emit('rerunChatReview', { sessionCode }); }}
             />
           </>
@@ -1013,6 +1049,10 @@ export default function SessionPage() {
         spectator={!!joinInfo?.spectator}
         acceptedPrice={acceptedPrice}
         chatVerdict={chatVerdict}
+        announce={announce}
+        announceSaved={announceSaved}
+        revealed={revealed}
+        onSendAnnouncement={handleSendAnnouncement}
         errorMessage={errorMessage}
         onDismissError={() => setErrorMessage('')}
       />

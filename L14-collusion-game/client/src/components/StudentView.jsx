@@ -64,7 +64,11 @@ function Rules({ config }) {
         for your rival.</p>
       <p><b>Your goal:</b> the most total profit over all rounds, not the most gallons.</p>
       <p>After each round you see your rival's price, both market shares and both profits.</p>
-      {config?.enableChat
+      {config?.announceTime > 0
+        ? <p><b>Announcements.</b> Before each round's price you have <b>{Math.round(config.announceTime / 60 * 10) / 10 === Math.round(config.announceTime / 60) ? `${Math.round(config.announceTime / 60)} minute${Math.round(config.announceTime / 60) === 1 ? '' : 's'}` : `${config.announceTime} seconds`}</b> to
+          publish one <b>public announcement</b>, as a press release to the market. When the time is up, you see your rival's announcement and
+          your rival sees yours; then you have {secs ? <b>{secs} seconds</b> : 'the round'} to set your price. Announcements are saved with the results{config?.aiChatReview ? ' and reviewed by an AI against U.S. antitrust law after the game' : ''}.</p>
+        : config?.enableChat
         ? <p><b>In this game you can chat with your rival</b> in the chat box. What you write is saved with the results.</p>
         : <p style={{ color: '#8a1c2c' }}><b>No communication with your rival.</b></p>}
     </div>
@@ -90,18 +94,68 @@ export function LawText({ text }) {
   );
 }
 
+// The announcement phase (Mert, 2026-11-16): one public announcement, editable until the time is up; whatever is
+// typed and not yet published goes in two seconds before the end
+function AnnounceCard({ a, saved, rounds, hide, onSend, errorMessage, onDismissError }) {
+  const [draft, setDraft] = useState(saved?.round === a.round ? saved.text : '');
+  const [now, setNow] = useState(Date.now());
+  const autoSent = useRef(false);
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 250); return () => clearInterval(t); }, []);
+  useEffect(() => { setDraft(saved?.round === a.round ? saved.text : ''); autoSent.current = false; }, [a.round]);
+  const left = Math.max(0, Math.ceil((a.endsAt - now) / 1000));
+  const mine = saved?.round === a.round ? saved.text : '';
+  useEffect(() => {
+    if (left <= 2 && !autoSent.current && draft.trim() && draft.trim() !== mine) { autoSent.current = true; onSend(draft.trim(), a.round); }
+  }, [left]);
+  const mm = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+  const low = left <= 15;
+  if (a.rivalIsAI) return (
+    <div className="card">
+      <div className="case">Round {a.round}{!hide && rounds ? ` of ${rounds}` : ''} &middot; announcements</div>
+      <div className="qt">Your rival this game is a computer, so there are no announcements.</div>
+      <div className="clock"><span className={`s${low ? ' low' : ''}`}>{mm}</span><span className="l">until prices open</span></div>
+    </div>
+  );
+  return (
+    <div className="card" id="announce-card">
+      <div className="case">Round {a.round}{!hide && rounds ? ` of ${rounds}` : ''} &middot; announcement</div>
+      <div className="qt">Write your public announcement</div>
+      <div className="clock"><span className={`s${low ? ' low' : ''}`}>{mm}</span><span className="l">until both announcements are revealed</span></div>
+      <div className={`bar${low ? ' low' : ''}`}><i style={{ width: `${Math.max(0, Math.min(100, (left / (a.full || 1)) * 100))}%` }} /></div>
+      <div className="hint" style={{ margin: '8px 0' }}>Like a press release to the market. Your rival sees it when the time is up, and you see theirs. Then you have a minute to set your price.</div>
+      <form onSubmit={e => { e.preventDefault(); if (draft.trim()) onSend(draft.trim(), a.round); }}>
+        <textarea className="ann-input" id="announce-text" rows={4} maxLength={400} value={draft} onChange={e => setDraft(e.target.value)} placeholder="Our station announces..." />
+        <button className="go" type="submit" disabled={!draft.trim() || draft.trim() === mine}>{mine ? 'Update announcement' : 'Publish announcement'}</button>
+      </form>
+      {mine ? <div className="fb ok" id="announce-ok">Published: "{mine}"{draft.trim() !== mine ? ' (your changes are not published yet)' : ''}. You can change it until the time is up.</div>
+        : <div className="fb info">Not published yet.</div>}
+      {errorMessage && <div className="fb no" onClick={onDismissError}>{errorMessage}</div>}
+    </div>
+  );
+}
+
+// both announcements of a round
+function AnnouncePair({ r, rivalLabel }) {
+  return (
+    <div className="ann-pair">
+      <div className="ann you"><span>You announced</span>{r.mine ? `"${r.mine}"` : <i>No announcement</i>}</div>
+      <div className="ann rival"><span>{rivalLabel} announced</span>{r.rival ? `"${r.rival}"` : <i>No announcement</i>}</div>
+    </div>
+  );
+}
+
 // The AI legal review of the pair's chat, on the game-over card (Mert, 2026-11-16)
 function Verdict({ v }) {
   if (!v) return null;
-  if (v.pending) return <div className="verdict wait" id="ai-verdict"><div className="vlbl">AI legal review of your chat</div><div className="vtxt">The AI is reading your chat against U.S. antitrust law. Your verdict appears here in a moment.</div></div>;
-  if (v.error && !v.verdict) return <div className="verdict wait" id="ai-verdict"><div className="vlbl">AI legal review of your chat</div><div className="vtxt">{v.error}</div></div>;
+  if (v.pending) return <div className="verdict wait" id="ai-verdict"><div className="vlbl">AI legal review</div><div className="vtxt">The AI is reading what you and your rival wrote against U.S. antitrust law. Your verdict appears here in a moment.</div></div>;
+  if (v.error && !v.verdict) return <div className="verdict wait" id="ai-verdict"><div className="vlbl">AI legal review</div><div className="vtxt">{v.error}</div></div>;
   const me = v.myStation || 'A', them = me === 'A' ? 'B' : 'A';
   const label = st => `Station ${st} (${st === me ? 'you' : 'your rival'})`;
   const by = v.crossedBy === 'both' ? 'Both of you crossed the line.' : v.crossedBy === me ? 'Your messages crossed the line.' : v.crossedBy === them ? "Your rival's messages crossed the line." : '';
   const ill = v.verdict === 'Illegal';
   return (
     <div className={`verdict ${ill ? 'bad' : 'good'}`} id="ai-verdict">
-      <div className="vlbl">AI legal review of your chat</div>
+      <div className="vlbl">AI legal review</div>
       <div className="vbig">{ill ? 'Illegal' : 'Legal'}</div>
       <div className="vsub">You were Station {me}.{by ? ' ' + by : ''}</div>
       {v.rule && <div className="vrule">{v.rule}</div>}
@@ -147,6 +201,10 @@ export function StudentView({
   spectator,
   acceptedPrice,
   chatVerdict,
+  announce,
+  announceSaved,
+  revealed,
+  onSendAnnouncement,
   errorMessage,
   onDismissError
 }) {
@@ -325,6 +383,8 @@ export function StudentView({
         {errorMessage && <div className="fb no" onClick={onDismissError}>{errorMessage}</div>}
       </div>
     );
+  } else if (announce && sessionStatus === 'running' && !roundActive) {
+    left = <AnnounceCard a={announce} saved={announceSaved} rounds={rounds} hide={hide} onSend={onSendAnnouncement} errorMessage={errorMessage} onDismissError={onDismissError} />;
   } else if (roundActive) {
     const done = hasSubmitted;
     const shownPrice = acceptedPrice ?? sent; // the server's figure once it has answered, the typed one until then
@@ -332,6 +392,7 @@ export function StudentView({
       <div className="card">
         <div className="case">Round {currentRound}{!hide && rounds ? ` of ${rounds}` : ''}</div>
         <div className="qt">{done ? (acceptedPrice != null ? 'Your price is in' : 'Sending your price') : 'Set your price'}</div>
+        {config?.announceTime > 0 && !rivalIsAI && (revealed || []).find(r => r.round === currentRound) && <AnnouncePair r={(revealed || []).find(r => r.round === currentRound)} rivalLabel={rivalLabel} />}
         <div className="clock"><span className={`s${low ? ' low' : ''}`}>{Math.max(0, timer)}s</span><span className="l">left in this round</span></div>
         <div className={`bar${low ? ' low' : ''}`}><i style={{ width: `${Math.max(0, Math.min(100, (timer / (fullTime || 1)) * 100))}%` }} /></div>
         <form onSubmit={handleSubmit}>
@@ -406,6 +467,13 @@ export function StudentView({
   const right = (
     <div className="stack">
       {/* the "Your market" road card went on 2026-11-11 (Mert); the rules still describe the road */}
+      {config?.announceTime > 0 && !rivalIsAI && !spectator && (
+        <div className="card" id="announcements-card">
+          <div className="gname">Announcements</div>
+          {(revealed || []).length === 0 ? <div className="hint">Both announcements of a round appear here when they are revealed.</div>
+            : [...revealed].sort((x, y) => x.round - y.round).map(r => <div key={r.round}><div className="ann-round">Round {r.round}</div><AnnouncePair r={r} rivalLabel={rivalLabel} /></div>)}
+        </div>
+      )}
       {/* the chat sits above the rounds (Mert, 2026-11-11) */}
       {config?.enableChat && (
         <div className="card">

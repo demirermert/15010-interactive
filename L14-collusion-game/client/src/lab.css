@@ -257,3 +257,19 @@ body{margin:0;font:16px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,s
 .dash .tabs .badge{margin-left:8px;font-size:12.5px;font-weight:700;background:#fdecee;color:var(--red);border-radius:999px;padding:2px 9px}
 .dash .grid.show-review > section:not(.statep):not(.review){display:none}
 .dash .grid:not(.show-review) > section.review{display:none}
+
+/* the announcement game (2026-11-16) */
+.lab .ann-input{width:100%;box-sizing:border-box;font:inherit;font-size:16px;border:1.5px solid #cfd4da;border-radius:10px;padding:10px 12px;resize:vertical}
+.lab .ann-input:focus{outline:0;border-color:var(--navy);box-shadow:0 0 0 3px rgba(31,46,92,.12)}
+.lab .ann-pair{display:flex;flex-direction:column;gap:6px;margin:8px 0 12px}
+.lab .ann{border-radius:8px;padding:8px 12px;font-size:15px;background:#f6f7f9;border-left:4px solid var(--you)}
+.lab .ann.rival{border-left-color:var(--rival);background:#fdf3f4}
+.lab .ann span{display:block;font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.lab .ann i{color:var(--muted)}
+.lab .ann-round{font-size:12px;font-weight:700;color:var(--navy);margin-top:6px}
+
+.dash .announcements .an-round{font-size:13px;font-weight:700;color:var(--navy);margin:12px 0 4px;text-transform:uppercase;letter-spacing:.06em}
+.dash .announcements .an-table{table-layout:fixed}
+.dash .announcements .an-table td{white-space:normal;vertical-align:top;font-size:14px}
+.dash .announcements .an-table td.nm{width:11%;font-weight:600;font-size:13px}.dash .announcements .an-table td.nm.a{color:var(--navy)}.dash .announcements .an-table td.nm.b{color:var(--red)}
+.dash .announcements .an-table td.tx{width:39%}.dash .announcements .an-table td i{color:var(--muted)}

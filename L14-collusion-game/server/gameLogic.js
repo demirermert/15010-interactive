@@ -470,6 +470,20 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
       }
       
       socket.emit('joinedSession', joinResponse);
+      // the announcement game: the phase in progress and the announcements seen so far (2026-11-16)
+      if (session.config.announceTime > 0 && session.status !== STATUS.LOBBY && session.status !== STATUS.SETUP) {
+        if (socket.data.role === 'student') {
+          const rv = revealedFor(session, socket.id);
+          if (rv.length) socket.emit('announcementsRevealed', { revealed: rv });
+          if (session.announcing) socket.emit('announcePhase', announcePayloadFor(session, socket.id));
+        } else {
+          if (session.announceLog?.length) socket.emit('announcementsAll', { log: session.announceLog });
+        }
+        if (socket.data.role !== 'student' && session.announcing) {
+          socket.emit('announcePhase', { round: session.currentRound, remaining: Math.max(0, Math.ceil((session.announceEndsAt - Date.now()) / 1000)), full: session.config.announceTime });
+          emitAnnounceProgress(session);
+        }
+      }
       // the pair's chat so far comes back after a refresh or a reconnect (Codex review, 2026-11-11)
       if (socket.data.role === 'student' && session.config.enableChat && session.chatLog) {
         const me = session.players.get(socket.id);
@@ -639,6 +653,108 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
     session.currentRound += 1;
     session.submissions.clear();
     session.roundFinalizing = false; // Reset flag for new round
+    if (session.config.announceTime > 0) { startAnnouncePhase(session); return; }
+    startPricePhase(session);
+  }
+
+  // ---- the announcement game (Mert, 2026-11-16) ------------------------------------------------------------------
+  // Each round: announceTime seconds in which each station writes (and may rewrite) one announcement, unseen by the
+  // rival; then both are revealed to the pair at once and the round's price time starts. The final announcements are
+  // kept like chat messages (chat log, chat_messages table), so the CSV and the AI review read them.
+  function announcePayloadFor(session, socketId) {
+    const pair = session.pairs.find(p => p.playerA === socketId || p.playerB === socketId);
+    const mine = pair && session.announcements?.get(pair.id)?.[pair.playerA === socketId ? 'A' : 'B'];
+    const remaining = Math.max(0, Math.ceil((session.announceEndsAt - Date.now()) / 1000));
+    return { round: session.currentRound, remaining, full: session.config.announceTime, side: sideOf(session, socketId), rivalIsAI: rivalIsAI(session, socketId), mine: mine || '' };
+  }
+
+  function emitAnnounceProgress(session) {
+    const humans = humanPairs(session);
+    let done = 0, total = 0;
+    humans.forEach(({ pair }) => { total += 2; const a = session.announcements?.get(pair.id) || {}; if (a.A) done++; if (a.B) done++; });
+    instructorSockets(session).forEach(id => io.to(id).emit('announceProgress', { round: session.currentRound, done, total, remaining: Math.max(0, Math.ceil((session.announceEndsAt - Date.now()) / 1000)) }));
+  }
+
+  function startAnnouncePhase(session) {
+    session.announcing = true;
+    session.announcements = new Map();
+    session.announceEndsAt = Date.now() + session.config.announceTime * 1000;
+    session.pairs.forEach(pair => [pair.playerA, pair.playerB].forEach(sid => io.to(sid).emit('announcePhase', announcePayloadFor(session, sid))));
+    instructorSockets(session).forEach(id => io.to(id).emit('announcePhase', { round: session.currentRound, remaining: session.config.announceTime, full: session.config.announceTime }));
+    broadcastSession(session);
+    emitAnnounceProgress(session);
+    session.timers.countdown = setInterval(() => {
+      try {
+        const remaining = Math.max(0, Math.ceil((session.announceEndsAt - Date.now()) / 1000));
+        io.to(session.code).emit('announceTimer', { remaining });
+      } catch (e) { console.error(e); }
+    }, 1000);
+    session.timers.announce = setTimeout(() => {
+      session.timers.announce = null;
+      if (session.timers.countdown) { clearInterval(session.timers.countdown); session.timers.countdown = null; }
+      try { revealAnnouncements(session); } catch (e) { console.error(`[Session ${session.code}] reveal failed:`, e); }
+      startPricePhase(session);
+    }, session.config.announceTime * 1000);
+  }
+
+  function handleAnnouncement(socket, payload) {
+    try {
+      const session = ensureSession(payload?.sessionCode);
+      const text = typeof payload?.text === 'string' ? payload.text.replace(/\s+/g, ' ').trim().slice(0, 400) : '';
+      if (!session.config.announceTime) throw new Error('This game has no announcements.');
+      if (session.status !== STATUS.RUNNING || !session.announcing) throw new Error('The announcement time is over.');
+      const sentFor = Number(payload?.round);
+      if (Number.isFinite(sentFor) && sentFor > 0 && sentFor !== session.currentRound) throw new Error('That announcement was for an earlier round.');
+      const player = session.players.get(socket.id);
+      if (!player || player.role !== 'student' || !player.pairId) throw new Error('You are not in a pair this game.');
+      const pair = session.pairs.find(p => p.id === player.pairId);
+      if (!pair) throw new Error('Pair not found');
+      if (rivalIsAI(session, socket.id)) throw new Error('Your rival this game is a computer, so there are no announcements.');
+      if (!text) throw new Error('Write your announcement first.');
+      const a = session.announcements.get(pair.id) || {};
+      a[pair.playerA === socket.id ? 'A' : 'B'] = text;
+      session.announcements.set(pair.id, a);
+      socket.emit('announcementSaved', { round: session.currentRound, text, at: Date.now() });
+      emitAnnounceProgress(session);
+    } catch (err) {
+      socket.emit('errorMessage', err.message);
+    }
+  }
+
+  // what a student has seen so far: per round, its announcement and its rival's
+  function revealedFor(session, socketId) {
+    const me = session.players.get(socketId);
+    return (me?.revealed || []).slice();
+  }
+
+  function revealAnnouncements(session) {
+    session.announcing = false;
+    const round = session.currentRound;
+    humanPairs(session).forEach(({ pair, a, b }) => {
+      const ann = session.announcements.get(pair.id) || {};
+      [[a, ann.A], [b, ann.B]].forEach(([p, text]) => {
+        if (!text) return;
+        const entry = { from: p.name, fromSocketId: p.socketId, message: text, timestamp: Date.now(), round };
+        if (!session.chatLog) session.chatLog = new Map();
+        if (!session.chatLog.has(pair.id)) session.chatLog.set(pair.id, []);
+        session.chatLog.get(pair.id).push(entry);
+        if (session.dbId) { try { db.saveChatMessage(session.dbId, { round, fromName: p.name, toName: (p === a ? b : a).name, message: text }); } catch (e) { console.error('Failed to save an announcement:', e); } }
+      });
+      [[a, ann.A, ann.B], [b, ann.B, ann.A]].forEach(([p, mine, theirs]) => {
+        p.revealed = (p.revealed || []).filter(r => r.round !== round).concat([{ round, mine: mine || '', rival: theirs || '' }]);
+        io.to(p.socketId).emit('announcementsRevealed', { revealed: p.revealed });
+      });
+    });
+    // the dashboard: every pair's announcements, round by round
+    session.announceLog = (session.announceLog || []).filter(e => e.round !== round).concat(humanPairs(session).map(({ pair, a, b }) => {
+      const ann = session.announcements.get(pair.id) || {};
+      return { round, pairId: pair.id, nameA: a.name, nameB: b.name, A: ann.A || '', B: ann.B || '' };
+    }));
+    instructorSockets(session).forEach(id => io.to(id).emit('announcementsAll', { log: session.announceLog }));
+    console.log(`[Session ${session.code}] round ${round}: announcements revealed`);
+  }
+
+  function startPricePhase(session) {
     session.roundStartTime = Date.now(); // Record when this round started
     
     // Get round time for this specific round (support array or single value)
@@ -805,6 +921,9 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
       const session = ensureSession(sessionCode);
       if (session.status !== STATUS.RUNNING) {
         throw new Error('The game is not running.');
+      }
+      if (session.announcing) {
+        throw new Error('Prices open when the announcements are revealed.');
       }
       if (!roundIsOpen(session)) {
         throw new Error('This round is over. Your price goes in when the next round starts.');
@@ -1165,7 +1284,7 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
         const messages = log.map(m => ({ round: m.round || 1, station: m.from === a.name ? 'A' : 'B', text: m.message }));
         let result;
         try {
-          const out = await reviewChat(messages);
+          const out = await reviewChat(messages, session.config.announceTime > 0 ? 'announce' : 'chat');
           result = { pairId: pair.id, nameA: a.name, nameB: b.name, ...out };
         } catch (err) {
           result = { pairId: pair.id, nameA: a.name, nameB: b.name, error: 'The AI review could not be reached. The instructor can run it again.' };
@@ -1211,6 +1330,11 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
     if (session.timers.countdown) {
       clearInterval(session.timers.countdown);
     }
+    if (session.timers.announce) {
+      clearTimeout(session.timers.announce);
+    }
+    session.timers.announce = null;
+    session.announcing = false;
     session.timers.round = null;
     session.timers.reveal = null;
     session.timers.timerBroadcast = null;
@@ -1344,6 +1468,7 @@ export function createGameManager(io, { instructorKey = '' } = {}) {
     handleStartSession,
     handlePriceSubmission,
     handleChatMessage,
+    handleAnnouncement,
     handleRerunChatReview,
     handleEndSession,
     handleDisconnect,

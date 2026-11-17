@@ -127,13 +127,14 @@ app.get('/session/:code/export', requireKey, (req, res) => {
 
     // Generate CSV. A chat game adds two columns: what the player wrote and what the rival wrote for that round (the
     // round being played, or the break before it), messages joined by " | " (2026-11-11)
-    const chat = sessionData.config?.enableChat ? db.getChatMessages(code) : null;
+    const announce = sessionData.config?.announceTime > 0;
+    const chat = sessionData.config?.enableChat || announce ? db.getChatMessages(code) : null;
     const said = (round, name) => chat.filter(m => m.round === round && m.from === name).map(m => m.message).join(' | ');
     // "Random Price": Yes when the student sent no price and the game gave a random one at the deadline (2026-11-11)
     // a game with the AI legal review adds its verdict for the pair, the rule and the reason (2026-11-16)
     const reviews = sessionData.config?.aiChatReview ? (sessionData.chatReviews || []) : null;
     const reviewOf = name => reviews.find(r => r.nameA === name || r.nameB === name);
-    let csv = 'Round,Player Name,Price,Random Price,Opponent Name,Opponent Price,Opponent Random Price,Quantity,Profit,Market Share' + (chat ? ',Chat Sent,Chat Received' : '') + (reviews ? ',AI Verdict,AI Rule,AI Reason' : '') + '\n';
+    let csv = 'Round,Player Name,Price,Random Price,Opponent Name,Opponent Price,Opponent Random Price,Quantity,Profit,Market Share' + (chat ? (announce ? ',Announcement,Rival Announcement' : ',Chat Sent,Chat Received') : '') + (reviews ? ',AI Verdict,AI Rule,AI Reason' : '') + '\n';
     sessionData.rounds.forEach(round => {
       round.results.forEach(result => {
         csv += `${round.round},${csvCell(result.playerName)},${result.price},${result.forced ? 'Yes' : 'No'},${csvCell(result.opponentName)},${result.opponentPrice},${result.opponentForced ? 'Yes' : 'No'},${Number(result.demand).toFixed(2)},${Number(result.profit).toFixed(2)},${(Number(result.marketShare) * 100).toFixed(2)}%`
@@ -178,6 +179,7 @@ io.on('connection', socket => {
   safe('startSession', ({ sessionCode }) => manager.handleStartSession(socket, sessionCode));
   safe('submitPrice', payload => manager.handlePriceSubmission(socket, payload));
   safe('chatMessage', payload => manager.handleChatMessage(socket, payload));
+  safe('announce', payload => manager.handleAnnouncement(socket, payload));
   safe('rerunChatReview', ({ sessionCode }) => manager.handleRerunChatReview(socket, sessionCode));
   safe('endSession', ({ sessionCode }) => manager.handleEndSession(socket, sessionCode));
   safe('heartbeat', () => manager.handleHeartbeat(socket.id));

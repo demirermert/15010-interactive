@@ -25,10 +25,15 @@ Apply exactly the law and the decision rule you are given. Answer with one JSON 
  "reason": two or three plain sentences for the students saying why, naming the stations as Station A and Station B and citing the rule,
  "evidence": up to three of the messages that decide it, each {"round": number, "station": "A" or "B", "text": the message copied exactly}; an empty list when nothing in the chat is about prices}`;
 
-// messages: [{ round, station: 'A'|'B', text }]
-function transcript(messages) {
-  return messages.map(m => `Round ${m.round}, Station ${m.station}: ${m.text}`).join('\n');
+// messages: [{ round, station: 'A'|'B', text }]; mode 'chat' (messages between the stations) or 'announce' (one
+// public announcement per station per round, 2026-11-16)
+function transcript(messages, mode) {
+  return messages.map(m => `Round ${m.round}, Station ${m.station}${mode === 'announce' ? ' announced' : ''}: ${m.text}`).join('\n');
 }
+const HEAD = {
+  chat: 'THE MESSAGES (oldest first)',
+  announce: 'THE ANNOUNCEMENTS (each station published one public announcement per round before setting its price; each saw the other\'s only after both were published). Apply the section "Public announcements (the announcement game)" and its decision rule.'
+};
 
 function parse(text) {
   const m = /\{[\s\S]*\}/.exec(text || '');
@@ -42,8 +47,10 @@ function parse(text) {
 
 // One pair. Returns { verdict, crossedBy, rule, reason, evidence: [{ round, station, text }] }; throws when the model
 // cannot be reached or answers nonsense twice.
-export async function reviewChat(messages) {
-  if (!messages.length) return { verdict: 'Legal', crossedBy: 'neither', rule: 'No messages', reason: 'The two stations sent each other no messages, so there was no communication to review.', evidence: [] };
+export async function reviewChat(messages, mode = 'chat') {
+  if (!messages.length) return mode === 'announce'
+    ? { verdict: 'Legal', crossedBy: 'neither', rule: 'No announcements', reason: 'Neither station made an announcement, so there was nothing to review.', evidence: [] }
+    : { verdict: 'Legal', crossedBy: 'neither', rule: 'No messages', reason: 'The two stations sent each other no messages, so there was no communication to review.', evidence: [] };
   if (!client) throw new Error('No OpenAI key on this server');
   let lastErr;
   // up to four tries: about one answer in ten came back without the JSON (2026-11-16)
@@ -53,7 +60,7 @@ export async function reviewChat(messages) {
         model: MODEL,
         messages: [
           { role: 'system', content: SYSTEM },
-          { role: 'user', content: `THE LAW\n\n${LAW_TEXT}\n\nTHE MESSAGES (oldest first)\n\n${transcript(messages)}` }
+          { role: 'user', content: `THE LAW\n\n${LAW_TEXT}\n\n${HEAD[mode] || HEAD.chat}\n\n${transcript(messages, mode)}` }
         ],
         response_format: { type: 'json_object' },
         ...(/gpt-[5-9]|o[1-9]/.test(MODEL) ? { max_completion_tokens: 4000, reasoning_effort: 'low' } : { temperature: 0, max_tokens: 600 })

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { RoundsChart, PairBars, PairDots } from '../charts.jsx';
 import { money, priceFmt } from '../econ.js';
@@ -74,6 +74,9 @@ export function InstructorDashboard({
   nextRoundCountdown,
   submissionProgress,
   chatReview,
+  announce,
+  announceProgress,
+  announceLog,
   onRerunReview
 }) {
   const navigate = useNavigate();
@@ -83,6 +86,14 @@ export function InstructorDashboard({
   const [selectedPair, setSelectedPair] = useState(null);
   const [hover, setHover] = useState(null); // { key, x, y }: the pair under the mouse, for the floating history box
   const [tab, setTab] = useState('results');
+  // the announcement phase's clock ticks on the dashboard too (2026-11-16)
+  const [nowTick, setNowTick] = useState(Date.now());
+  useEffect(() => { if (!announce) return undefined; const t = setInterval(() => setNowTick(Date.now()), 250); return () => clearInterval(t); }, [announce]);
+  const isAnnounce = (session?.config?.announceTime || 0) > 0;
+  // every pair's announcements: live from the server, or after a reload of a finished game from the review's chats
+  const annLog = (announceLog || []).length ? announceLog
+    : (chatReview?.results || []).flatMap(r => [...new Set((r.messages || []).map(m => m.round))].map(round => ({ round, pairId: r.pairId, nameA: r.nameA, nameB: r.nameB,
+      A: (r.messages.find(m => m.round === round && m.station === 'A') || {}).text || '', B: (r.messages.find(m => m.round === round && m.station === 'B') || {}).text || '' })));
   const reviewBadge = chatReview?.status === 'running' ? `reviewing ${chatReview.done} of ${chatReview.total}`
     : chatReview?.status === 'done' ? `${chatReview.results.filter(r => r.verdict === 'Illegal').length} illegal of ${chatReview.results.length}` : '';
   const onHover = (key, e) => setHover(key ? { key, x: e.clientX, y: e.clientY } : null);
@@ -171,6 +182,26 @@ export function InstructorDashboard({
         </div>
       </div>
     );
+  } else if (status === 'running' && announce) {
+    const left = Math.max(0, Math.ceil((announce.endsAt - nowTick) / 1000));
+    const ap = announceProgress && announceProgress.round === announce.round ? announceProgress : null;
+    state = (
+      <div className="state">
+        <div>
+          <div className="k">Round</div>
+          <div className="n">{announce.round}{rounds ? <small> of {rounds}</small> : null}</div>
+        </div>
+        <div>
+          <div className="k">Announcements revealed in</div>
+          <div className={`n${left <= 10 ? ' low' : ''}`} id="announce-clock">{Math.floor(left / 60)}:{String(left % 60).padStart(2, '0')}</div>
+        </div>
+        <div>
+          <div className="k">Announcements in</div>
+          <div className="n">{ap ? ap.done : '–'}<small>{ap ? ` of ${ap.total}` : ''}</small></div>
+          <div className="track"><div className={`fill${ap && ap.done >= ap.total ? ' ok' : ''}`} style={{ width: `${ap && ap.total ? (ap.done / ap.total) * 100 : 0}%` }} /></div>
+        </div>
+      </div>
+    );
   } else if (status === 'running') {
     const sub = submissionProgress && submissionProgress.round === current ? submissionProgress : null;
     const share = sub && sub.total ? sub.submitted / sub.total : 0;
@@ -247,6 +278,8 @@ export function InstructorDashboard({
             </div>
           )}
 
+          {isAnnounce && <AnnouncementsPanel log={annLog} status={status} />}
+
           <section className="panel wide">
             <div className="section-label">Average price across rounds</div>
             <div className="qtext">The average price the room set in each round; the band is one standard deviation either side.</div>
@@ -306,7 +339,7 @@ export function InstructorDashboard({
             )}
           </section>
 
-          {config?.aiChatReview && <ReviewPanel review={chatReview} pairTotals={pairTotals} status={status} onRerun={onRerunReview} />}
+          {config?.aiChatReview && <ReviewPanel review={chatReview} pairTotals={pairTotals} status={status} onRerun={onRerunReview} mode={isAnnounce ? 'announce' : 'chat'} />}
 
           {/* one market, chosen by name (Mert, 2026-11-11) */}
           <section className="panel wide">
@@ -389,7 +422,39 @@ export function InstructorDashboard({
 
 // The AI legal review of the chats (Mert, 2026-11-16): the counts, prices in illegal vs legal markets, and every pair's
 // verdict, rule and reason; a row opens the quoted lines and the whole chat.
-function ReviewPanel({ review, pairTotals, status, onRerun }) {
+// every pair's announcements, newest round first (Mert, 2026-11-16: "in the dashboard we'll also show the announcements")
+function AnnouncementsPanel({ log, status }) {
+  const [q, setQ] = useState('');
+  const rounds = [...new Set((log || []).map(e => e.round))].sort((a, b) => b - a);
+  const match = e => !q || `${e.nameA} ${e.nameB} ${e.A} ${e.B}`.toLowerCase().includes(q.toLowerCase());
+  return (
+    <section className="panel wide announcements" id="announcements-panel">
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="section-label">Announcements</div>
+        <input className="search" placeholder="Find a name or a word" value={q} onChange={e => setQ(e.target.value)} />
+      </div>
+      <div className="qtext">Each pair's two announcements, revealed together when the announcement time ends.</div>
+      {rounds.length === 0 ? <div className="empty-note">{status === 'running' ? 'The first announcements appear here when they are revealed.' : 'Appears when the first announcements are revealed.'}</div>
+        : rounds.map(r => (
+          <div key={r}>
+            <div className="an-round">Round {r}</div>
+            <table className="res an-table">
+              <tbody>
+                {(log || []).filter(e => e.round === r && match(e)).map(e => (
+                  <tr key={e.pairId}>
+                    <td className="nm a">{e.nameA}</td><td className="tx">{e.A ? `"${e.A}"` : <i>No announcement</i>}</td>
+                    <td className="nm b">{e.nameB}</td><td className="tx">{e.B ? `"${e.B}"` : <i>No announcement</i>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ))}
+    </section>
+  );
+}
+
+function ReviewPanel({ review, pairTotals, status, onRerun, mode = 'chat' }) {
   const [open, setOpen] = useState(null);
   const results = review?.results || [];
   const running = review?.status === 'running';
@@ -410,10 +475,10 @@ function ReviewPanel({ review, pairTotals, status, onRerun }) {
   return (
     <section className="panel wide review">
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-        <div className="section-label">AI legal review of the chats</div>
+        <div className="section-label">AI legal review of the {mode === 'announce' ? 'announcements' : 'chats'}</div>
         {status === 'complete' && !running && review && <button className="btn" onClick={onRerun}>Review again</button>}
       </div>
-      <div className="qtext">Each pair's chat, judged by the AI against U.S. antitrust law (the Sherman Act and the FTC's rule on invitations to collude). Click a pair for the AI's reasoning and the whole chat. Students see their own pair's verdict on the phone.</div>
+      <div className="qtext">Each pair's {mode === 'announce' ? 'announcements' : 'chat'}, judged by the AI against U.S. antitrust law (the Sherman Act and the FTC's rule on invitations to collude). Click a pair for the AI's reasoning and the whole {mode === 'announce' ? 'set of announcements' : 'chat'}. Students see their own pair's verdict on the phone.</div>
       {status !== 'complete' ? <div className="empty-note">Runs when the game ends.</div>
       : !review || review.status === 'none' ? <div className="empty-note">Starting the review...</div> : (
         <>
