@@ -291,3 +291,18 @@ body{margin:0;font:16px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,s
 .dash .announcements .an-tip th{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);text-align:left;padding:2px 6px}
 .dash .announcements .an-tip td{padding:3px 6px;border-top:1px solid #f0f1f3;white-space:nowrap;width:auto}
 .dash .announcements .an-tip tr.cur td{background:#eef3fa;font-weight:700}
+
+/* the Announcements panel: views, sortable columns, total profit (2026-11-17) */
+.dash .announcements .an-views{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.dash .announcements .an-views button{font:inherit;font-size:13px;font-weight:600;border:0;background:#fff;color:var(--muted);padding:5px 12px;cursor:pointer}
+.dash .announcements .an-views button.on{background:var(--navy);color:#fff}
+.dash .announcements .an-table th{white-space:nowrap}
+.dash .announcements .an-table th.nm{width:11%}.dash .announcements .an-table th.tx{width:29%}
+.dash .announcements .an-table th.vt{width:9%;text-align:right}.dash .announcements .an-table th.pf{width:11%;text-align:right}
+.dash .announcements .an-table th.rd{width:6%}
+.dash .announcements .an-table th.srt{cursor:pointer;color:var(--navy)}.dash .announcements .an-table th.srt:hover{text-decoration:underline}
+.dash .announcements .an-table td.pf{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;vertical-align:middle}
+.dash .announcements .an-table td.rd{color:var(--muted);font-weight:600;font-size:13px}
+.dash .announcements .an-pairs td.vt{vertical-align:middle}
+.dash .announcements .an-pairs tbody.an-pair-block{border-top:2px solid var(--line)}
+.dash .announcements .an-pairs tbody.an-pair-block tr:first-child td{border-top:2px solid #e3e6ea}

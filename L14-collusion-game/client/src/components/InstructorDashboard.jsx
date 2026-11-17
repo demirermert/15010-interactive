@@ -465,30 +465,85 @@ function AnnouncementsPanel({ log, status, review, byRound, config }) {
     return bad ? <span className="an-tag bad">Illegal</span> : r.verdict === 'Legal' ? <span className="an-tag good">Legal</span> : null; };
   const rounds = [...new Set((log || []).map(e => e.round))].sort((a, b) => b - a);
   const match = e => !q || `${e.nameA} ${e.nameB} ${e.A} ${e.B}`.toLowerCase().includes(q.toLowerCase());
+  // the pair's total profit over the game: both stations added up (Mert, 2026-11-17)
+  const pairProfit = e => (byRound || []).reduce((sum, r) => {
+    const p = (r.results || []).find(x => [x.playerA?.name, x.playerB?.name].includes(e.nameA) && [x.playerA?.name, x.playerB?.name].includes(e.nameB));
+    return sum + (Number(p?.playerA?.profit) || 0) + (Number(p?.playerB?.profit) || 0);
+  }, 0);
+  // views and sorting (Mert, 2026-11-17): by round (sorting inside each round) or by pair; sort by verdict or total profit
+  const [view, setView] = useState('round');
+  const [sort, setSort] = useState({ key: null, dir: -1 });
+  const sortBy = key => setSort(s => (s.key === key ? { key, dir: -s.dir } : { key, dir: -1 }));
+  const arrow = key => (sort.key === key ? (sort.dir < 0 ? ' ▼' : ' ▲') : '');
+  const verdictRank = e => { const r = resultOf(e); const bad = illegal(e, 'A') || illegal(e, 'B'); return r?.verdict === 'Illegal' ? (bad ? 3 : 2) : r?.verdict === 'Legal' ? 1 : 0; };
+  const pairRank = e => { const r = resultOf(e); return r?.verdict === 'Illegal' ? 2 : r?.verdict === 'Legal' ? 1 : 0; };
+  const order = (list, rank) => {
+    if (!sort.key) return list;
+    const val = sort.key === 'profit' ? pairProfit : rank;
+    return [...list].sort((x, y) => sort.dir * (val(x) - val(y)) || pairProfit(y) - pairProfit(x));
+  };
+  const textCell = (e, st) => <td className={`tx${illegal(e, st) ? ' ill' : ''}`}>{e[st] ? `"${e[st]}"` : <i>No announcement</i>}</td>;
+  const head = withRound => (
+    <thead><tr>
+      {withRound && <th className="rd">Round</th>}
+      <th className="nm">Station A</th><th className="tx">Announcement</th><th className="nm">Station B</th><th className="tx">Announcement</th>
+      <th className="vt srt" onClick={() => sortBy('verdict')}>Verdict{arrow('verdict')}</th>
+      <th className="pf srt" onClick={() => sortBy('profit')}>Total profit{arrow('profit')}</th>
+    </tr></thead>
+  );
+  // the pairs, in the order of their first appearance, each with its rounds
+  const pairsList = [...new Map((log || []).map(e => [e.pairId, e])).values()];
+  const roundsOf = pe => (log || []).filter(e => e.pairId === pe.pairId).sort((a, b) => a.round - b.round);
+  const pairVerdict = pe => { const r = resultOf(pe); return r?.verdict ? <span className={`an-tag ${r.verdict === 'Illegal' ? 'bad' : 'good'}`}>{r.verdict}</span> : null; };
   return (
     <section className="panel wide announcements" id="announcements-panel">
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-        <div className="section-label">Announcements</div>
+        <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+          <div className="section-label">Announcements</div>
+          <div className="an-views">
+            <button className={view === 'round' ? 'on' : ''} id="an-view-round" onClick={() => setView('round')}>By round</button>
+            <button className={view === 'pair' ? 'on' : ''} id="an-view-pair" onClick={() => setView('pair')}>By pair</button>
+          </div>
+        </div>
         <input className="search" placeholder="Find a name or a word" value={q} onChange={e => setQ(e.target.value)} />
       </div>
-      <div className="qtext">Each pair's two announcements, revealed together when the announcement time ends.{(review?.results || []).length ? ' After the AI review, the announcements it found illegal are in red, and each pair has its verdict.' : ''}</div>
+      <div className="qtext">Each pair's two announcements, revealed together when the announcement time ends.{(review?.results || []).length ? ' After the AI review, the announcements it found illegal are in red, and each pair has its verdict.' : ''} Click Verdict or Total profit to sort{view === 'round' ? ' (within each round)' : ''}; hover a name for that student's prices.</div>
       {rounds.length === 0 ? <div className="empty-note">{status === 'running' ? 'The first announcements appear here when they are revealed.' : 'Appears when the first announcements are revealed.'}</div>
-        : rounds.map(r => (
+        : view === 'round' ? rounds.map(r => (
           <div key={r}>
             <div className="an-round">Round {r}</div>
             <table className="res an-table">
+              {head(false)}
               <tbody>
-                {(log || []).filter(e => e.round === r && match(e)).map(e => (
+                {order((log || []).filter(e => e.round === r && match(e)), verdictRank).map(e => (
                   <tr key={e.pairId}>
-                    <NameCell name={e.nameA} side="a" round={e.round} /><td className={`tx${illegal(e, 'A') ? ' ill' : ''}`}>{e.A ? `"${e.A}"` : <i>No announcement</i>}</td>
-                    <NameCell name={e.nameB} side="b" round={e.round} /><td className={`tx${illegal(e, 'B') ? ' ill' : ''}`}>{e.B ? `"${e.B}"` : <i>No announcement</i>}</td>
+                    <NameCell name={e.nameA} side="a" round={e.round} />{textCell(e, 'A')}
+                    <NameCell name={e.nameB} side="b" round={e.round} />{textCell(e, 'B')}
                     <td className="vt">{pairTag(e)}</td>
+                    <td className="pf">{money(pairProfit(e))}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        ))}
+        )) : (
+          <table className="res an-table an-pairs">
+            {head(true)}
+            {order(pairsList.filter(pe => roundsOf(pe).some(match)), pairRank).map(pe => (
+              <tbody key={pe.pairId} className="an-pair-block">
+                {roundsOf(pe).map((e, k) => (
+                  <tr key={e.round}>
+                    <td className="rd">{e.round}</td>
+                    <NameCell name={e.nameA} side="a" round={e.round} />{textCell(e, 'A')}
+                    <NameCell name={e.nameB} side="b" round={e.round} />{textCell(e, 'B')}
+                    {k === 0 && <td className="vt" rowSpan={roundsOf(pe).length}>{pairVerdict(pe)}</td>}
+                    {k === 0 && <td className="pf" rowSpan={roundsOf(pe).length}>{money(pairProfit(pe))}</td>}
+                  </tr>
+                ))}
+              </tbody>
+            ))}
+          </table>
+        )}
     </section>
   );
 }
