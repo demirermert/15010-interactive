@@ -86,6 +86,7 @@ export function InstructorDashboard({
   const [selectedPair, setSelectedPair] = useState(null);
   const [hover, setHover] = useState(null); // { key, x, y }: the pair under the mouse, for the floating history box
   const [tab, setTab] = useState('results');
+  const [showAvg, setShowAvg] = useState(false); // the average-price chart, closed at first
   // the announcement phase's clock ticks on the dashboard too (2026-11-16)
   const [nowTick, setNowTick] = useState(Date.now());
   useEffect(() => { if (!announce) return undefined; const t = setInterval(() => setNowTick(Date.now()), 250); return () => clearInterval(t); }, [announce]);
@@ -281,7 +282,12 @@ export function InstructorDashboard({
           {isAnnounce && <AnnouncementsPanel log={annLog} status={status} review={chatReview} byRound={byRound} config={config} />}
 
           <section className="panel wide">
-            <div className="section-label">Average price across rounds</div>
+            {/* collapsible, closed at first (Mert, 2026-11-17) */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+              <div className="section-label" style={{ margin: 0 }}>Average price across rounds</div>
+              <button className="btn" id="avg-toggle" onClick={() => setShowAvg(v => !v)}>{showAvg ? 'Hide' : 'Show'}</button>
+            </div>
+            {!showAvg ? null : <>
             <div className="qtext">The average price the room set in each round; the band is one standard deviation either side.</div>
             {byRound.length === 0 ? <div className="empty-note">The first round's prices appear here when it ends.</div> : (
               <>
@@ -294,6 +300,7 @@ export function InstructorDashboard({
                 </div>
               </>
             )}
+            </>}
           </section>
 
           <section className="panel">
