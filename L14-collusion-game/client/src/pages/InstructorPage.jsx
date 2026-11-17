@@ -37,9 +37,9 @@ export const DEFAULT_GAMES = [
   // Game 3: a tiny driving cost (0.02 cents a mile, Mert 2026-11-11) so the Nash price is $3.32, just above cost
   { base: 'default', label: 'Game 3', cfg: { travelCost: 0.0002, roundTimes: [45, 30, 30, 30, 30, 30, 30, 30, 30, 30] } },
   // with the AI legal review of the chats on (Mert, 2026-11-16)
-  { base: 'default-chat', label: 'Bonus game with chat', cfg: { travelCost: 0.004, enableChat: true, aiChatReview: true, rounds: 5, differentTimePerRound: true, roundTime: 60, roundTimes: [60, 60, 60, 60, 60] } },
+  { base: 'default-chat', label: 'Bonus game with chat', cfg: { travelCost: 0.004, enableChat: true, aiChatReview: true, showModelParameters: true, rounds: 5, differentTimePerRound: true, roundTime: 60, roundTimes: [60, 60, 60, 60, 60] } },
   // the announcement game (Mert, 2026-11-16): 2 rounds; each a 2-minute public announcement, the reveal, then 1 minute for the price
-  { base: 'default-announce', label: 'Announcement game', cfg: { travelCost: 0.004, enableChat: false, announceTime: 120, aiChatReview: true, rounds: 2, differentTimePerRound: true, roundTime: 60, roundTimes: [60, 60] } }
+  { base: 'default-announce', label: 'Announcement game', cfg: { travelCost: 0.004, enableChat: false, announceTime: 120, aiChatReview: true, showModelParameters: true, rounds: 2, differentTimePerRound: true, roundTime: 60, roundTimes: [60, 60] } }
 ];
 
 const DEFAULT_CONFIG = {

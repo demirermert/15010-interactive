@@ -46,8 +46,16 @@ function Rules({ config }) {
   const secs = Array.isArray(t) ? null : t;
   const cost = Number(config?.marginalCost) || 0;
   const drive = Number(config?.travelCost) || 0;
+  const ann = config?.announceTime > 0;
+  const annLen = ann ? (config.announceTime % 60 === 0 ? `${config.announceTime / 60} minute${config.announceTime === 60 ? '' : 's'}` : `${config.announceTime} seconds`) : '';
+  const priceSecs = Array.isArray(t) ? t[0] : t;
   return (
     <div className="story">
+      {/* the announcement game: the announcements first (Mert, 2026-11-17) */}
+      {ann && <p className="ann-rule"><b>This game has public announcements.</b> Each round starts with <b>{annLen}</b> in which you
+        publish one <b>public announcement</b>, like a press release to the market. When the time is up you see your rival's
+        announcement and your rival sees yours; then you have <b>{priceSecs} seconds</b> to set your price. Announcements are saved with
+        the results{config?.aiChatReview ? ' and reviewed by an AI against U.S. antitrust law after the game' : ''}.</p>}
       <p>You and another student each run a gas station on the same road. {rounds}</p>
       <p>Each round, you and your rival <b>set your price per gallon at the same time</b>{secs ? <>, within <b>{secs} seconds</b></> : null}.
         Drivers along the road fill up where it is cheapest for them, counting the price at the pump and the drive to get
@@ -62,12 +70,20 @@ function Rules({ config }) {
       )}
       <p><b>Your cost is {priceFmt(cost, config)} per gallon</b> (the wholesale price plus taxes, delivery and card fees), the same
         for your rival.</p>
+      {/* the numbers in one place (Mert, 2026-11-17: "give the parameters, consumers' WTP etc in how it works") */}
+      {hot && config?.showModelParameters && (
+        <ul className="nums">
+          <li><b>Drivers' willingness to pay:</b> {priceFmt(config.consumerValue, config)} a gallon, drive included</li>
+          <li><b>Driving cost:</b> {perMile(drive)}</li>
+          <li><b>Your cost:</b> {priceFmt(cost, config)} a gallon, the same for your rival</li>
+          <li><b>Market:</b> {Number(config.marketSize || 0).toLocaleString('en-US')} gallons a round when every driver buys, on a {100}-mile road with a station at {Math.min(Number(config.x1), Number(config.x2)) === 0 && Math.max(Number(config.x1), Number(config.x2)) === 100 ? 'each end' : `mile ${config.x1} and mile ${config.x2}`}</li>
+          <li><b>Prices:</b> between {priceFmt(config.priceBounds?.min, config)} and {priceFmt(config.priceBounds?.max, config)} a gallon</li>
+        </ul>
+      )}
       <p><b>Your goal:</b> the most total profit over all rounds, not the most gallons.</p>
       <p>After each round you see your rival's price, both market shares and both profits.</p>
       {config?.announceTime > 0
-        ? <p><b>Announcements.</b> Before each round's price you have <b>{Math.round(config.announceTime / 60 * 10) / 10 === Math.round(config.announceTime / 60) ? `${Math.round(config.announceTime / 60)} minute${Math.round(config.announceTime / 60) === 1 ? '' : 's'}` : `${config.announceTime} seconds`}</b> to
-          publish one <b>public announcement</b>, as a press release to the market. When the time is up, you see your rival's announcement and
-          your rival sees yours; then you have {secs ? <b>{secs} seconds</b> : 'the round'} to set your price. Announcements are saved with the results{config?.aiChatReview ? ' and reviewed by an AI against U.S. antitrust law after the game' : ''}.</p>
+        ? null
         : config?.enableChat
         ? <p><b>In this game you can chat with your rival</b> in the chat box. What you write is saved with the results.</p>
         : <p style={{ color: '#8a1c2c' }}><b>No communication with your rival.</b></p>}
