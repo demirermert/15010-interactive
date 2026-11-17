@@ -306,3 +306,6 @@ body{margin:0;font:16px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,s
 .dash .announcements .an-pairs td.vt{vertical-align:middle}
 .dash .announcements .an-pairs tbody.an-pair-block{border-top:2px solid var(--line)}
 .dash .announcements .an-pairs tbody.an-pair-block tr:first-child td{border-top:2px solid #e3e6ea}
+
+/* the review's summary on top of Game results (2026-11-17) */
+.dash .rsum .rv-stats{margin-bottom:0}

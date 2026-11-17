@@ -279,6 +279,11 @@ export function InstructorDashboard({
             </div>
           )}
 
+          {config?.aiChatReview && status === 'complete' && chatReview && chatReview.status !== 'none' && (
+            <section className="panel wide rsum" id="review-summary">
+              <div className="review"><ReviewSummary review={chatReview} pairTotals={pairTotals} status={status} onRerun={onRerunReview} mode={isAnnounce ? 'announce' : 'chat'} /></div>
+            </section>
+          )}
           {isAnnounce && <AnnouncementsPanel log={annLog} status={status} review={chatReview} byRound={byRound} config={config} />}
 
           <section className="panel wide">
@@ -514,7 +519,6 @@ function AnnouncementsPanel({ log, status, review, byRound, config }) {
         </div>
         <input className="search" placeholder="Find a name or a word" value={q} onChange={e => setQ(e.target.value)} />
       </div>
-      <div className="qtext">Each pair's two announcements, revealed together when the announcement time ends.{(review?.results || []).length ? ' After the AI review, the announcements it found illegal are in red, and each pair has its verdict.' : ''} Click Verdict or Total profit to sort{view === 'round' ? ' (within each round)' : ''}; hover a name for that student's prices.</div>
       {rounds.length === 0 ? <div className="empty-note">{status === 'running' ? 'The first announcements appear here when they are revealed.' : 'Appears when the first announcements are revealed.'}</div>
         : view === 'round' ? rounds.map(r => (
           <div key={r}>
@@ -552,6 +556,34 @@ function AnnouncementsPanel({ log, status, review, byRound, config }) {
           </table>
         )}
     </section>
+  );
+}
+
+// the review's header, its line and the four boxes, on top of Game results (Mert, 2026-11-17)
+function ReviewSummary({ review, pairTotals, status, onRerun, mode = 'chat' }) {
+  const results = review?.results || [];
+  const running = review?.status === 'running';
+  const pairOf = r => pairTotals.find(p => p.key === r.pairId || p.key === [r.nameA, r.nameB].sort().join(' | '));
+  const mean = (rows, f) => { const v = rows.flatMap(r => { const p = pairOf(r); return p ? f(p) : []; }).filter(Number.isFinite); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+  const ill = results.filter(r => r.verdict === 'Illegal'), leg = results.filter(r => r.verdict === 'Legal'), failed = results.filter(r => !r.verdict);
+  const price = rows => mean(rows, p => [...p.pricesA, ...p.pricesB]), profit = rows => mean(rows, p => [p.a, p.b]);
+  const fmt = v => (v == null ? '-' : '$' + v.toFixed(2));
+  return (
+    <>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="section-label">AI legal review of the {mode === 'announce' ? 'announcements' : 'chats'}</div>
+        {status === 'complete' && !running && <button className="btn" onClick={onRerun}>Review again</button>}
+      </div>
+      <div className="qtext">Each pair's {mode === 'announce' ? 'announcements' : 'chat'}, judged by the AI against U.S. antitrust law (the Sherman Act and the FTC's rule on invitations to collude). The AI legal review tab has every pair with the AI's reasoning. Students see their own pair's verdict on the phone.</div>
+      {running && <div className="fb info">Reviewing: {review.done} of {review.total} pairs done</div>}
+      <div className="rv-stats">
+        <div className="rv-box bad"><div className="n">{ill.length}</div><div className="l">Illegal</div></div>
+        <div className="rv-box good"><div className="n">{leg.length}</div><div className="l">Legal</div></div>
+        {failed.length > 0 && <div className="rv-box"><div className="n">{failed.length}</div><div className="l">Not reviewed</div></div>}
+        <div className="rv-box"><div className="n">{fmt(price(ill))} <small>vs</small> {fmt(price(leg))}</div><div className="l">Average price, illegal vs legal markets</div></div>
+        <div className="rv-box"><div className="n">{profit(ill) == null ? '-' : money(profit(ill))} <small>vs</small> {profit(leg) == null ? '-' : money(profit(leg))}</div><div className="l">Total profit per station, illegal vs legal</div></div>
+      </div>
+    </>
   );
 }
 
