@@ -523,7 +523,7 @@ function ReviewPanel({ review, pairTotals, status, onRerun, mode = 'chat' }) {
                       <tr className="rv-open"><td colSpan={4}>
                         {/* the AI writes Station A / B (it never sees names); here the names go back in */}
                         {r.reason && <div className="rv-reason"><b>The AI's reasoning</b>{r.reason.replace(/Station A\b/g, r.nameA).replace(/Station B\b/g, r.nameB)}</div>}
-                        <div className="rv-chat"><b>The whole chat</b>{(r.messages || []).length === 0 ? <div>No messages.</div> : r.messages.map((m, i) => <div key={i} className={m.station === 'A' ? 'a' : 'b'}><span>R{m.round} {nameOf(r, m.station)}</span>{m.text}</div>)}</div>
+                        <div className="rv-chat"><b>{mode === 'announce' ? 'All announcements' : 'The whole chat'}</b>{(r.messages || []).length === 0 ? <div>{mode === 'announce' ? 'No announcements.' : 'No messages.'}</div> : r.messages.map((m, i) => <div key={i} className={m.station === 'A' ? 'a' : 'b'}><span>R{m.round} {nameOf(r, m.station)}</span>{m.text}</div>)}</div>
                       </td></tr>
                     )}
                   </React.Fragment>
