@@ -157,6 +157,8 @@ export function announceWords(config) {
   const a = config?.announceTime;
   if (!Array.isArray(a)) return secsWords(Number(a) || 0);
   if (a.every(v => Number(v) === Number(a[0]))) return secsWords(Number(a[0]));
+  // two times: the second one holds for every later round, said without naming the last round (Ellen, 2026-11-18)
+  if (a.length === 2) return `${secsWords(Number(a[0]))} in round 1 and ${secsWords(Number(a[1]))} in all subsequent rounds`;
   const parts = a.map((v, i) => `${secsWords(Number(v))} in round ${i + 1}`);
   return parts.length === 2 ? parts.join(' and ') : parts.slice(0, -1).join(', ') + ' and ' + parts[parts.length - 1];
 }
